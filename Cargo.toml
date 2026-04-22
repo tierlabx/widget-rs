@@ -1,0 +1,21 @@
+[package]
+name = "widget-rs"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+slint = { version = "1.8.0", features = ["raw-window-handle-06"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+directories = "5.0"
+tray-icon = "0.14"
+tao = "0.28"
+raw-window-handle = "0.6"
+windows-sys = { version = "0.52", features = [
+    "Win32_Foundation",
+    "Win32_UI_WindowsAndMessaging",
+    "Win32_System_Threading",
+] }
+
+[build-dependencies]
+slint-build = "1.8.0"

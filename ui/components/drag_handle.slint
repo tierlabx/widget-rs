@@ -1,0 +1,54 @@
+import { Theme } from "../theme.slint";
+
+export component DragHandle inherits Rectangle {
+    in property <string> title: "";
+    callback close-clicked();
+
+    height: 32px;
+    background: transparent;
+
+    HorizontalLayout {
+        padding-left: Theme.spacing-small;
+        padding-right: Theme.spacing-small;
+        alignment: space-between;
+
+        Text {
+            text: root.title;
+            color: Theme.text-secondary;
+            font-size: Theme.font-size-small;
+            vertical-alignment: center;
+        }
+
+        // Close button
+        Rectangle {
+            width: 24px;
+            height: 24px;
+            border-radius: 12px;
+            background: close-touch.has-hover ? #ff4444.transparentize(0.2) : transparent;
+            
+            Text {
+                text: "x";
+                color: close-touch.has-hover ? #ffffff : Theme.text-secondary;
+                horizontal-alignment: center;
+                vertical-alignment: center;
+                font-size: Theme.font-size-regular;
+            }
+
+            close-touch := TouchArea {
+                clicked => { root.close-clicked(); }
+            }
+        }
+    }
+
+    // This area is meant for dragging the window.
+    // In Slint 1.8, Window dragging might require calling window.start_window_drag() via Rust, 
+    // or we can use the WindowItem? We'll just define the touch area here.
+    TouchArea {
+        // Leave the close button clickable by putting this under or using a smaller width?
+        // Actually, z-index matters. The HorizontalLayout is above us.
+        x: 0; y: 0;
+        width: parent.width - 32px;
+        height: parent.height;
+        // callback drag-started();
+    }
+}

@@ -1,0 +1,255 @@
+import { Theme } from "theme.slint";
+import { Button } from "components/button.slint";
+import { Card } from "components/card.slint";
+
+export component MainWindow inherits Window {
+    width: 960px;
+    height: 640px;
+    background: Theme.background;
+    title: "Widget RS — Control Center";
+
+    HorizontalLayout {
+        padding: 0px;
+        spacing: 0px;
+
+        // ─── 左侧导航栏 ───────────────────────────────────────
+        Rectangle {
+            width: 220px;
+            background: Theme.surface;
+            border-width: 0px;
+
+            VerticalLayout {
+                padding: 24px;
+                spacing: 6px;
+                alignment: start;
+
+                // Logo 区
+                Text {
+                    text: "VoltAgent";
+                    color: Theme.primary;
+                    font-size: 22px;
+                    font-weight: 800;
+                }
+                Text {
+                    text: "Widget RS v0.1";
+                    color: Theme.text-secondary;
+                    font-size: 11px;
+                }
+
+                Rectangle { height: 24px; }  // 分隔
+
+                // 导航菜单
+                Rectangle { height: 4px; }
+                Text {
+                    text: "MENU";
+                    color: Theme.text-secondary;
+                    font-size: 10px;
+                    font-weight: 700;
+                    letter-spacing: 1.5px;
+                }
+
+                // 高亮激活态的第一个菜单项
+                Rectangle {
+                    height: 36px;
+                    border-radius: 6px;
+                    background: Theme.primary.transparentize(0.85);
+                    HorizontalLayout {
+                        padding-left: 12px;
+                        spacing: 8px;
+                        alignment: start;
+                        Text { text: "#"; color: Theme.primary; font-size: 14px; vertical-alignment: center; }
+                        Text { text: "Dashboard"; color: Theme.primary; font-size: 13px; font-weight: 600; vertical-alignment: center; }
+                    }
+                }
+                Rectangle {
+                    height: 36px;
+                    border-radius: 6px;
+                    background: hover-sn.has-hover ? Theme.surface.brighter(1.5) : transparent;
+                    hover-sn := TouchArea {}
+                    HorizontalLayout {
+                        padding-left: 12px;
+                        spacing: 8px;
+                        alignment: start;
+                        Text { text: "~"; color: Theme.text-secondary; font-size: 14px; vertical-alignment: center; }
+                        Text { text: "Sticky Notes"; color: Theme.text-secondary; font-size: 13px; vertical-alignment: center; }
+                    }
+                }
+                Rectangle {
+                    height: 36px;
+                    border-radius: 6px;
+                    background: hover-td.has-hover ? Theme.surface.brighter(1.5) : transparent;
+                    hover-td := TouchArea {}
+                    HorizontalLayout {
+                        padding-left: 12px;
+                        spacing: 8px;
+                        alignment: start;
+                        Text { text: "+"; color: Theme.text-secondary; font-size: 14px; vertical-alignment: center; }
+                        Text { text: "Todo List"; color: Theme.text-secondary; font-size: 13px; vertical-alignment: center; }
+                    }
+                }
+                Rectangle {
+                    height: 36px;
+                    border-radius: 6px;
+                    background: hover-pl.has-hover ? Theme.surface.brighter(1.5) : transparent;
+                    hover-pl := TouchArea {}
+                    HorizontalLayout {
+                        padding-left: 12px;
+                        spacing: 8px;
+                        alignment: start;
+                        Text { text: "*"; color: Theme.text-secondary; font-size: 14px; vertical-alignment: center; }
+                        Text { text: "Plugins"; color: Theme.text-secondary; font-size: 13px; vertical-alignment: center; }
+                    }
+                }
+
+                Rectangle { vertical-stretch: 1; }  // 弹性占位
+
+                // 底部设置
+                Rectangle {
+                    height: 36px;
+                    border-radius: 6px;
+                    background: hover-st.has-hover ? Theme.surface.brighter(1.5) : transparent;
+                    hover-st := TouchArea {}
+                    HorizontalLayout {
+                        padding-left: 12px;
+                        spacing: 8px;
+                        alignment: start;
+                        Text { text: "~"; color: Theme.text-secondary; font-size: 14px; vertical-alignment: center; }
+                        Text { text: "Settings"; color: Theme.text-secondary; font-size: 13px; vertical-alignment: center; }
+                    }
+                }
+            }
+        }
+
+        // 竖向分隔线
+        Rectangle { width: 1px; background: Theme.border; }
+
+        // ─── 右侧内容区 ───────────────────────────────────────
+        VerticalLayout {
+            horizontal-stretch: 1;
+            padding: 28px;
+            spacing: 20px;
+
+            // 顶部标题行
+            HorizontalLayout {
+                alignment: space-between;
+                height: 36px;
+
+                Text {
+                    text: "Dashboard";
+                    color: Theme.text;
+                    font-size: 20px;
+                    font-weight: 700;
+                    vertical-alignment: center;
+                }
+
+                Rectangle {
+                    width: 100px;
+                    height: 28px;
+                    border-radius: 14px;
+                    background: Theme.primary.transparentize(0.85);
+                    border-width: 1px;
+                    border-color: Theme.primary.transparentize(0.5);
+                    Text {
+                        text: "ONLINE";
+                        color: Theme.primary;
+                        font-size: 11px;
+                        font-weight: 700;
+                        horizontal-alignment: center;
+                        vertical-alignment: center;
+                    }
+                }
+            }
+
+            // 统计卡片行
+            HorizontalLayout {
+                spacing: 16px;
+                height: 110px;
+
+                Card {
+                    glowing: true;
+                    horizontal-stretch: 1;
+                    VerticalLayout {
+                        padding: 16px;
+                        spacing: 8px;
+                        Text { text: "Active Plugins"; color: Theme.text-secondary; font-size: 11px; font-weight: 600; letter-spacing: 0.5px; }
+                        Text { text: "3"; color: Theme.primary; font-size: 32px; font-weight: 800; }
+                        Text { text: "Running normally"; color: Theme.text-secondary; font-size: 11px; }
+                    }
+                }
+
+                Card {
+                    horizontal-stretch: 1;
+                    VerticalLayout {
+                        padding: 16px;
+                        spacing: 8px;
+                        Text { text: "Mouse Passthrough"; color: Theme.text-secondary; font-size: 11px; font-weight: 600; letter-spacing: 0.5px; }
+                        Text { text: "OFF"; color: Theme.text; font-size: 28px; font-weight: 800; }
+                        Text { text: "Click to toggle"; color: Theme.text-secondary; font-size: 11px; }
+                    }
+                }
+
+                Card {
+                    horizontal-stretch: 1;
+                    VerticalLayout {
+                        padding: 16px;
+                        spacing: 8px;
+                        Text { text: "Always on Top"; color: Theme.text-secondary; font-size: 11px; font-weight: 600; letter-spacing: 0.5px; }
+                        Text { text: "ON"; color: Theme.primary; font-size: 28px; font-weight: 800; }
+                        Text { text: "Widgets floating"; color: Theme.text-secondary; font-size: 11px; }
+                    }
+                }
+            }
+
+            // 插件列表区
+            Text {
+                text: "SYSTEM LOG";
+                color: Theme.text-secondary;
+                font-size: 11px;
+                font-weight: 700;
+                letter-spacing: 1.5px;
+            }
+
+            Card {
+                vertical-stretch: 1;
+                VerticalLayout {
+                    padding: 16px;
+                    spacing: 6px;
+                    alignment: start;
+
+                    Rectangle {
+                        height: 24px;
+                        HorizontalLayout {
+                            spacing: 8px;
+                            Rectangle { width: 8px; height: 8px; border-radius: 4px; background: Theme.primary; y: (parent.height - self.height) / 2; }
+                            Text { text: "Config loaded — always_on_top: true"; color: Theme.text-secondary; font-size: 12px; vertical-alignment: center; }
+                        }
+                    }
+                    Rectangle {
+                        height: 24px;
+                        HorizontalLayout {
+                            spacing: 8px;
+                            Rectangle { width: 8px; height: 8px; border-radius: 4px; background: Theme.primary; y: (parent.height - self.height) / 2; }
+                            Text { text: "Plugin scanner initialized — 0 plugins found"; color: Theme.text-secondary; font-size: 12px; vertical-alignment: center; }
+                        }
+                    }
+                    Rectangle {
+                        height: 24px;
+                        HorizontalLayout {
+                            spacing: 8px;
+                            Rectangle { width: 8px; height: 8px; border-radius: 4px; background: Theme.text-secondary; y: (parent.height - self.height) / 2; }
+                            Text { text: "StickyWidget shown at (50, 50)"; color: Theme.text-secondary; font-size: 12px; vertical-alignment: center; }
+                        }
+                    }
+                    Rectangle {
+                        height: 24px;
+                        HorizontalLayout {
+                            spacing: 8px;
+                            Rectangle { width: 8px; height: 8px; border-radius: 4px; background: Theme.text-secondary; y: (parent.height - self.height) / 2; }
+                            Text { text: "TodoWidget shown at (400, 50)"; color: Theme.text-secondary; font-size: 12px; vertical-alignment: center; }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

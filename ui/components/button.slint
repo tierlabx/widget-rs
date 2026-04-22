@@ -1,0 +1,41 @@
+import { Theme } from "../theme.slint";
+
+export component Button inherits Rectangle {
+    in property <string> text;
+    in property <bool> ghost: false;
+    callback clicked <=> touch.clicked;
+
+    width: 120px;
+    height: 36px;
+    border-radius: 4px;
+    background: root.ghost ? transparent : Theme.primary;
+    border-width: root.ghost ? 1px : 0px;
+    border-color: root.ghost ? Theme.border : transparent;
+
+    out property <bool> has-hover: touch.has-hover;
+    out property <bool> pressed: touch.pressed;
+
+    animate background { duration: 150ms; }
+    
+    states [
+        pressed when touch.pressed : {
+            background: root.ghost ? Theme.surface.darker(0.2) : Theme.primary.darker(0.2);
+        }
+        hover when touch.has-hover : {
+            background: root.ghost ? Theme.surface.brighter(0.5) : Theme.primary.brighter(0.2);
+        }
+    ]
+
+    Text {
+        text: root.text;
+        color: root.ghost ? Theme.text : Theme.background;
+        font-weight: 600;
+        horizontal-alignment: center;
+        vertical-alignment: center;
+    }
+
+    touch := TouchArea {
+        width: 100%;
+        height: 100%;
+    }
+}

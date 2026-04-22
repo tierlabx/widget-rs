@@ -1,0 +1,13 @@
+import { Theme } from "../theme.slint";
+
+export component Card inherits Rectangle {
+    in property <bool> glowing: false;
+    background: Theme.surface;
+    border-radius: 8px;
+    border-width: 1px;
+    border-color: root.glowing ? Theme.primary : Theme.border;
+
+    drop-shadow-blur: root.glowing ? 12px : 6px;
+    drop-shadow-color: root.glowing ? Theme.primary.transparentize(0.7) : #000000.transparentize(0.5);
+    drop-shadow-offset-y: 2px;
+}
