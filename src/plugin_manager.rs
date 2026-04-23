@@ -1,8 +1,16 @@
+use gpui::*;
 use std::fs;
 use std::path::PathBuf;
+use std::sync::Arc;
+
+pub trait Plugin: Send + Sync {
+    fn id(&self) -> &'static str;
+    fn spawn_window(&self, cx: &mut App) -> AnyWindowHandle;
+}
 
 pub struct PluginManager {
     plugin_dir: PathBuf,
+    plugins: Vec<Arc<dyn Plugin>>,
 }
 
 impl PluginManager {
@@ -14,7 +22,18 @@ impl PluginManager {
             let _ = fs::create_dir_all(&plugin_dir);
         }
 
-        Self { plugin_dir }
+        Self {
+            plugin_dir,
+            plugins: Vec::new(),
+        }
+    }
+
+    pub fn register(&mut self, plugin: Arc<dyn Plugin>) {
+        self.plugins.push(plugin);
+    }
+
+    pub fn get_plugins(&self) -> &[Arc<dyn Plugin>] {
+        &self.plugins
     }
 
     pub fn discover_plugins(&self) -> Vec<String> {
@@ -30,6 +49,4 @@ impl PluginManager {
         }
         plugins
     }
-
-    // Dynamic UI loading will be implemented here using slint::interpreter
 }
