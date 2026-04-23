@@ -5,7 +5,7 @@ use tray_icon::{
 
 /// 从生成的 icon.png 加载托盘图标
 fn build_icon() -> Icon {
-    let icon_bytes = include_bytes!("../logos/icon.png");
+    let icon_bytes = include_bytes!("../../../assets/logos/icon.png");
     let image = image::load_from_memory(icon_bytes)
         .expect("Failed to load icon image")
         .into_rgba8();

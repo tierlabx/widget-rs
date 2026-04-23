@@ -7407,8 +7407,18 @@ dependencies = [
  "todo_plugin",
  "tray-icon",
  "widget-core",
+ "widget-ui",
  "windows-sys 0.52.0",
  "winres",
+]
+
+[[package]]
+name = "widget-ui"
+version = "0.1.0"
+dependencies = [
+ "gpui",
+ "gpui-component",
+ "widget-core",
 ]
 
 [[package]]

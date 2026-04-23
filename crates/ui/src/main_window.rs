@@ -10,7 +10,7 @@ impl MainWindow {
 
 impl Render for MainWindow {
     fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        let is_visible = cx.global::<crate::window_manager::WindowManager>().is_visible;
+        let is_visible = cx.try_global::<widget_core::UIState>().map_or(true, |s| s.is_visible);
         
         if !is_visible {
             return div().bg(rgba(0x00000000)).into_any_element();

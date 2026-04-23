@@ -1,4 +1,4 @@
-mod ui;
+
 mod store;
 mod window_manager;
 mod tray;

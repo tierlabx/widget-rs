@@ -1,0 +1,23 @@
+[package]
+name = "widget-rs"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+gpui.workspace = true
+gpui-component.workspace = true
+widget-core.workspace = true
+widget-ui.workspace = true
+sticky_plugin.workspace = true
+todo_plugin.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+directories.workspace = true
+tray-icon.workspace = true
+tao.workspace = true
+raw-window-handle.workspace = true
+image.workspace = true
+windows-sys.workspace = true
+
+[build-dependencies]
+winres.workspace = true

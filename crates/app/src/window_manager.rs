@@ -1,5 +1,5 @@
 use gpui::*;
-use crate::ui::main_window::MainWindow;
+use widget_ui::main_window::MainWindow;
 use std::collections::HashMap;
 use raw_window_handle::{HasWindowHandle, RawWindowHandle};
 use windows_sys::Win32::UI::WindowsAndMessaging::{ShowWindow, SW_HIDE, SW_SHOW};
@@ -14,6 +14,7 @@ impl Global for WindowManager {}
 
 impl WindowManager {
     pub fn init(cx: &mut App) {
+        cx.set_global(widget_core::UIState { is_visible: true });
         cx.set_global(Self {
             main_window: None,
             widget_windows: HashMap::new(),
@@ -48,6 +49,9 @@ impl WindowManager {
     pub fn toggle_main_window(&mut self, cx: &mut App) {
         self.is_visible = !self.is_visible;
         let is_visible = self.is_visible;
+        cx.update_global::<widget_core::UIState, _>(|state, _| {
+            state.is_visible = is_visible;
+        });
         println!("Toggle main window requested. is_visible = {}", is_visible);
         
         if let Some(window) = &self.main_window {

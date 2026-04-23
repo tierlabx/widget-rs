@@ -1,12 +1,15 @@
-[package]
-name = "widget-rs"
-version = "0.1.0"
-edition = "2021"
+[workspace]
+members = [
+    "crates/*",
+    "plugins/*",
+]
+resolver = "2"
 
-[dependencies]
+[workspace.dependencies]
 gpui = "0.2.2"
 gpui-component = "0.5.1"
-widget-core = { path = "widget-core" }
+widget-core = { path = "crates/core" }
+widget-ui = { path = "crates/ui" }
 sticky_plugin = { path = "plugins/sticky" }
 todo_plugin = { path = "plugins/todo" }
 serde = { version = "1.0", features = ["derive"] }
@@ -21,12 +24,4 @@ windows-sys = { version = "0.52", features = [
     "Win32_UI_WindowsAndMessaging",
     "Win32_System_Threading",
 ] }
-
-[build-dependencies]
 winres = "0.1"
-
-[workspace]
-members = [
-    "widget-core",
-    "plugins/*",
-]
