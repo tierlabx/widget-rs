@@ -21,7 +21,9 @@ impl WindowManager {
     }
 
     pub fn main_window(&self)   -> &MainWindow   { &self.main_window   }
+    #[allow(dead_code)]
     pub fn sticky_widget(&self) -> &StickyWidget { &self.sticky_widget }
+    #[allow(dead_code)]
     pub fn todo_widget(&self)   -> &TodoWidget   { &self.todo_widget   }
 
     /// 显示所有窗口，并安排在事件循环启动后移除任务栏图标
