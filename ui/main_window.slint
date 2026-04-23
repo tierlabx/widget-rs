@@ -135,7 +135,6 @@ export component MainWindow inherits Window {
             VerticalLayout {
                 padding: 0px;
                 spacing: 0px;
-                alignment: start;
 
                 // ── Logo 区 ──────────────────────────
                 HorizontalLayout {
@@ -435,16 +434,16 @@ export component MainWindow inherits Window {
                             Rectangle {
                                 vertical-stretch: 1;
                                 border-radius: 4px;
-                                background: #1a1a0a;
+                                background: #fff2c5;
                                 border-width: 1px;
-                                border-color: Theme.border;
+                                border-color: #e5d8af;
                                 clip: true;
 
                                 Text {
                                     x: 12px;
                                     y: 12px;
                                     text: "这是一个便签示例...";
-                                    color: Theme.text-secondary;
+                                    color: #4a4531;
                                     font-size: 13px;
                                 }
                             }
@@ -467,39 +466,55 @@ export component MainWindow inherits Window {
                             // 待办列表预览
                             VerticalLayout {
                                 vertical-stretch: 1;
-                                spacing: 10px;
+                                spacing: 8px;
                                 alignment: start;
 
-                                HorizontalLayout {
-                                    spacing: 8px;
-                                    alignment: start;
-                                    Rectangle {
-                                        width: 8px;
-                                        height: 8px;
-                                        border-radius: 4px;
-                                        background: Theme.primary;
-                                        y: (parent.height - self.height) / 2;
-                                    }
-                                    Text {
-                                        text: "完成项目设计";
-                                        color: Theme.text-secondary;
-                                        font-size: 13px;
+                                Rectangle {
+                                    height: 32px;
+                                    border-radius: 4px;
+                                    background: #141414;
+                                    HorizontalLayout {
+                                        padding-left: 12px;
+                                        padding-right: 12px;
+                                        spacing: 10px;
+                                        alignment: start;
+                                        Text {
+                                            text: "○";
+                                            color: Theme.primary;
+                                            font-size: 14px;
+                                            font-weight: 700;
+                                            vertical-alignment: center;
+                                        }
+                                        Text {
+                                            text: "完成项目设计";
+                                            color: Theme.text-secondary;
+                                            font-size: 13px;
+                                            vertical-alignment: center;
+                                        }
                                     }
                                 }
-                                HorizontalLayout {
-                                    spacing: 8px;
-                                    alignment: start;
-                                    Rectangle {
-                                        width: 8px;
-                                        height: 8px;
-                                        border-radius: 4px;
-                                        background: Theme.primary;
-                                        y: (parent.height - self.height) / 2;
-                                    }
-                                    Text {
-                                        text: "编写文档";
-                                        color: Theme.text-secondary;
-                                        font-size: 13px;
+
+                                Rectangle {
+                                    height: 32px;
+                                    border-radius: 4px;
+                                    background: #141414;
+                                    HorizontalLayout {
+                                        padding-left: 12px;
+                                        padding-right: 12px;
+                                        spacing: 10px;
+                                        alignment: start;
+                                        Text {
+                                            text: "●";
+                                            color: Theme.primary;
+                                            font-size: 14px;
+                                            vertical-alignment: center;
+                                        }
+                                        Text {
+                                            text: "编写文档";
+                                            color: Theme.text-secondary;
+                                            font-size: 13px;
+                                            vertical-alignment: center;
+                                        }
                                     }
                                 }
                             }
@@ -563,7 +578,7 @@ export component MainWindow inherits Window {
                                 background: Theme.background;
 
                                 Text {
-                                    text: "点击启动以显示系统状态";
+                                    text: "点击启动以显示系统信息";
                                     color: Theme.text-muted;
                                     font-size: 13px;
                                     horizontal-alignment: center;

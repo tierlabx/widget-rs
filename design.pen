@@ -1315,56 +1315,6 @@
       "children": [
         {
           "type": "frame",
-          "id": "aM7BD",
-          "name": "stickyHeader",
-          "width": "fill_container",
-          "fill": "#101010f2",
-          "padding": [
-            10,
-            12
-          ],
-          "justifyContent": "space_between",
-          "alignItems": "center",
-          "children": [
-            {
-              "type": "text",
-              "id": "3Nr5b",
-              "name": "stickyTitle",
-              "fill": "$--snow-white",
-              "content": "便签",
-              "fontFamily": "Inter",
-              "fontSize": 14,
-              "fontWeight": "600"
-            },
-            {
-              "type": "frame",
-              "id": "e9kXS",
-              "name": "stickyHeaderActions",
-              "gap": 8,
-              "alignItems": "center",
-              "children": [
-                {
-                  "type": "ellipse",
-                  "id": "UMFgi",
-                  "name": "stickyMinBtn",
-                  "fill": "#fbbf24",
-                  "width": 12,
-                  "height": 12
-                },
-                {
-                  "type": "ellipse",
-                  "id": "hSi3s",
-                  "name": "stickyCloseBtn",
-                  "fill": "#ef4444",
-                  "width": 12,
-                  "height": 12
-                }
-              ]
-            }
-          ]
-        },
-        {
-          "type": "frame",
           "id": "1aa8z",
           "name": "stickyContent",
           "width": "fill_container",
@@ -1414,56 +1364,6 @@
       },
       "layout": "vertical",
       "children": [
-        {
-          "type": "frame",
-          "id": "s5mFw",
-          "name": "todoHeader",
-          "width": "fill_container",
-          "fill": "#050507f2",
-          "padding": [
-            10,
-            16
-          ],
-          "justifyContent": "space_between",
-          "alignItems": "center",
-          "children": [
-            {
-              "type": "text",
-              "id": "avFOH",
-              "name": "todoTitle",
-              "fill": "$--snow-white",
-              "content": "待办事项",
-              "fontFamily": "Inter",
-              "fontSize": 14,
-              "fontWeight": "600"
-            },
-            {
-              "type": "frame",
-              "id": "9QROe",
-              "name": "todoHeaderActions",
-              "gap": 8,
-              "alignItems": "center",
-              "children": [
-                {
-                  "type": "ellipse",
-                  "id": "bE73O",
-                  "name": "todoMinBtn",
-                  "fill": "#fbbf24",
-                  "width": 12,
-                  "height": 12
-                },
-                {
-                  "type": "ellipse",
-                  "id": "ZUmoR",
-                  "name": "todoCloseBtn",
-                  "fill": "#ef4444",
-                  "width": 12,
-                  "height": 12
-                }
-              ]
-            }
-          ]
-        },
         {
           "type": "frame",
           "id": "jHxzn",
