@@ -1,7 +1,6 @@
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::PathBuf;
-use directories::ProjectDirs;
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct AppConfig {
@@ -12,7 +11,7 @@ pub struct AppConfig {
 impl Default for AppConfig {
     fn default() -> Self {
         Self {
-            always_on_top: true,
+            always_on_top: false,
             mouse_passthrough: false,
         }
     }
@@ -24,13 +23,9 @@ pub struct Store {
 
 impl Store {
     pub fn new() -> Self {
-        let proj_dirs = ProjectDirs::from("com", "WidgetRS", "WidgetRS")
-            .expect("Could not find project directory");
-        let config_dir = proj_dirs.config_dir();
-        
-        if !config_dir.exists() {
-            fs::create_dir_all(config_dir).unwrap();
-        }
+        let mut config_dir = std::env::current_exe()
+            .expect("Could not find current executable path");
+        config_dir.pop(); // Go to the parent directory
 
         Self {
             config_path: config_dir.join("config.json"),

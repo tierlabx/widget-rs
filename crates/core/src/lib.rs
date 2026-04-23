@@ -2,6 +2,7 @@ use gpui::*;
 
 pub struct UIState {
     pub is_visible: bool,
+    pub is_edit_mode: bool,
 }
 
 impl Global for UIState {}

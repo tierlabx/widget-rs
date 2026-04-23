@@ -5958,7 +5958,9 @@ version = "0.1.0"
 dependencies = [
  "gpui",
  "gpui-component",
+ "raw-window-handle 0.6.2",
  "widget-core",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -6499,7 +6501,9 @@ version = "0.1.0"
 dependencies = [
  "gpui",
  "gpui-component",
+ "raw-window-handle 0.6.2",
  "widget-core",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -7418,7 +7422,9 @@ version = "0.1.0"
 dependencies = [
  "gpui",
  "gpui-component",
+ "raw-window-handle 0.6.2",
  "widget-core",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]

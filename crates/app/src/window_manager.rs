@@ -14,7 +14,7 @@ impl Global for WindowManager {}
 
 impl WindowManager {
     pub fn init(cx: &mut App) {
-        cx.set_global(widget_core::UIState { is_visible: true });
+        cx.set_global(widget_core::UIState { is_visible: true, is_edit_mode: false });
         cx.set_global(Self {
             main_window: None,
             widget_windows: HashMap::new(),

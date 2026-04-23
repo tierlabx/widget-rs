@@ -1925,5 +1925,8 @@
       "type": "color",
       "value": "#b8b3b0"
     }
+  },
+  "imports": {
+    "g": "pencil:shadcn.lib.pen"
   }
 }
