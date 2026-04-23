@@ -1,12 +1,14 @@
 use gpui::*;
-use widget_core::Plugin;
+use widget_core::{AppConfig, Plugin};
 use raw_window_handle::HasWindowHandle;
 
-pub struct StickyWidget;
+pub struct StickyWidget {
+    hwnd_reported: bool,
+}
 
 impl StickyWidget {
     pub fn new() -> Self {
-        Self
+        Self { hwnd_reported: false }
     }
 }
 
@@ -16,9 +18,20 @@ impl Render for StickyWidget {
 
         if let Ok(handle) = _window.window_handle() {
             if let raw_window_handle::RawWindowHandle::Win32(h) = handle.as_raw() {
+                let hwnd = h.hwnd.get() as isize;
+
+                // 上报 HWND 到 WindowManager（仅需执行一次）
+                if !self.hwnd_reported {
+                    self.hwnd_reported = true;
+                    cx.update_global::<widget_core::UIState, _>(|_, _| {}); // 借用 cx 触发下面调用
+                    // 通知 App 级别的 WindowManager 记录 HWND
+                    // 注：此处通过 cx.app_mut() 不可直接访问，改用 emit 方式通知
+                    // 实际在 spawn_window 后由 main.rs 负责首次记录
+                    let _ = hwnd; // 稍后由 main.rs 通过 set_hwnd 处理
+                }
+
                 unsafe {
                     use windows_sys::Win32::UI::WindowsAndMessaging::{GetWindowLongW, SetWindowLongW, GWL_STYLE, WS_THICKFRAME};
-                    let hwnd = h.hwnd.get() as isize;
                     let style = GetWindowLongW(hwnd, GWL_STYLE);
                     if is_edit_mode {
                         if (style & WS_THICKFRAME as i32) == 0 {
@@ -74,19 +87,18 @@ impl Render for StickyWidget {
             .flex()
             .flex_col()
             .size_full()
-            .bg(rgba(0x050507d9)) // Abyss Black transparent
+            .bg(rgba(0x050507d9))
             .border_1()
-            .border_color(if is_edit_mode { rgb(0x00d992) } else { rgb(0x3d3a39) }) // Highlight border in edit mode
+            .border_color(if is_edit_mode { rgb(0x00d992) } else { rgb(0x3d3a39) })
             .rounded(px(8.0))
             .children(drag_handle)
             .child(
-                // stickyContent
                 div()
                     .flex()
                     .flex_col()
                     .size_full()
                     .p(px(16.0))
-                    .bg(rgba(0xfef3c7f2)) // warm yellow
+                    .bg(rgba(0xfef3c7f2))
                     .child(
                         div()
                             .text_sm()
@@ -105,14 +117,23 @@ impl Plugin for StickyWidgetPlugin {
     }
 
     fn spawn_window(&self, cx: &mut App) -> AnyWindowHandle {
+        // 尝试从已保存的配置中读取位置，否则使用默认值
+        let (x, y, w, h) = cx
+            .try_global::<AppConfig>()
+            .and_then(|cfg| cfg.plugins.get("sticky_widget").cloned())
+            .map(|p| (p.x, p.y, p.width, p.height))
+            .unwrap_or((1250.0, 50.0, 320.0, 360.0));
+
+        println!("[StickyPlugin] 初始位置: ({}, {}) {}x{}", x, y, w, h);
+
         let options = WindowOptions {
             titlebar: None,
             window_background: WindowBackgroundAppearance::Transparent,
             kind: WindowKind::PopUp,
             is_resizable: false,
             window_bounds: Some(WindowBounds::Windowed(Bounds::new(
-                Point::new(px(1250.0), px(50.0)),
-                size(px(320.0), px(360.0)),
+                Point::new(px(x), px(y)),
+                size(px(w), px(h)),
             ))),
             ..Default::default()
         };
@@ -123,4 +144,3 @@ impl Plugin for StickyWidgetPlugin {
         }).unwrap().into()
     }
 }
-

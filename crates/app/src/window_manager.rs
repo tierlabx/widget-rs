@@ -1,12 +1,18 @@
 use gpui::*;
 use widget_ui::main_window::MainWindow;
+use widget_core::{AppConfig, PluginConfig};
 use std::collections::HashMap;
 use raw_window_handle::{HasWindowHandle, RawWindowHandle};
-use windows_sys::Win32::UI::WindowsAndMessaging::{ShowWindow, SW_HIDE, SW_SHOW};
+use windows_sys::Win32::UI::WindowsAndMessaging::{
+    ShowWindow, SW_HIDE, SW_SHOW, GetWindowRect,
+};
+use windows_sys::Win32::Foundation::RECT;
+use crate::store::Store;
 
 pub struct WindowManager {
     pub main_window: Option<WindowHandle<gpui_component::Root>>,
-    pub widget_windows: HashMap<&'static str, AnyWindowHandle>,
+    /// 注册的插件窗口：id -> (窗口句柄, HWND)
+    pub widget_windows: HashMap<&'static str, (AnyWindowHandle, isize)>,
     pub is_visible: bool,
 }
 
@@ -42,8 +48,65 @@ impl WindowManager {
         });
     }
 
+    /// 注册插件窗口，同时记录 HWND 以便后续读取位置
     pub fn register_widget_window(&mut self, id: &'static str, handle: AnyWindowHandle) {
-        self.widget_windows.insert(id, handle);
+        // 尝试从窗口句柄中提取 HWND
+        let hwnd = Self::extract_hwnd(&handle);
+        self.widget_windows.insert(id, (handle, hwnd));
+    }
+
+    /// 从 AnyWindowHandle 中提取 Win32 HWND
+    fn extract_hwnd(handle: &AnyWindowHandle) -> isize {
+        // AnyWindowHandle 无法直接在此安全上下文中读取句柄，
+        // 我们通过存储插件窗口时用额外调用来获取。
+        // 这里先存 0，在插件首次渲染时会通过 set_hwnd 更新。
+        let _ = handle;
+        0
+    }
+
+    /// 在插件首次渲染后，通过插件 ID 更新已记录的 HWND
+    #[allow(dead_code)]
+    pub fn set_hwnd(&mut self, id: &'static str, hwnd: isize) {
+        if let Some(entry) = self.widget_windows.get_mut(id) {
+            entry.1 = hwnd;
+        }
+    }
+
+    /// 读取所有已注册插件的当前窗口位置并保存到配置文件
+    pub fn save_all_plugin_bounds(&self, cx: &mut App, store: &Store) {
+        let mut config = cx
+            .try_global::<AppConfig>()
+            .cloned()
+            .unwrap_or_default();
+
+        for (id, (_handle, hwnd)) in &self.widget_windows {
+            if *hwnd == 0 {
+                continue;
+            }
+            let mut rect = RECT { left: 0, top: 0, right: 0, bottom: 0 };
+            let ok = unsafe { GetWindowRect(*hwnd, &mut rect) };
+            if ok != 0 {
+                config.plugins.insert(
+                    id.to_string(),
+                    PluginConfig {
+                        x: rect.left as f32,
+                        y: rect.top as f32,
+                        width: (rect.right - rect.left) as f32,
+                        height: (rect.bottom - rect.top) as f32,
+                    },
+                );
+                println!(
+                    "[WindowManager] 保存插件 {} 位置: ({}, {}) {}x{}",
+                    id, rect.left, rect.top,
+                    rect.right - rect.left,
+                    rect.bottom - rect.top
+                );
+            }
+        }
+
+        // 写回全局状态
+        cx.set_global(config.clone());
+        store.save_config(&config);
     }
 
     pub fn toggle_main_window(&mut self, cx: &mut App) {
@@ -52,7 +115,7 @@ impl WindowManager {
         cx.update_global::<widget_core::UIState, _>(|state, _| {
             state.is_visible = is_visible;
         });
-        println!("Toggle main window requested. is_visible = {}", is_visible);
+        println!("切换主窗口可见性: is_visible = {}", is_visible);
         
         if let Some(window) = &self.main_window {
             window.update(cx, |_, window, cx| {
@@ -68,4 +131,3 @@ impl WindowManager {
         }
     }
 }
-

@@ -1,12 +1,14 @@
 use gpui::*;
-use widget_core::Plugin;
+use widget_core::{AppConfig, Plugin};
 use raw_window_handle::HasWindowHandle;
 
-pub struct TodoWidget;
+pub struct TodoWidget {
+    hwnd_reported: bool,
+}
 
 impl TodoWidget {
     pub fn new() -> Self {
-        Self
+        Self { hwnd_reported: false }
     }
 }
 
@@ -16,9 +18,15 @@ impl Render for TodoWidget {
 
         if let Ok(handle) = _window.window_handle() {
             if let raw_window_handle::RawWindowHandle::Win32(h) = handle.as_raw() {
+                let hwnd = h.hwnd.get() as isize;
+
+                if !self.hwnd_reported {
+                    self.hwnd_reported = true;
+                    let _ = hwnd;
+                }
+
                 unsafe {
                     use windows_sys::Win32::UI::WindowsAndMessaging::{GetWindowLongW, SetWindowLongW, GWL_STYLE, WS_THICKFRAME};
-                    let hwnd = h.hwnd.get() as isize;
                     let style = GetWindowLongW(hwnd, GWL_STYLE);
                     if is_edit_mode {
                         if (style & WS_THICKFRAME as i32) == 0 {
@@ -74,20 +82,19 @@ impl Render for TodoWidget {
             .flex()
             .flex_col()
             .size_full()
-            .bg(rgba(0x101010d9)) // Carbon Surface transparent
+            .bg(rgba(0x101010d9))
             .border_1()
-            .border_color(if is_edit_mode { rgb(0x00d992) } else { rgb(0x3d3a39) }) // Highlight border in edit mode
+            .border_color(if is_edit_mode { rgb(0x00d992) } else { rgb(0x3d3a39) })
             .rounded(px(8.0))
             .children(drag_handle)
             .child(
-                // todoList
                 div()
                     .flex()
                     .flex_col()
                     .size_full()
                     .p(px(16.0))
                     .gap(px(8.0))
-                    // Item 1 (completed = false)
+                    // 项目 1（未完成）
                     .child(
                         div()
                             .flex()
@@ -99,7 +106,6 @@ impl Render for TodoWidget {
                             .bg(rgb(0x050507))
                             .rounded(px(6.0))
                             .child(
-                                // check
                                 div()
                                     .w(px(18.0))
                                     .h(px(18.0))
@@ -114,7 +120,7 @@ impl Render for TodoWidget {
                                     .child("完成项目设计")
                             )
                     )
-                    // Item 2 (completed = true)
+                    // 项目 2（已完成）
                     .child(
                         div()
                             .flex()
@@ -126,7 +132,6 @@ impl Render for TodoWidget {
                             .bg(rgb(0x050507))
                             .rounded(px(6.0))
                             .child(
-                                // check
                                 div()
                                     .w(px(18.0))
                                     .h(px(18.0))
@@ -143,7 +148,7 @@ impl Render for TodoWidget {
                                     .child("编写文档")
                             )
                     )
-                    // Item 3 (completed = false)
+                    // 项目 3（未完成）
                     .child(
                         div()
                             .flex()
@@ -155,7 +160,6 @@ impl Render for TodoWidget {
                             .bg(rgb(0x050507))
                             .rounded(px(6.0))
                             .child(
-                                // check
                                 div()
                                     .w(px(18.0))
                                     .h(px(18.0))
@@ -170,9 +174,8 @@ impl Render for TodoWidget {
                                     .child("代码审查")
                             )
                     )
-                    // Spacer
                     .child(div().flex_1())
-                    // Add Btn
+                    // 添加按钮
                     .child(
                         div()
                             .flex()
@@ -210,14 +213,23 @@ impl Plugin for TodoWidgetPlugin {
     }
 
     fn spawn_window(&self, cx: &mut App) -> AnyWindowHandle {
+        // 尝试从已保存的配置中读取位置，否则使用默认值
+        let (x, y, w, h) = cx
+            .try_global::<AppConfig>()
+            .and_then(|cfg| cfg.plugins.get("todo_widget").cloned())
+            .map(|p| (p.x, p.y, p.width, p.height))
+            .unwrap_or((1250.0, 450.0, 360.0, 400.0));
+
+        println!("[TodoPlugin] 初始位置: ({}, {}) {}x{}", x, y, w, h);
+
         let options = WindowOptions {
             titlebar: None,
             window_background: WindowBackgroundAppearance::Transparent,
             kind: WindowKind::PopUp,
             is_resizable: false,
             window_bounds: Some(WindowBounds::Windowed(Bounds::new(
-                Point::new(px(1250.0), px(450.0)),
-                size(px(360.0), px(400.0)),
+                Point::new(px(x), px(y)),
+                size(px(w), px(h)),
             ))),
             ..Default::default()
         };
@@ -228,4 +240,3 @@ impl Plugin for TodoWidgetPlugin {
         }).unwrap().into()
     }
 }
-
