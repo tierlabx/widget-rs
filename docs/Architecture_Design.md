@@ -6,10 +6,10 @@
 
 ```mermaid
 graph TD
-    subgraph UI Layer (Slint)
-        MW[Main Window .slint]
-        SW[Sticky Widget .slint]
-        TW[Todo Widget .slint]
+    subgraph UI Layer (GPUI)
+        MW[Main Window .rs]
+        SW[Sticky Widget .rs]
+        TW[Todo Widget .rs]
         PW[Dynamic Plugin Widgets]
         Tray[System Tray Icon]
     end
@@ -41,7 +41,7 @@ graph TD
     WM -- Updates Props/State --> MW
     WM -- Updates Props/State --> SW
     WM -- Updates Props/State --> TW
-    PM -- Slint Interpreter --> PW
+    PM -- GPUI Component --> PW
     Sandbox -- Modifies Plugin UI --> PM
     
     %% Controller to OS API
@@ -58,12 +58,12 @@ graph TD
 ### 2.1 UI Layer (表现层)
 包含静态编译的 UI（主窗口、内置小部件）以及运行时动态解释的 UI。
 * **职能**：定义界面的布局、颜色、动画、交互热区。
-* **动态组件 (Dynamic Plugin Widgets)**：通过 Slint 解释器加载执行的第三方界面。
+* **动态组件 (Dynamic Plugin Widgets)**：通过 GPUI 组件体系或 WASM 加载执行的第三方界面。
 
 ### 2.2 Controller Layer (控制层)
 基于 Rust 的核心业务运行枢纽。
 * **App Core Manager & Window Manager**：核心事件调度与多窗口句柄管理。
-* **Plugin & Interpreter Manager (新增)**：插件生命周期管理器。负责发现、下载（插件市场）、解压并注册第三方插件。利用 Slint `interpreter` 引擎将文本形式的 `.slint` 解析成内存中的真实原生窗口。
+* **Plugin & Interpreter Manager (新增)**：插件生命周期管理器。负责发现、下载（插件市场）、解压并注册第三方插件。未来通过 WASM 引擎或动态组件库解析执行。
 * **Sandbox (新增)**：插件安全运行沙箱。限制第三方逻辑仅能调用公开安全的 Host 接口，隔离可能导致崩溃的代码。
 
 ### 2.3 Data Layer (数据层)
@@ -73,7 +73,7 @@ graph TD
 
 ## 3. 事件循环与生命周期 (Lifecycle)
 1. **初始化**：Rust `main()` 启动，读取本地 JSON 数据。
-2. **插件装载**：Plugin Manager 扫描本地 `plugins/` 目录，初始化第三方插件并预加载其动态 UI 模板及 Wasm/脚本逻辑。
+2. **插件装载**：Plugin Manager 扫描本地 `plugins/` 目录，初始化第三方插件并预加载其动态 UI 及 Wasm/脚本逻辑。
 3. **窗口孵化**：分配并保留原生与内置窗口句柄，按需通过 interpreter 实例化插件窗口。
 4. **运行态**：
    * 宿主事件与数据双向绑定照常运行。

@@ -1,6 +1,6 @@
 # Widget RS
 
-基于 **Rust + Slint** 构建的桌面小部件系统，支持始终置顶、鼠标穿透、系统托盘驱动，以及插件化扩展。
+基于 **Rust + GPUI** 构建的桌面小部件系统，支持始终置顶、鼠标穿透、系统托盘驱动，以及插件化扩展。
 
 ---
 
@@ -18,7 +18,7 @@ cargo run
 
 | 层级 | 技术 |
 |---|---|
-| UI 渲染 | [Slint](https://slint.dev/) 1.8 |
+| UI 渲染 | [GPUI](https://gpui.rs/) + gpui-component |
 | 系统托盘 | [tray-icon](https://github.com/tauri-apps/tray-icon) |
 | 数据持久化 | serde_json + directories |
 | Win32 交互 | windows-sys 0.52 |
@@ -30,25 +30,18 @@ cargo run
 
 ```
 widget-rs/
-├── build.rs                  # Slint 编译脚本
-├── src/
-│   ├── main.rs               # 程序入口，事件循环驱动
-│   ├── window_manager.rs     # 窗口管理，任务栏隐藏核心逻辑
-│   ├── tray.rs               # 系统托盘图标与菜单
-│   ├── store.rs              # JSON 配置读写
-│   └── plugin_manager.rs     # 插件目录扫描
 └── ui/
-    ├── index.slint           # UI 根模块导出
-    ├── theme.slint           # 全局主题 Token
-    ├── main_window.slint     # 主控制面板
-    ├── sticky_widget.slint   # 便签悬浮窗
-    ├── todo_widget.slint     # 待办悬浮窗
+    ├── mod.rs                # UI 根模块导出
+    ├── theme.rs              # 全局主题 Token
+    ├── main_window.rs        # 主控制面板
+    ├── sticky_widget.rs      # 便签悬浮窗
+    ├── todo_widget.rs        # 待办悬浮窗
     └── components/           # 基础 UI 组件库
-        ├── button.slint
-        ├── card.slint
-        ├── drag_handle.slint
-        ├── todo_item.slint
-        └── line_edit.slint
+        ├── button.rs
+        ├── card.rs
+        ├── drag_handle.rs
+        ├── todo_item.rs
+        └── line_edit.rs
 ```
 
 ---
@@ -57,15 +50,16 @@ widget-rs/
 
 ### 1. 关闭主窗口不退出程序
 
-程序使用 `slint::run_event_loop()`（而非绑定到主窗口的 `.run()`），配合拦截关闭事件：
+程序使用 GPUI 的全局应用状态，配合托盘菜单控制窗口显示/隐藏，而不是直接退出：
 
 ```rust
-wm.main_window().window().on_close_requested(|| {
-    slint::CloseRequestResponse::HideWindow  // 隐藏而非退出
+// 隐藏而非退出
+cx.update_global::<WindowManager, _>(|wm, cx| {
+    wm.toggle_main_window(cx);
 });
 ```
 
-只有点击托盘菜单「Quit」才会调用 `slint::quit_event_loop()` 真正退出。
+只有点击托盘菜单「Quit」才会调用 `cx.quit()` 真正退出。
 
 ---
 
@@ -79,8 +73,8 @@ wm.main_window().window().on_close_requested(|| {
 
 | 方案 | 失败原因 |
 |---|---|
-| 在 `show()` 前用 `EnumWindows` 设置 `WS_EX_TOOLWINDOW` | Slint 的 Win32 窗口在事件循环首次运行前尚未完全初始化 |
-| `show()` 后立即设置 + `SW_HIDE`→`SW_SHOW` | Shell 已注册按钮；Slint 内部渲染循环会重新触发 `ShowWindow` 覆盖修改 |
+| 在 `show()` 前用 `EnumWindows` 设置 `WS_EX_TOOLWINDOW` | GPUI 的 Win32 窗口在事件循环首次运行前尚未完全初始化 |
+| `show()` 后立即设置 + `SW_HIDE`→`SW_SHOW` | Shell 已注册按钮；GPUI 内部渲染循环会重新触发 `ShowWindow` 覆盖修改 |
 | 用 `FindWindowW` 查找 HWND | 无边框窗口没有 OS 级 title，查找失败 |
 | `raw-window-handle` 在事件循环启动前获取 HWND | 此时 `window_handle()` 返回 `None` |
 
@@ -98,7 +92,7 @@ wm.main_window().window().on_close_requested(|| {
 
 **三层保障的原理**：
 
-1. **精确 HWND**：通过 `slint` 的 `raw-window-handle-06` feature 直接获取目标窗口句柄，避免 `EnumWindows` 误操作其他窗口
+1. **精确 HWND**：通过 GPUI 提供的原生窗口句柄获取目标窗口句柄，避免 `EnumWindows` 误操作其他窗口
 
 2. **隐藏的 dummy owner**（核心）：Windows 规则是「拥有可见任务栏按钮的 owner 的弹出窗口，其按钮跟随 owner」。创建一个 `STATIC` 类型的 1×1 像素窗口（永不显示），将其设为弹出窗口的 owner。由于 dummy owner 本身不在任务栏，owned 的弹出窗口也就不会出现在任务栏。
 
@@ -136,14 +130,17 @@ ShowWindow(hwnd, SW_SHOWNOACTIVATE);                // 强制 Shell 刷新
 
 ### 3. 系统托盘事件驱动
 
-`tray-icon` 的 `MenuEvent` 通过 `slint::Timer` 在 Slint 事件线程内轮询，避免跨线程问题：
+`tray-icon` 的 `MenuEvent` 通过 GPUI 的后台异步任务轮询，避免跨线程问题：
 
 ```rust
-tray_timer.start(TimerMode::Repeated, Duration::from_millis(50), move || {
-    if let Ok(event) = MenuEvent::receiver().try_recv() {
-        // Toggle / Quit
+cx.spawn(async move |cx| {
+    loop {
+        if let Ok(event) = MenuEvent::receiver().try_recv() {
+            // Toggle / Quit
+        }
+        cx.background_executor().timer(std::time::Duration::from_millis(50)).await;
     }
-});
+}).detach();
 ```
 
 ---
@@ -152,5 +149,5 @@ tray_timer.start(TimerMode::Repeated, Duration::from_millis(50), move || {
 
 - [ ] 便签/待办数据持久化绑定（写入 `store.rs` JSON）
 - [ ] 鼠标穿透切换（winit 后端 `WS_EX_TRANSPARENT`）
-- [ ] 插件系统：动态加载 `plugins/` 目录下的 `.slint` 文件
+- [ ] 插件系统：动态加载和管理独立编译的外部组件或脚本
 - [ ] 插件市场 UI
