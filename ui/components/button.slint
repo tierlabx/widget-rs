@@ -17,6 +17,7 @@ export enum ButtonVariant {
 export component Button inherits Rectangle {
     in property <string> text;
     in property <ButtonVariant> variant: ButtonVariant.Primary;
+    in property <length> font-size: Theme.font-size-medium;
     // 兼容旧版 ghost 属性
     in property <bool> ghost: false;
     callback clicked <=> touch.clicked;
@@ -57,17 +58,23 @@ export component Button inherits Rectangle {
         }
     ]
 
-    Text {
-        text: root.text;
-        // 文字颜色
-        color:
-            root.effective-variant == ButtonVariant.Ghost     ? Theme.text :
-            root.effective-variant == ButtonVariant.Secondary ? Theme.text-secondary :
-            Theme.volt-mint;  // Primary
-        font-size: Theme.font-size-medium;
-        font-weight: 500;
-        horizontal-alignment: center;
-        vertical-alignment: center;
+    HorizontalLayout {
+        padding-left: 12px;
+        padding-right: 12px;
+        alignment: center;
+
+        Text {
+            text: root.text;
+            // 文字颜色
+            color:
+                root.effective-variant == ButtonVariant.Ghost     ? Theme.text :
+                root.effective-variant == ButtonVariant.Secondary ? Theme.text-secondary :
+                Theme.volt-mint;  // Primary
+            font-size: root.font-size;
+            font-weight: 500;
+            horizontal-alignment: center;
+            vertical-alignment: center;
+        }
     }
 
     touch := TouchArea {

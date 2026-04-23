@@ -29,60 +29,7 @@ component StatusBadge inherits Rectangle {
     }
 }
 
-// 小按钮：次要样式（设置）
-component SmallBtnSecondary inherits Rectangle {
-    in property <string> label;
-    callback clicked <=> ta.clicked;
-    height: 32px;
-    border-radius: 6px;
-    background: Theme.background;
-    border-width: 1px;
-    border-color: Theme.border;
-    ta := TouchArea {}
-    animate opacity { duration: 100ms; }
-    opacity: ta.pressed ? 0.7 : 1.0;
-
-    HorizontalLayout {
-        padding-left: 12px;
-        padding-right: 12px;
-        alignment: center;
-        Text {
-            text: root.label;
-            color: Theme.text-secondary;
-            font-size: 13px;
-            vertical-alignment: center;
-        }
-    }
-}
-
-// 小按钮：主要样式（显示/隐藏、启动）
-component SmallBtnPrimary inherits Rectangle {
-    in property <string> label;
-    callback clicked <=> ta.clicked;
-    height: 32px;
-    border-radius: 6px;
-    background: Theme.surface;
-    border-width: 1px;
-    border-color: Theme.primary;
-    drop-shadow-blur: 8px;
-    drop-shadow-color: #00d99222;
-    drop-shadow-offset-y: 0px;
-    ta := TouchArea {}
-    animate opacity { duration: 100ms; }
-    opacity: ta.pressed ? 0.7 : 1.0;
-
-    HorizontalLayout {
-        padding-left: 12px;
-        padding-right: 12px;
-        alignment: center;
-        Text {
-            text: root.label;
-            color: Theme.volt-mint;
-            font-size: 13px;
-            vertical-alignment: center;
-        }
-    }
-}
+// Removed inline buttons, using shared Button component from components/button.slint
 
 // 小部件卡片行（标题+状态徽章）
 component CardHeader inherits HorizontalLayout {
@@ -106,8 +53,18 @@ component CardActions inherits HorizontalLayout {
     alignment: end;
     spacing: 8px;
 
-    SmallBtnSecondary { label: "设置"; }
-    SmallBtnPrimary { label: root.primary-label; }
+    Button {
+        text: "设置";
+        variant: ButtonVariant.Secondary;
+        height: 32px;
+        font-size: 13px;
+    }
+    Button {
+        text: root.primary-label;
+        variant: ButtonVariant.Primary;
+        height: 32px;
+        font-size: 13px;
+    }
 }
 
 export component MainWindow inherits Window {
