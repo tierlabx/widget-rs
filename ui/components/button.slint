@@ -1,35 +1,71 @@
+// 按钮组件 — 对应 design.pen 中三种按钮样式
+// 幽灵按钮 (DP8EQ): 透明背景 + warm-charcoal 描边
+// 主要按钮 (kJLeo): carbon-surface 背景 + emerald-signal 描边 + volt-mint 文字
+// 次要按钮 (xs6Tj): abyss-black 背景 + warm-charcoal 描边 + warm-parchment 文字
 import { Theme } from "../theme.slint";
+
+// 按钮变体枚举
+export enum ButtonVariant {
+    // 幽灵: 透明背景，charcoal 边框，白色文字
+    Ghost,
+    // 主要: 深色背景，绿色边框，薄荷绿文字
+    Primary,
+    // 次要: 最深背景，charcoal 边框，暖灰文字
+    Secondary,
+}
 
 export component Button inherits Rectangle {
     in property <string> text;
+    in property <ButtonVariant> variant: ButtonVariant.Primary;
+    // 兼容旧版 ghost 属性
     in property <bool> ghost: false;
     callback clicked <=> touch.clicked;
 
-    width: 120px;
-    height: 36px;
-    border-radius: 4px;
-    background: root.ghost ? transparent : Theme.primary;
-    border-width: root.ghost ? 1px : 0px;
-    border-color: root.ghost ? Theme.border : transparent;
+    // 根据变体计算实际样式
+    private property <ButtonVariant> effective-variant: root.ghost ? ButtonVariant.Ghost : root.variant;
+
+    height: 44px;
+    border-radius: Theme.radius-medium;
+
+    // 背景色
+    background:
+        effective-variant == ButtonVariant.Ghost     ? transparent :
+        effective-variant == ButtonVariant.Secondary ? Theme.background :
+        Theme.surface;  // Primary
+
+    // 边框
+    border-width: 1px;
+    border-color:
+        effective-variant == ButtonVariant.Primary ? Theme.primary :
+        Theme.border;  // Ghost & Secondary
 
     out property <bool> has-hover: touch.has-hover;
     out property <bool> pressed: touch.pressed;
 
     animate background { duration: 150ms; }
-    
+    animate opacity { duration: 100ms; }
+
     states [
-        pressed when touch.pressed : {
-            background: root.ghost ? Theme.surface.darker(0.2) : Theme.primary.darker(0.2);
+        pressed when touch.pressed: {
+            opacity: 0.75;
         }
-        hover when touch.has-hover : {
-            background: root.ghost ? Theme.surface.brighter(0.5) : Theme.primary.brighter(0.2);
+        hover when touch.has-hover: {
+            background:
+                effective-variant == ButtonVariant.Ghost     ? Theme.surface :
+                effective-variant == ButtonVariant.Secondary ? Theme.surface :
+                Theme.surface.brighter(0.3);
         }
     ]
 
     Text {
         text: root.text;
-        color: root.ghost ? Theme.text : Theme.background;
-        font-weight: 600;
+        // 文字颜色
+        color:
+            root.effective-variant == ButtonVariant.Ghost     ? Theme.text :
+            root.effective-variant == ButtonVariant.Secondary ? Theme.text-secondary :
+            Theme.volt-mint;  // Primary
+        font-size: Theme.font-size-medium;
+        font-weight: 500;
         horizontal-alignment: center;
         vertical-alignment: center;
     }

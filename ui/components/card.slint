@@ -1,13 +1,22 @@
+// 卡片组件 — 对应 design.pen 中两种卡片样式
+// 基础卡片 (BWW3E): carbon-surface + warm-charcoal 1px 边框 + 阴影
+// 高亮卡片 (3McfD): carbon-surface + emerald-signal 2px 边框 + 更强阴影
 import { Theme } from "../theme.slint";
 
 export component Card inherits Rectangle {
+    // true = 高亮卡片（绿色边框），false = 基础卡片（charcoal 边框）
     in property <bool> glowing: false;
+
     background: Theme.surface;
-    border-radius: 8px;
-    border-width: 1px;
+    border-radius: Theme.radius-large;
+
+    // 基础卡片 1px charcoal，高亮卡片 2px emerald
+    border-width: root.glowing ? 2px : 1px;
     border-color: root.glowing ? Theme.primary : Theme.border;
 
-    drop-shadow-blur: root.glowing ? 12px : 6px;
-    drop-shadow-color: root.glowing ? Theme.primary.transparentize(0.7) : #000000.transparentize(0.5);
-    drop-shadow-offset-y: 2px;
+    // 阴影
+    drop-shadow-blur: root.glowing ? 15px : 15px;
+    drop-shadow-color: root.glowing ? #00d99233 : #5c585533;
+    drop-shadow-offset-x: 0px;
+    drop-shadow-offset-y: 0px;
 }
