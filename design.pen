@@ -48,22 +48,52 @@
                   "cornerRadius": 8,
                   "stroke": {
                     "align": "center",
-                    "thickness": 2,
-                    "fill": "$--emerald-signal"
+                    "thickness": 1,
+                    "fill": "#3d3a39"
                   },
-                  "layout": "vertical",
-                  "justifyContent": "center",
-                  "alignItems": "center",
+                  "layout": "none",
                   "children": [
                     {
+                      "type": "ellipse",
+                      "id": "GJ7bo",
+                      "x": 6,
+                      "y": 6,
+                      "name": "dot1",
+                      "fill": "#3d3a39",
+                      "width": 4,
+                      "height": 4
+                    },
+                    {
+                      "type": "ellipse",
+                      "id": "9yItd",
+                      "x": 12,
+                      "y": 6,
+                      "name": "dot2",
+                      "fill": "#3d3a39",
+                      "width": 4,
+                      "height": 4
+                    },
+                    {
+                      "type": "ellipse",
+                      "id": "Ctajq",
+                      "x": 18,
+                      "y": 6,
+                      "name": "dot3",
+                      "fill": "#3d3a39",
+                      "width": 4,
+                      "height": 4
+                    },
+                    {
                       "type": "text",
-                      "id": "yoBpN",
-                      "name": "logoSymbol",
+                      "id": "YcABm",
+                      "x": 10,
+                      "y": 12,
+                      "name": "w_text",
                       "fill": "$--emerald-signal",
-                      "content": "⚡",
-                      "fontFamily": "system-ui",
-                      "fontSize": 20,
-                      "fontWeight": "normal"
+                      "content": "W",
+                      "fontFamily": "Inter",
+                      "fontSize": 22,
+                      "fontWeight": "700"
                     }
                   ]
                 },

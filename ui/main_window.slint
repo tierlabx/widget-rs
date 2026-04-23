@@ -102,22 +102,12 @@ export component MainWindow inherits Window {
                     spacing: 16px;
                     alignment: start;
 
-                    // 40×40 Logo 方块（绿色描边）
-                    Rectangle {
+                    // Logo 图标
+                    Image {
+                        source: @image-url("../logos/icon.png");
                         width: 40px;
                         height: 40px;
-                        border-radius: 8px;
-                        background: Theme.surface;
-                        border-width: 2px;
-                        border-color: Theme.primary;
-
-                        Text {
-                            text: "⚡";
-                            color: Theme.primary;
-                            font-size: 20px;
-                            horizontal-alignment: center;
-                            vertical-alignment: center;
-                        }
+                        image-fit: contain;
                     }
 
                     // 应用名称

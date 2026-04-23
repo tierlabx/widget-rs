@@ -11,6 +11,7 @@ directories = "5.0"
 tray-icon = "0.14"
 tao = "0.28"
 raw-window-handle = "0.6"
+image = { version = "0.24", default-features = false, features = ["png"] }
 windows-sys = { version = "0.52", features = [
     "Win32_Foundation",
     "Win32_UI_WindowsAndMessaging",
@@ -19,3 +20,4 @@ windows-sys = { version = "0.52", features = [
 
 [build-dependencies]
 slint-build = "1.16"
+winres = "0.1"

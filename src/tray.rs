@@ -3,28 +3,15 @@ use tray_icon::{
     TrayIconBuilder, TrayIcon, Icon,
 };
 
-/// 生成一个 32x32 的翡翠绿实心圆图标（RGBA 原始数据）
+/// 从生成的 icon.png 加载托盘图标
 fn build_icon() -> Icon {
-    let size: u32 = 32;
-    let mut rgba = vec![0u8; (size * size * 4) as usize];
-    let cx = size as f32 / 2.0;
-    let cy = size as f32 / 2.0;
-    let r = (size as f32 / 2.0) - 1.0;
-
-    for y in 0..size {
-        for x in 0..size {
-            let dx = x as f32 - cx;
-            let dy = y as f32 - cy;
-            let idx = ((y * size + x) * 4) as usize;
-            if (dx * dx + dy * dy).sqrt() <= r {
-                rgba[idx]     = 0x00; // R
-                rgba[idx + 1] = 0xd9; // G
-                rgba[idx + 2] = 0x92; // B
-                rgba[idx + 3] = 0xff; // A
-            }
-        }
-    }
-    Icon::from_rgba(rgba, size, size).expect("Failed to create tray icon")
+    let icon_bytes = include_bytes!("../logos/icon.png");
+    let image = image::load_from_memory(icon_bytes)
+        .expect("Failed to load icon image")
+        .into_rgba8();
+    let (width, height) = image.dimensions();
+    let rgba = image.into_raw();
+    Icon::from_rgba(rgba, width, height).expect("Failed to create tray icon")
 }
 
 /// 返回 (TrayIcon, toggle_menu_id, quit_menu_id)
