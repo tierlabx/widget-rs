@@ -1,0 +1,8 @@
+[package]
+name = "widget-core"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+gpui = "0.2.2"
+gpui-component = "0.5.1"

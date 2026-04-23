@@ -1,5 +1,5 @@
 use gpui::*;
-use crate::plugin_manager::Plugin;
+use widget_core::Plugin;
 
 pub struct StickyWidget;
 
@@ -62,3 +62,4 @@ impl Plugin for StickyWidgetPlugin {
         }).unwrap().into()
     }
 }
+

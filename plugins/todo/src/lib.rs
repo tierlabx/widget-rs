@@ -1,5 +1,5 @@
 use gpui::*;
-use crate::plugin_manager::Plugin;
+use widget_core::Plugin;
 
 pub struct TodoWidget;
 
@@ -167,3 +167,4 @@ impl Plugin for TodoWidgetPlugin {
         }).unwrap().into()
     }
 }
+

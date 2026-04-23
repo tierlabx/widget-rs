@@ -1,6 +1,8 @@
 use gpui::*;
 use crate::ui::main_window::MainWindow;
 use std::collections::HashMap;
+use raw_window_handle::{HasWindowHandle, RawWindowHandle};
+use windows_sys::Win32::UI::WindowsAndMessaging::{ShowWindow, SW_HIDE, SW_SHOW};
 
 pub struct WindowManager {
     pub main_window: Option<WindowHandle<gpui_component::Root>>,
@@ -45,12 +47,21 @@ impl WindowManager {
 
     pub fn toggle_main_window(&mut self, cx: &mut App) {
         self.is_visible = !self.is_visible;
-        println!("Toggle main window requested. is_visible = {}", self.is_visible);
+        let is_visible = self.is_visible;
+        println!("Toggle main window requested. is_visible = {}", is_visible);
         
         if let Some(window) = &self.main_window {
-            window.update(cx, |_, _, cx| {
+            window.update(cx, |_, window, cx| {
+                if let Ok(handle) = window.window_handle() {
+                    if let RawWindowHandle::Win32(h) = handle.as_raw() {
+                        unsafe {
+                            ShowWindow(h.hwnd.get() as isize, if is_visible { SW_SHOW } else { SW_HIDE });
+                        }
+                    }
+                }
                 cx.notify();
             }).ok();
         }
     }
 }
+

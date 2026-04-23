@@ -18,8 +18,8 @@ fn build_icon() -> Icon {
 pub fn setup_tray() -> Result<(TrayIcon, MenuId, MenuId), Box<dyn std::error::Error>> {
     let tray_menu = Menu::new();
 
-    let toggle_i = MenuItem::new("Toggle Control Center", true, None);
-    let quit_i   = MenuItem::new("Quit Widget RS", true, None);
+    let toggle_i = MenuItem::new("显示/隐藏控制台", true, None);
+    let quit_i   = MenuItem::new("退出 Widget RS", true, None);
 
     let toggle_id = toggle_i.id().clone();
     let quit_id   = quit_i.id().clone();

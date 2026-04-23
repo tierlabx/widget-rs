@@ -9,7 +9,6 @@ use window_manager::WindowManager;
 use plugin_manager::PluginManager;
 use tray_icon::menu::MenuEvent;
 use gpui::*;
-use std::sync::Arc;
 
 fn main() {
     let store = Store::new();
@@ -17,14 +16,11 @@ fn main() {
     println!("Loaded config: {:?}", config);
 
     let mut pm = PluginManager::new();
-    println!("Discovered plugins: {:?}", pm.discover_plugins());
-    
-    // 注册内置小部件插件
-    pm.register(Arc::new(ui::StickyWidgetPlugin));
-    pm.register(Arc::new(ui::TodoWidgetPlugin));
+    pm.register(std::sync::Arc::new(sticky_plugin::StickyWidgetPlugin));
+    pm.register(std::sync::Arc::new(todo_plugin::TodoWidgetPlugin));
 
     // 初始化系统托盘
-    let (_tray_icon, toggle_id, quit_id) = tray::setup_tray().expect("Failed to init tray");
+    let (tray_icon, toggle_id, quit_id) = tray::setup_tray().expect("Failed to init tray");
 
     // 初始化 GPUI 应用
     let app = Application::new();
@@ -43,6 +39,8 @@ fn main() {
 
         // 托盘菜单事件异步轮询
         cx.spawn(async move |cx| {
+            // 将 tray_icon 移动到这里以保持它的生命周期
+            let _tray = tray_icon;
             loop {
                 if let Ok(event) = MenuEvent::receiver().try_recv() {
                     if event.id == toggle_id {
@@ -50,6 +48,8 @@ fn main() {
                             wm.toggle_main_window(cx);
                         });
                     } else if event.id == quit_id {
+                        // 显式丢弃托盘图标，防止出现重影
+                        drop(_tray);
                         let _: gpui::Result<()> = cx.update(|cx| {
                             cx.quit();
                         });
@@ -61,3 +61,4 @@ fn main() {
         }).detach();
     });
 }
+

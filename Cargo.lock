@@ -5953,6 +5953,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a2eb9349b6444b326872e140eb1cf5e7c522154d69e7a0ffb0fb81c06b37543f"
 
 [[package]]
+name = "sticky_plugin"
+version = "0.1.0"
+dependencies = [
+ "gpui",
+ "gpui-component",
+ "widget-core",
+]
+
+[[package]]
 name = "str_indices"
 version = "0.4.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6483,6 +6492,15 @@ name = "tinyvec_macros"
 version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1f3ccbac311fea05f86f61904b462b55fb3df8837a366dfc601a0161d0532f20"
+
+[[package]]
+name = "todo_plugin"
+version = "0.1.0"
+dependencies = [
+ "gpui",
+ "gpui-component",
+ "widget-core",
+]
 
 [[package]]
 name = "tokio"
@@ -7366,6 +7384,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "widget-core"
+version = "0.1.0"
+dependencies = [
+ "gpui",
+ "gpui-component",
+]
+
+[[package]]
 name = "widget-rs"
 version = "0.1.0"
 dependencies = [
@@ -7376,8 +7402,11 @@ dependencies = [
  "raw-window-handle 0.6.2",
  "serde",
  "serde_json",
+ "sticky_plugin",
  "tao",
+ "todo_plugin",
  "tray-icon",
+ "widget-core",
  "windows-sys 0.52.0",
  "winres",
 ]

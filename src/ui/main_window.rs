@@ -13,7 +13,7 @@ impl Render for MainWindow {
         let is_visible = cx.global::<crate::window_manager::WindowManager>().is_visible;
         
         if !is_visible {
-            return div().into_any_element();
+            return div().bg(rgba(0x00000000)).into_any_element();
         }
 
         div()

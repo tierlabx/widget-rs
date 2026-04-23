@@ -1,0 +1,12 @@
+[package]
+name = "sticky_plugin"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+crate-type = ["rlib"]
+
+[dependencies]
+gpui = "0.2.2"
+gpui-component = "0.5.1"
+widget-core = { path = "../../widget-core" }
