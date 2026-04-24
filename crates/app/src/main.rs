@@ -23,7 +23,8 @@ fn main() {
     let (tray_icon, toggle_id, quit_id) = tray::setup_tray().expect("系统托盘初始化失败");
 
     // 初始化 GPUI 应用
-    let app = Application::new();
+    use gpui_component_assets::Assets;
+    let app = Application::new().with_assets(Assets);
     let store_for_app = Arc::clone(&store);
 
     app.run(move |cx| {

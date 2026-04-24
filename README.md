@@ -154,4 +154,5 @@ cx.spawn(async move |cx| {
 
 ## BUG
 
-系统托盘切换有bug
+ctrl D 后 组件不见了，应确保小组件在屏幕中
+

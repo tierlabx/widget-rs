@@ -4,7 +4,7 @@ use widget_core::{AppConfig, PluginConfig};
 use std::collections::HashMap;
 use raw_window_handle::{HasWindowHandle, RawWindowHandle};
 use windows_sys::Win32::UI::WindowsAndMessaging::{
-    ShowWindow, SW_HIDE, SW_SHOW, GetWindowRect,
+    ShowWindow, GetWindowRect,
 };
 use windows_sys::Win32::Foundation::RECT;
 use crate::store::Store;
@@ -110,8 +110,32 @@ impl WindowManager {
     }
 
     pub fn toggle_main_window(&mut self, cx: &mut App) {
-        self.is_visible = !self.is_visible;
+        let mut next_visible = !self.is_visible;
+        
+        if let Some(window) = &self.main_window {
+            window.update(cx, |_, window, _cx| {
+                if let Ok(handle) = window.window_handle() {
+                    if let RawWindowHandle::Win32(h) = handle.as_raw() {
+                        unsafe {
+                            let hwnd = h.hwnd.get() as isize;
+                            use windows_sys::Win32::UI::WindowsAndMessaging::{IsWindowVisible, IsIconic};
+                            let is_win_visible = IsWindowVisible(hwnd) != 0;
+                            let is_minimized = IsIconic(hwnd) != 0;
+                            
+                            if is_win_visible && !is_minimized {
+                                next_visible = false;
+                            } else {
+                                next_visible = true;
+                            }
+                        }
+                    }
+                }
+            }).ok();
+        }
+
+        self.is_visible = next_visible;
         let is_visible = self.is_visible;
+        
         cx.update_global::<widget_core::UIState, _>(|state, _| {
             state.is_visible = is_visible;
         });
@@ -122,7 +146,18 @@ impl WindowManager {
                 if let Ok(handle) = window.window_handle() {
                     if let RawWindowHandle::Win32(h) = handle.as_raw() {
                         unsafe {
-                            ShowWindow(h.hwnd.get() as isize, if is_visible { SW_SHOW } else { SW_HIDE });
+                            let hwnd = h.hwnd.get() as isize;
+                            use windows_sys::Win32::UI::WindowsAndMessaging::{IsIconic, SW_RESTORE, SW_SHOW, SW_HIDE, SetForegroundWindow};
+                            if is_visible {
+                                if IsIconic(hwnd) != 0 {
+                                    ShowWindow(hwnd, SW_RESTORE);
+                                } else {
+                                    ShowWindow(hwnd, SW_SHOW);
+                                }
+                                SetForegroundWindow(hwnd);
+                            } else {
+                                ShowWindow(hwnd, SW_HIDE);
+                            }
                         }
                     }
                 }

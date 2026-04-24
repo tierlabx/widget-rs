@@ -1,6 +1,8 @@
 use gpui::*;
 use raw_window_handle::{HasWindowHandle, RawWindowHandle};
-use windows_sys::Win32::UI::WindowsAndMessaging::{ShowWindow, SW_HIDE, SW_RESTORE, IsZoomed};
+use windows_sys::Win32::UI::WindowsAndMessaging::{
+    ShowWindow, SW_HIDE, SW_RESTORE, IsZoomed, SetForegroundWindow
+};
 
 pub struct MainWindow {
     is_maximized: bool,
@@ -87,7 +89,7 @@ impl MainWindow {
                     })
                     .child(
                         div().flex().items_center().gap(px(10.0)).ml(px(16.0))
-                        .child(div().text_base().text_color(rgb(0x00d992)).child("⊞"))
+                        .child(div().text_color(rgb(0x00d992)).child(gpui_component::Icon::new(gpui_component::IconName::WindowMaximize)))
                         .child(div().text_sm().font_weight(FontWeight::SEMIBOLD).text_color(rgb(0xf2f2f2)).child("Widget RS"))
                     )
             )
@@ -105,7 +107,7 @@ impl MainWindow {
                             .id("min-btn")
                             .hover(|s| s.bg(rgba(0xffffff1a)))
                             .on_click(|_, window, _| { window.minimize_window(); })
-                            .child(div().text_xs().text_color(rgb(0x8b949e)).child("━"))
+                            .child(div().text_color(rgb(0x8b949e)).child(gpui_component::Icon::new(gpui_component::IconName::Minus)))
                     )
                     .child(
                         div()
@@ -113,22 +115,40 @@ impl MainWindow {
                             .flex().justify_center().items_center()
                             .id("max-btn")
                             .hover(|s| s.bg(rgba(0xffffff1a)))
-                            .on_click(move |_, window, _| {
+                            .on_click(move |_, window, cx| {
+                                let mut hwnd_opt = None;
                                 if let Ok(handle) = window.window_handle() {
                                     if let RawWindowHandle::Win32(h) = handle.as_raw() {
                                         unsafe {
                                             let hwnd = h.hwnd.get() as isize;
+                                            hwnd_opt = Some(hwnd);
                                             if IsZoomed(hwnd) != 0 {
-                                                ShowWindow(hwnd, SW_RESTORE);
+                                                windows_sys::Win32::UI::WindowsAndMessaging::PostMessageW(hwnd, windows_sys::Win32::UI::WindowsAndMessaging::WM_SYSCOMMAND, windows_sys::Win32::UI::WindowsAndMessaging::SC_RESTORE as usize, 0);
                                             } else {
-                                                window.zoom_window();
+                                                windows_sys::Win32::UI::WindowsAndMessaging::PostMessageW(hwnd, windows_sys::Win32::UI::WindowsAndMessaging::WM_SYSCOMMAND, windows_sys::Win32::UI::WindowsAndMessaging::SC_MAXIMIZE as usize, 0);
                                             }
                                         }
                                     }
                                 }
+                                let app_cx: &mut gpui::App = cx;
+                                app_cx.spawn(async move |async_cx| {
+                                    // 连续多次刷新以覆盖 Windows 的窗口动画时间 (大约 200-250ms)
+                                    for _ in 0..6 {
+                                        async_cx.background_executor().timer(std::time::Duration::from_millis(50)).await;
+                                        let _ = async_cx.update(|cx| {
+                                            cx.refresh_windows();
+                                        });
+                                    }
+                                    // 动画结束后，模拟一次系统级的重新聚焦，强制 GPUI 更新视图边界
+                                    if let Some(hwnd) = hwnd_opt {
+                                        unsafe {
+                                            SetForegroundWindow(hwnd);
+                                        }
+                                    }
+                                }).detach();
                             })
                             .child(
-                                div().text_xs().text_color(rgb(0x8b949e)).child(if self.is_maximized { "❐" } else { "☐" })
+                                div().text_color(rgb(0x8b949e)).child(gpui_component::Icon::new(if self.is_maximized { gpui_component::IconName::Minimize } else { gpui_component::IconName::Maximize }))
                             )
                     )
                     .child(
@@ -147,7 +167,7 @@ impl MainWindow {
                                     }
                                 }
                             })
-                            .child(div().text_xs().text_color(rgb(0x8b949e)).child("✕"))
+                            .child(div().text_color(rgb(0x8b949e)).child(gpui_component::Icon::new(gpui_component::IconName::Close)))
                     )
             )
     }
@@ -186,19 +206,19 @@ impl MainWindow {
                         .rounded(px(8.0))
                         .bg(rgba(0x00d9921a))
                         .border_1().border_color(rgba(0x00d99220))
-                        .child(div().text_base().text_color(rgb(0x00d992)).child("⊞"))
+                        .child(div().text_color(rgb(0x00d992)).child(gpui_component::Icon::new(gpui_component::IconName::WindowMaximize)))
                         .child(div().text_sm().font_weight(FontWeight::MEDIUM).text_color(rgb(0xf2f2f2)).child("控制面板"))
                     )
                     .child(
                         div().flex().items_center().w_full().px(px(16.0)).py(px(10.0)).gap(px(16.0))
                         .rounded(px(8.0))
-                        .child(div().text_base().text_color(rgb(0x8b949e)).child("⊞"))
+                        .child(div().text_color(rgb(0x8b949e)).child(gpui_component::Icon::new(gpui_component::IconName::LayoutDashboard)))
                         .child(div().text_sm().font_weight(FontWeight::MEDIUM).text_color(rgb(0xb8b3b0)).child("小部件库"))
                     )
                     .child(
                         div().flex().items_center().w_full().px(px(16.0)).py(px(10.0)).gap(px(16.0))
                         .rounded(px(8.0))
-                        .child(div().text_base().text_color(rgb(0x8b949e)).child("⚙"))
+                        .child(div().text_color(rgb(0x8b949e)).child(gpui_component::Icon::new(gpui_component::IconName::Settings)))
                         .child(div().text_sm().font_weight(FontWeight::MEDIUM).text_color(rgb(0xb8b3b0)).child("设置"))
                     )
             )
@@ -262,7 +282,7 @@ impl MainWindow {
                     .child(
                         div().flex_1().flex().items_center().gap(px(10.0)).px(px(16.0)).py(px(12.0))
                         .bg(rgba(0x00d9920d)).border_1().border_color(rgba(0x00d99225)).rounded(px(8.0))
-                        .child(div().text_base().text_color(rgb(0x00d992)).child("⚡"))
+                        .child(div().text_color(rgb(0x00d992)).child(gpui_component::Icon::new(gpui_component::IconName::Star)))
                         .child(
                             div().flex().flex_col().gap(px(2.0))
                             .child(div().text_xl().font_weight(FontWeight::BOLD).text_color(rgb(0xf2f2f2)).child("2"))
@@ -272,7 +292,7 @@ impl MainWindow {
                     .child(
                         div().flex_1().flex().items_center().gap(px(10.0)).px(px(16.0)).py(px(12.0))
                         .bg(rgba(0xffffff06)).border_1().border_color(rgba(0x3d3a3960)).rounded(px(8.0))
-                        .child(div().text_base().text_color(rgb(0x8b949e)).child("⏸"))
+                        .child(div().text_color(rgb(0x8b949e)).child(gpui_component::Icon::new(gpui_component::IconName::CircleX)))
                         .child(
                             div().flex().flex_col().gap(px(2.0))
                             .child(div().text_xl().font_weight(FontWeight::BOLD).text_color(rgb(0xf2f2f2)).child("2"))
@@ -282,7 +302,7 @@ impl MainWindow {
                     .child(
                         div().flex_1().flex().items_center().gap(px(10.0)).px(px(16.0)).py(px(12.0))
                         .bg(rgba(0xffffff06)).border_1().border_color(rgba(0x3d3a3960)).rounded(px(8.0))
-                        .child(div().text_base().text_color(rgb(0xb8b3b0)).child("◈"))
+                        .child(div().text_color(rgb(0xb8b3b0)).child(gpui_component::Icon::new(gpui_component::IconName::GalleryVerticalEnd)))
                         .child(
                             div().flex().flex_col().gap(px(2.0))
                             .child(div().text_xl().font_weight(FontWeight::BOLD).text_color(rgb(0xf2f2f2)).child("4"))
@@ -302,19 +322,19 @@ impl MainWindow {
                         div().flex().flex_col().w_full().gap(px(16.0))
                         .child(
                             div().flex().w_full().gap(px(16.0))
-                            .child(self.render_widget_card("便签", "📝", true, 0, cx))
-                            .child(self.render_widget_card("待办事项", "☑", true, 1, cx))
+                            .child(self.render_widget_card("便签", gpui_component::IconName::File, true, 0, cx))
+                            .child(self.render_widget_card("待办事项", gpui_component::IconName::CircleCheck, true, 1, cx))
                         )
                         .child(
                             div().flex().w_full().gap(px(16.0))
-                            .child(self.render_widget_card("时钟", "⏱", false, 2, cx))
-                            .child(self.render_widget_card("系统监控", "☵", false, 3, cx))
+                            .child(self.render_widget_card("时钟", gpui_component::IconName::LoaderCircle, false, 2, cx))
+                            .child(self.render_widget_card("系统监控", gpui_component::IconName::SquareTerminal, false, 3, cx))
                         )
                     )
             )
     }
 
-    fn render_widget_card(&self, title: &str, icon: &str, is_running: bool, kind: u8, _cx: &mut Context<Self>) -> impl IntoElement {
+    fn render_widget_card(&self, title: &str, icon: gpui_component::IconName, is_running: bool, kind: u8, _cx: &mut Context<Self>) -> impl IntoElement {
         use crate::components::button::{Button, ButtonVariant};
         use crate::components::badge::{Badge, BadgeVariant};
         use crate::components::card::Card;
@@ -324,7 +344,7 @@ impl MainWindow {
 
         let action_btn1 = Button::new(("btn-settings", kind as usize), "设置")
             .variant(ButtonVariant::Ghost)
-            .icon("⚙");
+            .icon(gpui_component::IconName::Settings);
 
         let action_btn2 = if is_running {
             Button::new(("btn-toggle", kind as usize), "显示/隐藏")
@@ -369,7 +389,7 @@ impl MainWindow {
                 div()
                     .flex().flex_col().justify_center().items_center().w_full().h_full().p(px(12.0)).gap(px(8.0)).rounded(px(6.0))
                     .bg(rgb(0x050507)).border_1().border_color(rgba(0x3d3a3940))
-                    .child(div().text_3xl().text_color(rgba(0x3d3a3960)).child("☵"))
+                    .child(div().text_color(rgba(0x3d3a3960)).child(gpui_component::Icon::new(gpui_component::IconName::SquareTerminal).size(px(32.0))))
                     .child(div().text_sm().text_color(rgba(0x3d3a3980)).child("点击启动以显示系统信息"))
             }
         };
@@ -384,7 +404,7 @@ impl MainWindow {
                         .child(
                             div().flex().justify_center().items_center().w(px(32.0)).h(px(32.0)).rounded(px(6.0))
                             .bg(rgba(0x00d9921a)).border_1().border_color(rgba(0x00d99240))
-                            .child(div().text_base().text_color(if is_running { rgb(0x00d992) } else { rgb(0x8b949e) }).child(icon.to_string()))
+                            .child(div().text_color(if is_running { rgb(0x00d992) } else { rgb(0x8b949e) }).child(gpui_component::Icon::new(icon)))
                         )
                         .child(div().text_lg().font_weight(FontWeight::SEMIBOLD).text_color(rgb(0xf2f2f2)).child(title.to_string()))
                     )

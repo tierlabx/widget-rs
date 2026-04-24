@@ -1,4 +1,5 @@
 use gpui::*;
+use gpui_component::{Icon, IconName};
 
 #[derive(Default, Clone, Copy, PartialEq, Eq)]
 pub enum ButtonVariant {
@@ -13,7 +14,7 @@ pub enum ButtonVariant {
 pub struct Button {
     variant: ButtonVariant,
     label: SharedString,
-    icon: Option<SharedString>,
+    icon: Option<IconName>,
     id: ElementId,
 }
 
@@ -32,8 +33,8 @@ impl Button {
         self
     }
 
-    pub fn icon(mut self, icon: impl Into<SharedString>) -> Self {
-        self.icon = Some(icon.into());
+    pub fn icon(mut self, icon: IconName) -> Self {
+        self.icon = Some(icon);
         self
     }
 }
@@ -96,7 +97,7 @@ impl IntoElement for Button {
         let mut content = div().flex().items_center().gap(px(6.0));
         
         if let Some(icon) = self.icon {
-            content = content.child(div().text_sm().child(icon));
+            content = content.child(Icon::new(icon));
         }
 
         content = content.child(div().text_sm().font_weight(FontWeight::MEDIUM).child(self.label));
