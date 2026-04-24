@@ -16,6 +16,7 @@ pub struct Button {
     label: SharedString,
     icon: Option<IconName>,
     id: ElementId,
+    on_click: Option<Box<dyn Fn(&ClickEvent, &mut Window, &mut App) + 'static>>,
 }
 
 impl Button {
@@ -25,6 +26,7 @@ impl Button {
             label: label.into(),
             variant: ButtonVariant::Default,
             icon: None,
+            on_click: None,
         }
     }
 
@@ -35,6 +37,15 @@ impl Button {
 
     pub fn icon(mut self, icon: IconName) -> Self {
         self.icon = Some(icon);
+        self
+    }
+
+    /// 设置点击回调，回调参数为 (&ClickEvent, &mut Window, &mut App)
+    pub fn on_click(
+        mut self,
+        handler: impl Fn(&ClickEvent, &mut Window, &mut App) + 'static,
+    ) -> Self {
+        self.on_click = Some(Box::new(handler));
         self
     }
 }
@@ -94,8 +105,14 @@ impl IntoElement for Button {
             container = container.border_1().border_color(border_color);
         }
 
+        if let Some(handler) = self.on_click {
+            container = container.on_click(move |evt, window, cx| {
+                handler(evt, window, cx);
+            });
+        }
+
         let mut content = div().flex().items_center().gap(px(6.0));
-        
+
         if let Some(icon) = self.icon {
             content = content.child(Icon::new(icon));
         }
