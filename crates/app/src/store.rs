@@ -8,10 +8,9 @@ pub struct Store {
 
 impl Store {
     pub fn new() -> Self {
-        // 将配置存放在可执行文件所在目录
         let mut config_dir = std::env::current_exe()
             .expect("无法获取可执行文件路径");
-        config_dir.pop(); // 退到父目录
+        config_dir.pop();
 
         Self {
             config_path: config_dir.join("config.json"),
@@ -28,17 +27,30 @@ impl Store {
         }
     }
 
-    /// 将配置写入磁盘
+    /// 原子写入配置：先写 .tmp 再 rename，防止写一半崩溃损坏文件
     pub fn save_config(&self, config: &AppConfig) {
-        match serde_json::to_string_pretty(config) {
-            Ok(content) => {
-                if let Err(e) = fs::write(&self.config_path, content) {
-                    eprintln!("[Store] 保存配置失败: {}", e);
-                } else {
-                    println!("[Store] 配置已保存到 {:?}", self.config_path);
-                }
+        let json = match serde_json::to_string_pretty(config) {
+            Ok(s) => s,
+            Err(e) => {
+                eprintln!("[Store] 序列化失败: {}", e);
+                return;
             }
-            Err(e) => eprintln!("[Store] 序列化配置失败: {}", e),
+        };
+
+        // 写入临时文件
+        let tmp_path = self.config_path.with_extension("json.tmp");
+        if let Err(e) = fs::write(&tmp_path, &json) {
+            eprintln!("[Store] 写入临时文件失败: {}", e);
+            return;
+        }
+
+        // 原子替换（同一文件系统上 rename 是原子的）
+        if let Err(e) = fs::rename(&tmp_path, &self.config_path) {
+            eprintln!("[Store] 原子替换失败: {}", e);
+            // 尝试直接写（降级）
+            let _ = fs::write(&self.config_path, &json);
+        } else {
+            println!("[Store] 配置已保存到 {:?}", self.config_path);
         }
     }
 }

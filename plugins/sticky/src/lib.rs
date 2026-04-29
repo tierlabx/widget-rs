@@ -1,46 +1,77 @@
 use gpui::*;
+use gpui_component::input::{Input, InputState, InputEvent};
+use gpui_component::{Icon, IconName};
 use widget_core::{AppConfig, Plugin};
 use raw_window_handle::HasWindowHandle;
 
 pub struct StickyWidget {
     hwnd_reported: bool,
+    input: Entity<InputState>,
 }
 
 impl StickyWidget {
-    pub fn new() -> Self {
-        Self { hwnd_reported: false }
+    pub fn new(window: &mut Window, cx: &mut Context<Self>) -> Self {
+        // 从全局配置读取已保存的便签内容
+        let saved_content = cx
+            .try_global::<AppConfig>()
+            .map(|c| c.sticky_content.clone())
+            .unwrap_or_default();
+
+        let input = cx.new(|cx| {
+            InputState::new(window, cx)
+                .multi_line(true)
+                .default_value(saved_content)
+                .placeholder("在这里记录你的想法...")
+        });
+
+        // 内容变化时更新内存 + 立即写盘
+        // 便签内容较小，每次变化直接落盘是可接受的
+        cx.subscribe(
+            &input,
+            |_this: &mut Self, input: Entity<InputState>, event: &InputEvent, cx| {
+                // Change 事件在每次文字变化时触发
+                if let InputEvent::Change = event {
+                    let text = input.read(cx).value().to_string();
+                    cx.update_global::<AppConfig, _>(|config, _| {
+                        config.sticky_content = text;
+                    });
+                    widget_core::save_config_now(cx);
+                }
+            },
+        )
+        .detach();
+
+        Self {
+            hwnd_reported: false,
+            input,
+        }
     }
 }
 
 impl Render for StickyWidget {
     fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        let is_edit_mode = cx.try_global::<widget_core::UIState>().map_or(false, |s| s.is_edit_mode);
+        let is_edit_mode = cx
+            .try_global::<widget_core::UIState>()
+            .map_or(false, |s| s.is_edit_mode);
 
         if let Ok(handle) = _window.window_handle() {
             if let raw_window_handle::RawWindowHandle::Win32(h) = handle.as_raw() {
                 let hwnd = h.hwnd.get() as isize;
-
-                // 上报 HWND 到 WindowManager（仅需执行一次）
                 if !self.hwnd_reported {
                     self.hwnd_reported = true;
-                    cx.update_global::<widget_core::UIState, _>(|_, _| {}); // 借用 cx 触发下面调用
-                    // 通知 App 级别的 WindowManager 记录 HWND
-                    // 注：此处通过 cx.app_mut() 不可直接访问，改用 emit 方式通知
-                    // 实际在 spawn_window 后由 main.rs 负责首次记录
-                    let _ = hwnd; // 稍后由 main.rs 通过 set_hwnd 处理
+                    let _ = hwnd;
                 }
-
                 unsafe {
-                    use windows_sys::Win32::UI::WindowsAndMessaging::{GetWindowLongW, SetWindowLongW, GWL_STYLE, WS_THICKFRAME};
+                    use windows_sys::Win32::UI::WindowsAndMessaging::{
+                        GetWindowLongW, SetWindowLongW, GWL_STYLE, WS_THICKFRAME,
+                    };
                     let style = GetWindowLongW(hwnd, GWL_STYLE);
                     if is_edit_mode {
                         if (style & WS_THICKFRAME as i32) == 0 {
                             SetWindowLongW(hwnd, GWL_STYLE, style | WS_THICKFRAME as i32);
                         }
-                    } else {
-                        if (style & WS_THICKFRAME as i32) != 0 {
-                            SetWindowLongW(hwnd, GWL_STYLE, style & !(WS_THICKFRAME as i32));
-                        }
+                    } else if (style & WS_THICKFRAME as i32) != 0 {
+                        SetWindowLongW(hwnd, GWL_STYLE, style & !(WS_THICKFRAME as i32));
                     }
                 }
             }
@@ -62,10 +93,10 @@ impl Render for StickyWidget {
                                 unsafe {
                                     windows_sys::Win32::UI::Input::KeyboardAndMouse::ReleaseCapture();
                                     windows_sys::Win32::UI::WindowsAndMessaging::SendMessageW(
-                                        h.hwnd.get() as isize, 
-                                        windows_sys::Win32::UI::WindowsAndMessaging::WM_NCLBUTTONDOWN, 
-                                        windows_sys::Win32::UI::WindowsAndMessaging::HTCAPTION as usize, 
-                                        0
+                                        h.hwnd.get() as isize,
+                                        windows_sys::Win32::UI::WindowsAndMessaging::WM_NCLBUTTONDOWN,
+                                        windows_sys::Win32::UI::WindowsAndMessaging::HTCAPTION as usize,
+                                        0,
                                     );
                                 }
                             }
@@ -76,12 +107,14 @@ impl Render for StickyWidget {
                             .text_xs()
                             .font_weight(FontWeight::BOLD)
                             .text_color(rgb(0x050507))
-                            .child(":: 拖拽移动便签 ::")
-                    )
+                            .child(":: 拖拽移动便签 ::"),
+                    ),
             )
         } else {
             None
         };
+
+        let input = &self.input;
 
         div()
             .flex()
@@ -92,19 +125,51 @@ impl Render for StickyWidget {
             .border_color(if is_edit_mode { rgb(0x00d992) } else { rgb(0x3d3a39) })
             .rounded(px(8.0))
             .children(drag_handle)
+            // 标题栏
+            .child(
+                div()
+                    .flex()
+                    .items_center()
+                    .gap(px(6.0))
+                    .w_full()
+                    .px(px(14.0))
+                    .py(px(10.0))
+                    .bg(rgb(0xfef3c7))
+                    .border_b_1()
+                    .border_color(rgba(0xf59e0b60))
+                    .child(
+                        div()
+                            .text_color(rgb(0x92400e))
+                            .child(Icon::new(IconName::File).size(px(14.0))),
+                    )
+                    .child(
+                        div()
+                            .text_sm()
+                            .font_weight(FontWeight::SEMIBOLD)
+                            .text_color(rgb(0x78350f))
+                            .child("便签"),
+                    ),
+            )
+            // 文本区域
             .child(
                 div()
                     .flex()
                     .flex_col()
-                    .size_full()
-                    .p(px(16.0))
-                    .bg(rgba(0xfef3c7f2))
+                    .flex_1()
+                    .w_full()
+                    .bg(rgb(0xfef3c7))
+                    .p(px(10.0))
                     .child(
                         div()
-                            .text_sm()
-                            .text_color(rgb(0x78350f))
-                            .child("在这里记录你的想法...\n\n双击编辑内容")
-                    )
+                            .flex_1()
+                            .w_full()
+                            .h_full()
+                            .bg(rgba(0xffffff80))
+                            .rounded(px(4.0))
+                            .p(px(6.0))
+                            .text_color(rgb(0x3d2000))
+                            .child(Input::new(input).h_full().appearance(false).bordered(false)),
+                    ),
             )
     }
 }
@@ -117,14 +182,11 @@ impl Plugin for StickyWidgetPlugin {
     }
 
     fn spawn_window(&self, cx: &mut App) -> AnyWindowHandle {
-        // 尝试从已保存的配置中读取位置，否则使用默认值
         let (x, y, w, h) = cx
             .try_global::<AppConfig>()
             .and_then(|cfg| cfg.plugins.get("sticky_widget").cloned())
             .map(|p| (p.x, p.y, p.width, p.height))
             .unwrap_or((1250.0, 50.0, 320.0, 360.0));
-
-        println!("[StickyPlugin] 初始位置: ({}, {}) {}x{}", x, y, w, h);
 
         let options = WindowOptions {
             titlebar: None,
@@ -139,8 +201,10 @@ impl Plugin for StickyWidgetPlugin {
         };
 
         cx.open_window(options, |window, cx| {
-            let view = cx.new(|_| StickyWidget::new());
+            let view = cx.new(|cx| StickyWidget::new(window, cx));
             cx.new(|cx| gpui_component::Root::new(view, window, cx))
-        }).unwrap().into()
+        })
+        .unwrap()
+        .into()
     }
 }

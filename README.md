@@ -16,13 +16,13 @@ cargo run
 
 ## 技术栈
 
-| 层级 | 技术 |
-|---|---|
-| UI 渲染 | [GPUI](https://gpui.rs/) + gpui-component |
-| 系统托盘 | [tray-icon](https://github.com/tauri-apps/tray-icon) |
-| 数据持久化 | serde_json + directories |
-| Win32 交互 | windows-sys 0.52 |
-| 原生窗口句柄 | raw-window-handle 0.6 |
+| 层级         | 技术                                                 |
+| ------------ | ---------------------------------------------------- |
+| UI 渲染      | [GPUI](https://gpui.rs/) + gpui-component            |
+| 系统托盘     | [tray-icon](https://github.com/tauri-apps/tray-icon) |
+| 数据持久化   | serde_json + directories                             |
+| Win32 交互   | windows-sys 0.52                                     |
+| 原生窗口句柄 | raw-window-handle 0.6                                |
 
 ---
 
@@ -71,12 +71,12 @@ cx.update_global::<WindowManager, _>(|wm, cx| {
 
 #### 失败的尝试
 
-| 方案 | 失败原因 |
-|---|---|
-| 在 `show()` 前用 `EnumWindows` 设置 `WS_EX_TOOLWINDOW` | GPUI 的 Win32 窗口在事件循环首次运行前尚未完全初始化 |
-| `show()` 后立即设置 + `SW_HIDE`→`SW_SHOW` | Shell 已注册按钮；GPUI 内部渲染循环会重新触发 `ShowWindow` 覆盖修改 |
-| 用 `FindWindowW` 查找 HWND | 无边框窗口没有 OS 级 title，查找失败 |
-| `raw-window-handle` 在事件循环启动前获取 HWND | 此时 `window_handle()` 返回 `None` |
+| 方案                                                   | 失败原因                                                            |
+| ------------------------------------------------------ | ------------------------------------------------------------------- |
+| 在 `show()` 前用 `EnumWindows` 设置 `WS_EX_TOOLWINDOW` | GPUI 的 Win32 窗口在事件循环首次运行前尚未完全初始化                |
+| `show()` 后立即设置 + `SW_HIDE`→`SW_SHOW`              | Shell 已注册按钮；GPUI 内部渲染循环会重新触发 `ShowWindow` 覆盖修改 |
+| 用 `FindWindowW` 查找 HWND                             | 无边框窗口没有 OS 级 title，查找失败                                |
+| `raw-window-handle` 在事件循环启动前获取 HWND          | 此时 `window_handle()` 返回 `None`                                  |
 
 #### 最终有效方案
 
@@ -147,7 +147,6 @@ cx.spawn(async move |cx| {
 
 ## 后续规划
 
-- [ ] 便签/待办数据持久化绑定（写入 `store.rs` JSON）
 - [ ] 鼠标穿透切换（winit 后端 `WS_EX_TRANSPARENT`）
 - [ ] 插件系统：动态加载和管理独立编译的外部组件或脚本
 - [ ] 插件市场 UI
@@ -155,4 +154,3 @@ cx.spawn(async move |cx| {
 ## BUG
 
 ctrl D 后 组件不见了，应确保小组件在屏幕中
-

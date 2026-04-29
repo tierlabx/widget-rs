@@ -12,6 +12,13 @@ pub struct PluginConfig {
     pub height: f32,
 }
 
+/// 持久化的待办条目
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct TodoItemData {
+    pub text: String,
+    pub done: bool,
+}
+
 /// 应用全局配置（可被序列化存储）
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct AppConfig {
@@ -19,6 +26,12 @@ pub struct AppConfig {
     pub mouse_passthrough: bool,
     /// 各插件位置，键为插件 ID，例如 "sticky_widget"
     pub plugins: HashMap<String, PluginConfig>,
+    /// 便签内容
+    #[serde(default)]
+    pub sticky_content: String,
+    /// 待办事项列表
+    #[serde(default)]
+    pub todo_items: Vec<TodoItemData>,
 }
 
 impl Default for AppConfig {
@@ -27,11 +40,36 @@ impl Default for AppConfig {
             always_on_top: false,
             mouse_passthrough: false,
             plugins: HashMap::new(),
+            sticky_content: String::new(),
+            todo_items: Vec::new(),
         }
     }
 }
 
 impl Global for AppConfig {}
+
+/// 保存回调：由 app crate 注册，插件调用以立即落盘
+pub struct SaveCallback(pub std::sync::Arc<dyn Fn(&AppConfig) + Send + Sync>);
+impl Global for SaveCallback {}
+
+/// 立即落盘：克隆数据后交给后台执行器执行 IO，不阻塞 GPUI 主线程
+/// 在任何 GPUI 事件处理器（subscribe/listener）内都可安全调用
+pub fn save_config_now(cx: &mut App) {
+    // 1. 先克隆好所需数据（短暂借用，立即释放）
+    let config = match cx.try_global::<AppConfig>() {
+        Some(c) => c.clone(),
+        None => return,
+    };
+    let save_fn = match cx.try_global::<SaveCallback>() {
+        Some(cb) => cb.0.clone(), // 克隆 Arc，立即释放对 SaveCallback 的借用
+        None => return,
+    };
+
+    // 2. 将 IO 操作派发到后台线程，完全绕开 GPUI RefCell
+    cx.background_executor().spawn(async move {
+        save_fn(&config);
+    }).detach();
+}
 
 /// UI 运行时状态（不持久化）
 pub struct UIState {

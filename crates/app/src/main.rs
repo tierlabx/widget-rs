@@ -9,6 +9,7 @@ use plugin_manager::PluginManager;
 use tray_icon::menu::MenuEvent;
 use gpui::*;
 use std::sync::Arc;
+use widget_core::AppConfig;
 
 fn main() {
     let store = Arc::new(Store::new());
@@ -28,6 +29,15 @@ fn main() {
     app.run(move |cx| {
         gpui_component::init(cx);
         cx.set_global(config.clone());
+
+        // 注册立即写盘回调，插件可调用 save_config_now(cx) 触发
+        let store_for_save = Arc::clone(&store_for_app);
+        cx.set_global(widget_core::SaveCallback(
+            std::sync::Arc::new(move |cfg: &AppConfig| {
+                store_for_save.save_config(cfg);
+            })
+        ));
+
         WindowManager::init(cx);
 
         // 启动插件窗口
