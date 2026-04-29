@@ -49,7 +49,7 @@ impl Render for MainWindow {
 }
 
 impl MainWindow {
-    fn render_titlebar(&self, window: &mut Window, _cx: &mut Context<Self>) -> impl IntoElement {
+    fn render_titlebar(&self, _window: &mut Window, _cx: &mut Context<Self>) -> impl IntoElement {
         let is_max = self.is_maximized;
         div().flex().justify_between().items_center().w_full().h(px(48.0))
             .bg(rgb(0x101010)).border_b_1().border_color(rgb(0x3d3a39))

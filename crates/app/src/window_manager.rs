@@ -2,7 +2,7 @@ use gpui::*;
 use widget_ui::main_window::MainWindow;
 use widget_core::{AppConfig, PluginConfig};
 use std::collections::HashMap;
-use raw_window_handle::{HasWindowHandle, RawWindowHandle};
+
 use windows_sys::Win32::UI::WindowsAndMessaging::{
     ShowWindow, GetWindowRect,
 };
@@ -113,6 +113,7 @@ impl WindowManager {
     }
 
     /// 获取插件的 HWND（用于在异步上下文中安全操作，避免嵌套借用）
+    #[allow(dead_code)]
     pub fn get_plugin_hwnd(&self, plugin_id: &str) -> isize {
         self.widget_windows.iter()
             .find(|(k, _)| **k == plugin_id)
@@ -121,6 +122,7 @@ impl WindowManager {
     }
 
     /// 通过 HWND 直接控制插件窗口显示/隐藏（不借用 cx，可在 update_global 外调用）
+    #[allow(dead_code)]
     pub fn show_plugin_window(hwnd: isize, visible: bool) {
         if hwnd == 0 { return; }
         unsafe {
@@ -135,6 +137,7 @@ impl WindowManager {
     }
 
     /// 应用"始终置顶"设置到所有插件窗口
+    #[allow(dead_code)]
     pub fn apply_always_on_top(&self, always_on_top: bool) {
         use windows_sys::Win32::UI::WindowsAndMessaging::{
             SetWindowPos, HWND_TOPMOST, HWND_NOTOPMOST,
@@ -151,6 +154,7 @@ impl WindowManager {
     }
 
     /// 应用"鼠标穿透"设置到所有插件窗口
+    #[allow(dead_code)]
     pub fn apply_mouse_passthrough(&self, passthrough: bool) {
         use windows_sys::Win32::UI::WindowsAndMessaging::{
             GetWindowLongW, SetWindowLongW, GWL_EXSTYLE,
@@ -172,6 +176,7 @@ impl WindowManager {
     }
 
     /// 获取主窗口的 HWND（避免在 update_global 闭包内嵌套调用）
+    #[allow(dead_code)]
     pub fn get_main_hwnd(&self) -> isize {
         // 只能通过已存储的值，或者在外部通过 window.update 读取
         // 这里返回 0 占位，主窗口 HWND 通过 toggle_main_window_win32 外部传入
@@ -180,11 +185,13 @@ impl WindowManager {
 
     /// 通过 Win32 API 切换主窗口可见性，不持有 cx borrow
     /// 返回：(next_visible, hwnd)
+    #[allow(dead_code)]
     pub fn compute_next_visible(&mut self) -> bool {
         !self.is_visible
     }
 
     /// 更新 is_visible 字段
+    #[allow(dead_code)]
     pub fn set_visible(&mut self, visible: bool) {
         self.is_visible = visible;
     }
@@ -197,7 +204,7 @@ impl WindowManager {
         }
         unsafe {
             use windows_sys::Win32::UI::WindowsAndMessaging::{
-                IsWindowVisible, IsIconic, IsZoomed,
+                IsWindowVisible, IsIconic,
                 ShowWindow, SW_RESTORE, SW_SHOW, SW_HIDE, SetForegroundWindow
             };
             let is_win_visible = IsWindowVisible(hwnd) != 0;
@@ -220,6 +227,7 @@ impl WindowManager {
     }
 
     /// 兼容旧接口（托盘事件中使用），已迁移为 toggle_main_window_win32
+    #[allow(dead_code)]
     pub fn toggle_main_window(&mut self, _cx: &mut App) {
         self.toggle_main_window_win32();
     }
