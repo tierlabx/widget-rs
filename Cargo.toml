@@ -5,6 +5,18 @@ members = [
 ]
 resolver = "2"
 
+[profile.release]
+# 启用链接时优化，大幅减小可执行文件体积
+lto = true
+# 单个代码生成单元，优化更彻底（编译更慢）
+codegen-units = 1
+# 去除调试符号，减小体积
+strip = true
+# 优化级别：速度
+opt-level = 3
+# 出现 panic 直接中止，不展开栈
+panic = "abort"
+
 [workspace.dependencies]
 gpui = "0.2.2"
 gpui-component = "0.5.1"
