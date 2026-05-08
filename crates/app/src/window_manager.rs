@@ -4,7 +4,7 @@ use widget_core::{AppConfig, PluginConfig};
 use std::collections::HashMap;
 
 use windows_sys::Win32::UI::WindowsAndMessaging::{
-    ShowWindow, GetWindowRect,
+    ShowWindow, GetWindowRect, FindWindowW, SetWindowLongPtrW, GWLP_HWNDPARENT,
 };
 use windows_sys::Win32::Foundation::RECT;
 use crate::store::Store;
@@ -230,5 +230,23 @@ impl WindowManager {
     #[allow(dead_code)]
     pub fn toggle_main_window(&mut self, _cx: &mut App) {
         self.toggle_main_window_win32();
+    }
+
+    /// 将窗口附加到桌面（Progman），防止 Win + D 时被最小化
+    pub fn attach_to_desktop(hwnd: isize) {
+        if hwnd == 0 { return; }
+        unsafe {
+            // "Progman" 的 UTF-16 编码
+            let class_name: [u16; 8] = [
+                'P' as u16, 'r' as u16, 'o' as u16, 'g' as u16, 
+                'm' as u16, 'a' as u16, 'n' as u16, 0
+            ];
+            let progman = FindWindowW(class_name.as_ptr(), std::ptr::null());
+            if progman != 0 {
+                // 在 64 位系统上，GWLP_HWNDPARENT 用于设置 Owner
+                SetWindowLongPtrW(hwnd, GWLP_HWNDPARENT, progman);
+                println!("[WindowManager] 已将 HWND {} 附加到桌面 (Progman: {})", hwnd, progman);
+            }
+        }
     }
 }

@@ -108,6 +108,8 @@ fn main() {
                     if let Some(e) = wm.widget_windows.get_mut(id.as_str()) { e.1 = *hwnd; }
                     // 注册到 thread_local，供 widget-ui on_click 直接使用
                     widget_core::register_plugin_hwnd(id, *hwnd);
+                    // 防止 Win + D 隐藏小组件
+                    WindowManager::attach_to_desktop(*hwnd);
                 }
                 if main_hwnd != 0 { wm.main_hwnd = main_hwnd; }
             });
