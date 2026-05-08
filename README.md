@@ -150,7 +150,3 @@ cx.spawn(async move |cx| {
 - [ ] 鼠标穿透切换（winit 后端 `WS_EX_TRANSPARENT`）
 - [ ] 插件系统：动态加载和管理独立编译的外部组件或脚本
 - [ ] 插件市场 UI
-
-## BUG
-
-ctrl D 后 组件不见了，应确保小组件在屏幕中
