@@ -14,14 +14,17 @@ use std::sync::Arc;
 use widget_core::AppConfig;
 
 fn main() {
+    // 1. 初始化存储和加载配置
     let store = Arc::new(Store::new());
     let config = store.load_config();
     println!("[main] 已加载配置: {:?}", config);
 
+    // 2. 初始化插件管理器并注册内置小组件
     let mut pm = PluginManager::new();
     pm.register(Arc::new(sticky_plugin::StickyWidgetPlugin));
     pm.register(Arc::new(todo_plugin::TodoWidgetPlugin));
 
+    // 3. 初始化系统托盘（包括托盘图标和菜单）
     let (tray_icon, toggle_id, quit_id) = tray::setup_tray().expect("系统托盘初始化失败");
 
     use gpui_component_assets::Assets;
@@ -29,6 +32,7 @@ fn main() {
     let store_for_app = Arc::clone(&store);
 
     app.run(move |cx| {
+        // 初始化全局状态和组件资产
         gpui_component::init(cx);
         cx.set_global(config.clone());
 
@@ -40,9 +44,10 @@ fn main() {
             })
         ));
 
+        // 初始化窗口管理器，用于管理主窗口和所有插件窗口的生命周期和状态
         WindowManager::init(cx);
 
-        // 启动插件窗口
+        // 启动并注册所有已加载的插件窗口
         let plugins = pm.get_plugins().to_vec();
         cx.update_global::<WindowManager, _>(|wm, cx| {
             for plugin in &plugins {
@@ -102,13 +107,13 @@ fn main() {
 
             if main_hwnd != 0 { println!("[main] 主窗口 HWND = {}", main_hwnd); }
 
-            // Step 3: 写回 WindowManager + 注册 thread_local
+            // Step 3: 将 HWND 写回 WindowManager 并注册到 thread_local 供全局访问
             let _ = cx.update_global::<WindowManager, _>(|wm, _| {
                 for (id, hwnd) in &id_hwnd {
                     if let Some(e) = wm.widget_windows.get_mut(id.as_str()) { e.1 = *hwnd; }
-                    // 注册到 thread_local，供 widget-ui on_click 直接使用
+                    // 注册到 thread_local，供 widget-ui on_click 等跨线程操作直接使用
                     widget_core::register_plugin_hwnd(id, *hwnd);
-                    // 防止 Win + D 隐藏小组件
+                    // 防止 Win + D （显示桌面）操作导致小组件被隐藏
                     WindowManager::attach_to_desktop(*hwnd);
                 }
                 if main_hwnd != 0 { wm.main_hwnd = main_hwnd; }
@@ -117,7 +122,7 @@ fn main() {
             let _ = store_for_hwnd;
         }).detach();
 
-        // 托盘菜单事件轮询（仅此一个异步循环，操作简单不嵌套）
+        // 启动托盘菜单事件的独立轮询循环（这是一个简单的轮询异步任务，避免借用嵌套）
         let store_for_tray = Arc::clone(&store_for_app);
         cx.spawn(async move |cx| {
             let _tray = tray_icon;
@@ -136,7 +141,8 @@ fn main() {
 
                     } else if event.id == quit_id {
                         let store_quit = Arc::clone(&store_for_tray);
-                        // save_all_plugin_bounds 只调 cx.try_global + cx.set_global（无嵌套）
+                        // 退出前，保存所有插件窗口的当前位置和状态。
+                        // 这里直接操作 try_global / set_global，不涉及复杂的锁嵌套
                         let _ = cx.update_global::<WindowManager, _>(|wm, cx| {
                             wm.save_all_plugin_bounds(cx, &store_quit);
                         });

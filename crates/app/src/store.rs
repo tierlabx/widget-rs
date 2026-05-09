@@ -2,11 +2,16 @@ use widget_core::AppConfig;
 use std::fs;
 use std::path::PathBuf;
 
+/// 存储管理器
+/// 
+/// 负责应用程序配置的持久化保存与加载，支持本地文件系统操作。
 pub struct Store {
+    /// 配置文件存储路径（通常与可执行文件同目录下的 config.json）
     config_path: PathBuf,
 }
 
 impl Store {
+    /// 创建一个新的 Store 实例，并初始化配置文件路径
     pub fn new() -> Self {
         let mut config_dir = std::env::current_exe()
             .expect("无法获取可执行文件路径");
@@ -17,7 +22,7 @@ impl Store {
         }
     }
 
-    /// 加载配置，不存在则返回默认值
+    /// 加载配置，如果文件不存在或读取失败，则返回默认配置
     pub fn load_config(&self) -> AppConfig {
         if self.config_path.exists() {
             let content = fs::read_to_string(&self.config_path).unwrap_or_default();
@@ -26,6 +31,7 @@ impl Store {
             AppConfig::default()
         }
     }
+
 
     /// 原子写入配置：先写 .tmp 再 rename，防止写一半崩溃损坏文件
     pub fn save_config(&self, config: &AppConfig) {

@@ -9,18 +9,28 @@ use windows_sys::Win32::UI::WindowsAndMessaging::{
 use windows_sys::Win32::Foundation::RECT;
 use crate::store::Store;
 
+/// 窗口管理器
+///
+/// 负责全局窗口的状态管理、插件窗口位置的读写、可见性控制、以及应用 Windows 平台相关的窗口效果（如置顶、鼠标穿透、防最小化等）。
 pub struct WindowManager {
+    /// 主窗口的句柄引用，可能尚未初始化
     pub main_window: Option<WindowHandle<gpui_component::Root>>,
-    /// 主窗口的 Win32 HWND（提取后存储，避免 toggle 时嵌套借用）
+    /// 主窗口的 Win32 HWND（提取后单独存储，避免后续操作时产生不必要的生命周期或借用嵌套）
     pub main_hwnd: isize,
-    /// 注册的插件窗口：id -> (窗口句柄, HWND)
+    /// 注册的所有插件窗口：插件 ID 映射到 (窗口泛型句柄, Win32 HWND)
     pub widget_windows: HashMap<&'static str, (AnyWindowHandle, isize)>,
+    /// 全局应用是否可见的状态标志
     pub is_visible: bool,
 }
 
 impl Global for WindowManager {}
 
 impl WindowManager {
+    /// 初始化窗口管理器和主窗口
+    /// 
+    /// - 注册全局 UI 状态
+    /// - 实例化并打开主窗口
+    /// - 将 WindowManager 自身保存至应用的全局状态中
     pub fn init(cx: &mut App) {
         cx.set_global(widget_core::UIState { is_visible: true, is_edit_mode: false, plugin_visibility: std::collections::HashMap::new() });
         cx.set_global(Self {
@@ -51,23 +61,28 @@ impl WindowManager {
         });
     }
 
-    /// 注册插件窗口，同时记录 HWND 以便后续读取位置
+    /// 注册插件窗口
+    ///
+    /// 将插件窗口记录到 `widget_windows` 字典中。初始时如果无法直接读取 HWND，则记录为 0。
     pub fn register_widget_window(&mut self, id: &'static str, handle: AnyWindowHandle) {
-        // 尝试从窗口句柄中提取 HWND
+        // 尝试从窗口句柄中提取 HWND，默认先给 0
         let hwnd = Self::extract_hwnd(&handle);
         self.widget_windows.insert(id, (handle, hwnd));
     }
 
-    /// 从 AnyWindowHandle 中提取 Win32 HWND
+    /// 从 `AnyWindowHandle` 中尝试提取 Win32 HWND
+    ///
+    /// 注意：`AnyWindowHandle` 无法在此处直接安全地同步读取句柄。
+    /// 这里的处理逻辑是先返回 0 作为占位符，等到插件窗口首次实际渲染或异步流程中，
+    /// 再调用 `set_hwnd` 进行真实 HWND 的更新。
     fn extract_hwnd(handle: &AnyWindowHandle) -> isize {
-        // AnyWindowHandle 无法直接在此安全上下文中读取句柄，
-        // 我们通过存储插件窗口时用额外调用来获取。
-        // 这里先存 0，在插件首次渲染时会通过 set_hwnd 更新。
         let _ = handle;
         0
     }
 
-    /// 在插件首次渲染后，通过插件 ID 更新已记录的 HWND
+    /// 更新已注册的插件 HWND
+    /// 
+    /// 此方法通常在插件窗口渲染完成、可以通过底层 API 拿到真正系统句柄后调用。
     #[allow(dead_code)]
     pub fn set_hwnd(&mut self, id: &'static str, hwnd: isize) {
         if let Some(entry) = self.widget_windows.get_mut(id) {
@@ -75,7 +90,9 @@ impl WindowManager {
         }
     }
 
-    /// 读取所有已注册插件的当前窗口位置并保存到配置文件
+    /// 保存所有插件的当前屏幕位置和尺寸到配置文件
+    /// 
+    /// 通过 Win32 API `GetWindowRect` 读取各插件最新的屏幕坐标和大小，并持久化到 `Store`。
     pub fn save_all_plugin_bounds(&self, cx: &mut App, store: &Store) {
         let mut config = cx
             .try_global::<AppConfig>()
@@ -112,7 +129,10 @@ impl WindowManager {
         store.save_config(&config);
     }
 
-    /// 获取插件的 HWND（用于在异步上下文中安全操作，避免嵌套借用）
+    /// 获取指定插件的 Win32 HWND
+    /// 
+    /// 返回 `0` 表示插件不存在或 HWND 尚未加载。这主要用于在异步任务中安全地引用底层窗口句柄，
+    /// 而无需锁定/借用整个 `WindowManager` 或 `Context`。
     #[allow(dead_code)]
     pub fn get_plugin_hwnd(&self, plugin_id: &str) -> isize {
         self.widget_windows.iter()
@@ -121,7 +141,9 @@ impl WindowManager {
             .unwrap_or(0)
     }
 
-    /// 通过 HWND 直接控制插件窗口显示/隐藏（不借用 cx，可在 update_global 外调用）
+    /// 控制特定窗口（基于 HWND）的可见性
+    /// 
+    /// 此方法纯通过底层 Win32 API 操作，不依赖应用生命周期机制。
     #[allow(dead_code)]
     pub fn show_plugin_window(hwnd: isize, visible: bool) {
         if hwnd == 0 { return; }
@@ -196,7 +218,11 @@ impl WindowManager {
         self.is_visible = visible;
     }
 
-    /// 切换主窗口显示/隐藏，纯 Win32 实现，不借用 cx（必须先调用 set_main_hwnd）
+    /// 切换主窗口显示/隐藏
+    /// 
+    /// 此方法是纯粹基于系统底层 Win32 API (`ShowWindow`, `IsIconic` 等) 的实现，
+    /// 能有效规避在部分操作闭包中获取框架级别 Window 可变引用造成的借用冲突。
+    /// （前提：必须已通过某种方式正确设置了 `self.main_hwnd`）
     pub fn toggle_main_window_win32(&mut self) -> bool {
         let hwnd = self.main_hwnd;
         if hwnd == 0 {
