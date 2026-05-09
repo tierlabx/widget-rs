@@ -59,7 +59,7 @@ impl MainWindow {
                         if let Ok(h) = win.window_handle() {
                             if let RawWindowHandle::Win32(h) = h.as_raw() { unsafe {
                                 windows_sys::Win32::UI::Input::KeyboardAndMouse::ReleaseCapture();
-                                windows_sys::Win32::UI::WindowsAndMessaging::SendMessageW(
+                                windows_sys::Win32::UI::WindowsAndMessaging::PostMessageW(
                                     h.hwnd.get() as isize,
                                     windows_sys::Win32::UI::WindowsAndMessaging::WM_NCLBUTTONDOWN,
                                     windows_sys::Win32::UI::WindowsAndMessaging::HTCAPTION as usize, 0);

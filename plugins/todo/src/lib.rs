@@ -142,7 +142,7 @@ impl Render for TodoWidget {
                             if let raw_window_handle::RawWindowHandle::Win32(h) = handle.as_raw() {
                                 unsafe {
                                     windows_sys::Win32::UI::Input::KeyboardAndMouse::ReleaseCapture();
-                                    windows_sys::Win32::UI::WindowsAndMessaging::SendMessageW(
+                                    windows_sys::Win32::UI::WindowsAndMessaging::PostMessageW(
                                         h.hwnd.get() as isize,
                                         windows_sys::Win32::UI::WindowsAndMessaging::WM_NCLBUTTONDOWN,
                                         windows_sys::Win32::UI::WindowsAndMessaging::HTCAPTION as usize,
