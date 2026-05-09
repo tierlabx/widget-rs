@@ -4,8 +4,8 @@
     {
       "type": "frame",
       "id": "main-window",
-      "x": 0,
-      "y": 0,
+      "x": -66,
+      "y": -76,
       "name": "Widget RS - 主窗口",
       "clip": true,
       "width": 1200,
@@ -33,33 +33,16 @@
           "alignItems": "center",
           "children": [
             {
-              "type": "frame",
-              "id": "H8Hvp",
-              "name": "窗口标题区",
-              "gap": 10,
-              "alignItems": "center",
-              "children": [
-                {
-                  "type": "icon_font",
-                  "id": "kRg8B",
-                  "width": 18,
-                  "height": 18,
-                  "iconFontName": "layout-dashboard",
-                  "iconFontFamily": "lucide",
-                  "fill": "$--emerald-signal"
-                },
-                {
-                  "type": "text",
-                  "id": "88URo",
-                  "name": "titleText",
-                  "fill": "$--snow-white",
-                  "content": "Widget RS",
-                  "fontFamily": "Inter",
-                  "fontSize": 14,
-                  "fontWeight": "600",
-                  "letterSpacing": 0.2
-                }
-              ]
+              "type": "rectangle",
+              "id": "tepOF",
+              "fill": {
+                "type": "image",
+                "enabled": true,
+                "url": "icon.png",
+                "mode": "fill"
+              },
+              "width": 47,
+              "height": 47
             },
             {
               "type": "frame",
@@ -159,114 +142,6 @@
               },
               "layout": "vertical",
               "children": [
-                {
-                  "type": "frame",
-                  "id": "0nvsP",
-                  "name": "sidebarHeader",
-                  "width": "fill_container",
-                  "gap": "$--spacing-md",
-                  "padding": [
-                    "$--spacing-lg",
-                    "$--spacing-md"
-                  ],
-                  "alignItems": "center",
-                  "children": [
-                    {
-                      "type": "frame",
-                      "id": "48Lwt",
-                      "name": "logoIcon",
-                      "width": 40,
-                      "height": 40,
-                      "fill": {
-                        "type": "gradient",
-                        "gradientType": "linear",
-                        "enabled": true,
-                        "rotation": 135,
-                        "size": {
-                          "height": 1
-                        },
-                        "colors": [
-                          {
-                            "color": "#00d99220",
-                            "position": 0
-                          },
-                          {
-                            "color": "#101010",
-                            "position": 1
-                          }
-                        ]
-                      },
-                      "cornerRadius": 10,
-                      "stroke": {
-                        "align": "center",
-                        "thickness": 1,
-                        "fill": "#00d99240"
-                      },
-                      "effect": {
-                        "type": "shadow",
-                        "shadowType": "outer",
-                        "color": "#00d99230",
-                        "blur": 8
-                      },
-                      "layout": "none",
-                      "children": [
-                        {
-                          "type": "ellipse",
-                          "id": "GJ7bo",
-                          "x": 6,
-                          "y": 6,
-                          "name": "dot1",
-                          "fill": "#3d3a39",
-                          "width": 4,
-                          "height": 4
-                        },
-                        {
-                          "type": "ellipse",
-                          "id": "9yItd",
-                          "x": 12,
-                          "y": 6,
-                          "name": "dot2",
-                          "fill": "#3d3a39",
-                          "width": 4,
-                          "height": 4
-                        },
-                        {
-                          "type": "ellipse",
-                          "id": "Ctajq",
-                          "x": 18,
-                          "y": 6,
-                          "name": "dot3",
-                          "fill": "#3d3a39",
-                          "width": 4,
-                          "height": 4
-                        },
-                        {
-                          "type": "text",
-                          "id": "YcABm",
-                          "x": 10,
-                          "y": 12,
-                          "name": "w_text",
-                          "fill": "$--emerald-signal",
-                          "content": "W",
-                          "fontFamily": "Inter",
-                          "fontSize": 20,
-                          "fontWeight": "700"
-                        }
-                      ]
-                    },
-                    {
-                      "type": "text",
-                      "id": "BvzoG",
-                      "name": "appTitle",
-                      "fill": "$--snow-white",
-                      "content": "Widget RS",
-                      "fontFamily": "system-ui",
-                      "fontSize": 16,
-                      "fontWeight": "700",
-                      "letterSpacing": 0.5
-                    }
-                  ]
-                },
                 {
                   "type": "frame",
                   "id": "Y6SGj",
@@ -1645,6 +1520,7 @@
                                       "content": "2026 · 04 · 24",
                                       "fontFamily": "Inter",
                                       "fontSize": 13,
+                                      "fontWeight": "normal",
                                       "letterSpacing": 2
                                     }
                                   ]

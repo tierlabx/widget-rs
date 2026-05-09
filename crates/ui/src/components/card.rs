@@ -59,21 +59,22 @@ impl IntoElement for Card {
 
         if let Some(h) = self.header {
             container = container.child(
-                div().flex().justify_between().items_center().w_full().child(h)
+                div()
+                    .flex()
+                    .justify_between()
+                    .items_center()
+                    .w_full()
+                    .child(h),
             );
         }
 
         if let Some(c) = self.content {
             // The content area is the key to preventing the overflow bug
-            container = container.child(
-                div().flex_1().w_full().overflow_hidden().child(c)
-            );
+            container = container.child(div().flex_1().w_full().overflow_hidden().child(c));
         }
 
         if let Some(f) = self.footer {
-            container = container.child(
-                div().flex().justify_end().w_full().gap(px(8.0)).child(f)
-            );
+            container = container.child(div().flex().justify_end().w_full().gap(px(8.0)).child(f));
         }
 
         container.into_any_element()

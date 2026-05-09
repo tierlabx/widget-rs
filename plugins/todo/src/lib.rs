@@ -1,10 +1,10 @@
-use gpui::*;
 use gpui::prelude::FluentBuilder;
-use gpui_component::input::{Input, InputState, InputEvent};
+use gpui::*;
+use gpui_component::input::{Input, InputEvent, InputState};
 use gpui_component::scroll::ScrollableElement;
 use gpui_component::{Icon, IconName};
-use widget_core::{AppConfig, TodoItemData, Plugin};
 use raw_window_handle::HasWindowHandle;
+use widget_core::{AppConfig, Plugin, TodoItemData};
 
 /// 单条待办任务
 #[derive(Clone)]
@@ -27,8 +27,12 @@ pub struct TodoWidget {
 impl TodoWidget {
     /// 将当前 items 写入全局 AppConfig 并立即落盘
     fn save_to_config(items: &[TodoItem], cx: &mut App) {
-        let data: Vec<TodoItemData> = items.iter()
-            .map(|i| TodoItemData { text: i.text.clone(), done: i.done })
+        let data: Vec<TodoItemData> = items
+            .iter()
+            .map(|i| TodoItemData {
+                text: i.text.clone(),
+                done: i.done,
+            })
             .collect();
         cx.update_global::<AppConfig, _>(|cfg, _| {
             cfg.todo_items = data;
@@ -45,23 +49,34 @@ impl TodoWidget {
                 if cfg.todo_items.is_empty() {
                     // 首次启动使用示例数据
                     vec![
-                        TodoItem { text: "完成项目设计".into(), done: false },
-                        TodoItem { text: "编写文档".into(), done: true },
-                        TodoItem { text: "代码审查".into(), done: false },
+                        TodoItem {
+                            text: "完成项目设计".into(),
+                            done: false,
+                        },
+                        TodoItem {
+                            text: "编写文档".into(),
+                            done: true,
+                        },
+                        TodoItem {
+                            text: "代码审查".into(),
+                            done: false,
+                        },
                     ]
                 } else {
-                    cfg.todo_items.iter()
-                        .map(|d| TodoItem { text: d.text.clone(), done: d.done })
+                    cfg.todo_items
+                        .iter()
+                        .map(|d| TodoItem {
+                            text: d.text.clone(),
+                            done: d.done,
+                        })
                         .collect()
                 }
             })
             .unwrap_or_default();
 
         // ── 新增输入框 ──────────────────────────────────────────────
-        let new_input = cx.new(|cx| {
-            InputState::new(window, cx)
-                .placeholder("输入新待办，按 Enter 确认...")
-        });
+        let new_input =
+            cx.new(|cx| InputState::new(window, cx).placeholder("输入新待办，按 Enter 确认..."));
         cx.subscribe(
             &new_input,
             |this: &mut Self, input: Entity<InputState>, event: &InputEvent, cx| {
@@ -69,7 +84,10 @@ impl TodoWidget {
                     let text = input.read(cx).value().to_string();
                     let trimmed = text.trim().to_string();
                     if !trimmed.is_empty() {
-                        this.items.push(TodoItem { text: trimmed, done: false });
+                        this.items.push(TodoItem {
+                            text: trimmed,
+                            done: false,
+                        });
                         Self::save_to_config(&this.items, cx);
                     }
                     this.show_input = false;
@@ -80,10 +98,7 @@ impl TodoWidget {
         .detach();
 
         // ── 编辑输入框（占位，实际每次编辑时重建）─────────────────
-        let edit_input = cx.new(|cx| {
-            InputState::new(window, cx)
-                .placeholder("编辑待办内容...")
-        });
+        let edit_input = cx.new(|cx| InputState::new(window, cx).placeholder("编辑待办内容..."));
 
         Self {
             hwnd_reported: false,
@@ -220,7 +235,8 @@ impl Render for TodoWidget {
                                 .default_value(current)
                                 .placeholder("编辑待办内容，Enter 确认...")
                         });
-                        cx.subscribe(&new_edit,
+                        cx.subscribe(
+                            &new_edit,
                             |this: &mut Self, input: Entity<InputState>, event: &InputEvent, cx| {
                                 if let InputEvent::PressEnter { .. } = event {
                                     let text = input.read(cx).value().to_string();
@@ -236,8 +252,9 @@ impl Render for TodoWidget {
                                     Self::save_to_config(&this.items, cx);
                                     cx.notify();
                                 }
-                            }
-                        ).detach();
+                            },
+                        )
+                        .detach();
                         this.edit_input = new_edit;
                         this.editing_idx = Some(idx);
                         this.show_input = false;
@@ -268,9 +285,7 @@ impl Render for TodoWidget {
                         )
                         .child(
                             // Input 保持默认 appearance，让它自带白色背景+深色文字
-                            div()
-                                .flex_1()
-                                .child(Input::new(edit_input))
+                            div().flex_1().child(Input::new(edit_input)),
                         )
                         // 确认按钮
                         .child(
@@ -329,7 +344,11 @@ impl Render for TodoWidget {
                                 .cursor_pointer()
                                 .id(ElementId::Name(format!("todo-check-{idx}").into()))
                                 .border_color(if done { rgb(0x00d992) } else { rgb(0x4a4a4e) })
-                                .bg(if done { rgba(0x00d99230) } else { rgba(0x00000000) })
+                                .bg(if done {
+                                    rgba(0x00d99230)
+                                } else {
+                                    rgba(0x00000000)
+                                })
                                 .flex()
                                 .justify_center()
                                 .items_center()
@@ -395,7 +414,11 @@ impl Render for TodoWidget {
             .size_full()
             .bg(rgba(0x111113f0))
             .border_1()
-            .border_color(if is_edit_mode { rgb(0x00d992) } else { rgb(0x2e2e32) })
+            .border_color(if is_edit_mode {
+                rgb(0x00d992)
+            } else {
+                rgb(0x2e2e32)
+            })
             .rounded(px(8.0))
             .children(drag_handle)
             // 标题栏
@@ -500,15 +523,11 @@ impl Render for TodoWidget {
                         }
                         cx.notify();
                     }))
-                    .child(
-                        div()
-                            .text_color(rgb(0x00d992))
-                            .child(if show_input {
-                                Icon::new(IconName::Minus).size(px(14.0)).into_any_element()
-                            } else {
-                                Icon::new(IconName::Plus).size(px(14.0)).into_any_element()
-                            }),
-                    )
+                    .child(div().text_color(rgb(0x00d992)).child(if show_input {
+                        Icon::new(IconName::Minus).size(px(14.0)).into_any_element()
+                    } else {
+                        Icon::new(IconName::Plus).size(px(14.0)).into_any_element()
+                    }))
                     .child(
                         div()
                             .text_sm()

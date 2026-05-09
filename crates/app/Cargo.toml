@@ -19,6 +19,8 @@ raw-window-handle.workspace = true
 image.workspace = true
 windows-sys.workspace = true
 gpui-component-assets = "0.5.1"
+rust-embed = "8.5"
+anyhow = "1.0"
 
 [build-dependencies]
 winres.workspace = true

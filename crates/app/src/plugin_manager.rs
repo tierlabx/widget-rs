@@ -3,7 +3,7 @@ use std::sync::Arc;
 pub use widget_core::Plugin;
 
 /// 插件管理器
-/// 
+///
 /// 负责注册和管理系统中所有小组件（Widget）插件。
 pub struct PluginManager {
     /// 已注册的插件列表，使用 Arc 共享以供并发/跨线程使用
@@ -19,7 +19,7 @@ impl PluginManager {
     }
 
     /// 注册一个新的插件
-    /// 
+    ///
     /// # 参数
     /// * `plugin` - 要注册的插件，需要实现 `Plugin` trait
     pub fn register(&mut self, plugin: Arc<dyn Plugin>) {

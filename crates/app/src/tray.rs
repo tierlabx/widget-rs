@@ -1,6 +1,6 @@
 use tray_icon::{
-    menu::{Menu, MenuItem, PredefinedMenuItem, MenuId},
-    TrayIconBuilder, TrayIcon, Icon,
+    menu::{Menu, MenuId, MenuItem, PredefinedMenuItem},
+    Icon, TrayIcon, TrayIconBuilder,
 };
 
 /// 从生成的 icon.png 加载托盘图标
@@ -29,16 +29,12 @@ pub fn setup_tray() -> Result<(TrayIcon, MenuId, MenuId), Box<dyn std::error::Er
     let tray_menu = Menu::new();
 
     let toggle_i = MenuItem::new("显示/隐藏控制台", true, None);
-    let quit_i   = MenuItem::new("退出 Widget RS", true, None);
+    let quit_i = MenuItem::new("退出 Widget RS", true, None);
 
     let toggle_id = toggle_i.id().clone();
-    let quit_id   = quit_i.id().clone();
+    let quit_id = quit_i.id().clone();
 
-    tray_menu.append_items(&[
-        &toggle_i,
-        &PredefinedMenuItem::separator(),
-        &quit_i,
-    ])?;
+    tray_menu.append_items(&[&toggle_i, &PredefinedMenuItem::separator(), &quit_i])?;
 
     let tray_icon = TrayIconBuilder::new()
         .with_menu(Box::new(tray_menu))

@@ -1,8 +1,8 @@
 use gpui::*;
-use gpui_component::input::{Input, InputState, InputEvent};
+use gpui_component::input::{Input, InputEvent, InputState};
 use gpui_component::{Icon, IconName};
-use widget_core::{AppConfig, Plugin};
 use raw_window_handle::HasWindowHandle;
+use widget_core::{AppConfig, Plugin};
 
 pub struct StickyWidget {
     hwnd_reported: bool,
@@ -122,7 +122,11 @@ impl Render for StickyWidget {
             .size_full()
             .bg(rgba(0x050507d9))
             .border_1()
-            .border_color(if is_edit_mode { rgb(0x00d992) } else { rgb(0x3d3a39) })
+            .border_color(if is_edit_mode {
+                rgb(0x00d992)
+            } else {
+                rgb(0x3d3a39)
+            })
             .rounded(px(8.0))
             .children(drag_handle)
             // 标题栏

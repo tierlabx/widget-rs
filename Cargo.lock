@@ -7422,12 +7422,14 @@ dependencies = [
 name = "widget-rs"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
  "directories",
  "gpui",
  "gpui-component",
  "gpui-component-assets",
  "image 0.24.9",
  "raw-window-handle 0.6.2",
+ "rust-embed",
  "serde",
  "serde_json",
  "sticky_plugin",

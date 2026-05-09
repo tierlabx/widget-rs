@@ -1,0 +1,96 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="100%" height="100%">
+  <defs>
+    <!-- 核心渐变 -->
+    <linearGradient id="grad-core" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#6366f1" /> <!-- Indigo -->
+      <stop offset="100%" stop-color="#a855f7" /> <!-- Purple -->
+    </linearGradient>
+
+    <!-- 卫星插件渐变 -->
+    <linearGradient id="grad-sat1" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#14b8a6" /> <!-- Teal -->
+      <stop offset="100%" stop-color="#3b82f6" /> <!-- Blue -->
+    </linearGradient>
+    <linearGradient id="grad-sat2" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#f59e0b" /> <!-- Amber -->
+      <stop offset="100%" stop-color="#f43f5e" /> <!-- Rose -->
+    </linearGradient>
+    <linearGradient id="grad-sat3" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#ec4899" /> <!-- Pink -->
+      <stop offset="100%" stop-color="#8b5cf6" /> <!-- Violet -->
+    </linearGradient>
+
+    <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="6" result="blur" />
+      <feComposite in="SourceGraphic" in2="blur" operator="over" />
+    </filter>
+
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="6" stdDeviation="6" flood-color="#0f172a" flood-opacity="0.25" />
+    </filter>
+  </defs>
+
+  <!-- 背景透明 -->
+  
+  <g transform="translate(100, 100)">
+    
+    <!-- 轨道/生态系统 (动态旋转虚线环) -->
+    <circle cx="0" cy="0" r="45" fill="none" stroke="#6366f1" stroke-width="1.5" stroke-dasharray="4 8" opacity="0.4">
+      <animateTransform attributeName="transform" type="rotate" from="0" to="360" dur="20s" repeatCount="indefinite" />
+    </circle>
+    <circle cx="0" cy="0" r="70" fill="none" stroke="#a855f7" stroke-width="1" stroke-dasharray="2 10" opacity="0.2">
+      <animateTransform attributeName="transform" type="rotate" from="360" to="0" dur="25s" repeatCount="indefinite" />
+    </circle>
+
+    <!-- 中心主控核心 (平台) -->
+    <g filter="url(#glow)">
+      <!-- 核心呼吸动画 -->
+      <animateTransform attributeName="transform" type="scale" values="1; 1.05; 1" dur="4s" repeatCount="indefinite" calcMode="spline" keySplines="0.4 0 0.6 1; 0.4 0 0.6 1" />
+      <circle cx="0" cy="0" r="28" fill="url(#grad-core)" opacity="0.95" />
+      <circle cx="0" cy="0" r="26" fill="none" stroke="#ffffff" stroke-width="1" opacity="0.3" />
+      <!-- 中心阵列点 -->
+      <circle cx="0" cy="0" r="8" fill="#ffffff" opacity="0.9">
+        <animate attributeName="opacity" values="0.9; 0.5; 0.9" dur="4s" repeatCount="indefinite" />
+      </circle>
+    </g>
+
+    <!-- 卫星插件 1: 右上角 (圆角矩形，代表应用类插件) -->
+    <g filter="url(#shadow)">
+      <animateTransform attributeName="transform" type="translate" values="40,-35; 40,-43; 40,-35" dur="3.5s" repeatCount="indefinite" calcMode="spline" keySplines="0.4 0 0.6 1; 0.4 0 0.6 1" />
+      <rect x="-14" y="-14" width="28" height="28" rx="8" fill="url(#grad-sat1)" transform="rotate(15)" />
+      <!-- 内部极简修饰 -->
+      <circle cx="0" cy="0" r="4" fill="#ffffff" opacity="0.8" />
+    </g>
+
+    <!-- 卫星插件 2: 底部 (胶囊形，代表信息/控制类插件) -->
+    <g filter="url(#shadow)">
+      <animateTransform attributeName="transform" type="translate" values="-10,48; -10,41; -10,48" dur="4.2s" repeatCount="indefinite" calcMode="spline" keySplines="0.4 0 0.6 1; 0.4 0 0.6 1" />
+      <rect x="-18" y="-10" width="36" height="20" rx="10" fill="url(#grad-sat2)" transform="rotate(-10)" />
+      <line x1="-6" y1="0" x2="6" y2="0" stroke="#ffffff" stroke-width="3" stroke-linecap="round" opacity="0.8" />
+    </g>
+
+    <!-- 卫星插件 3: 左上角 (圆形，代表仪表盘/小工具) -->
+    <g filter="url(#shadow)">
+      <animateTransform attributeName="transform" type="translate" values="-42,-18; -42,-25; -42,-18" dur="3.8s" repeatCount="indefinite" calcMode="spline" keySplines="0.4 0 0.6 1; 0.4 0 0.6 1" />
+      <circle cx="0" cy="0" r="14" fill="url(#grad-sat3)" />
+      <polygon points="0,-4 3.5,2.5 -3.5,2.5" fill="#ffffff" opacity="0.8" />
+    </g>
+
+    <!-- 散落的光谱粒子 (代表无限可能的插件生态) -->
+    <g fill="#ffffff" opacity="0.6">
+      <circle cx="20" cy="35" r="2">
+        <animate attributeName="opacity" values="0.2; 0.8; 0.2" dur="2s" repeatCount="indefinite" />
+      </circle>
+      <circle cx="-45" cy="25" r="1.5">
+        <animate attributeName="opacity" values="0.1; 0.9; 0.1" dur="3s" repeatCount="indefinite" />
+      </circle>
+      <circle cx="45" cy="-10" r="2.5">
+        <animate attributeName="opacity" values="0.3; 1; 0.3" dur="2.5s" repeatCount="indefinite" />
+      </circle>
+      <circle cx="-10" cy="-45" r="1.5">
+        <animate attributeName="opacity" values="0.2; 0.7; 0.2" dur="4s" repeatCount="indefinite" />
+      </circle>
+    </g>
+
+  </g>
+</svg>

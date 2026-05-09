@@ -1,17 +1,42 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
-mod store;
-mod window_manager;
-mod tray;
 mod plugin_manager;
+mod store;
+mod tray;
+mod window_manager;
 
-use store::Store;
-use window_manager::WindowManager;
-use plugin_manager::PluginManager;
-use tray_icon::menu::MenuEvent;
 use gpui::*;
+use plugin_manager::PluginManager;
 use std::sync::Arc;
+use store::Store;
+use tray_icon::menu::MenuEvent;
 use widget_core::AppConfig;
+use window_manager::WindowManager;
+
+#[derive(rust_embed::RustEmbed)]
+#[folder = "../../assets"]
+struct LocalAssets;
+
+struct AppAssets;
+
+impl gpui::AssetSource for AppAssets {
+    fn load(&self, path: &str) -> gpui::Result<Option<std::borrow::Cow<'static, [u8]>>> {
+        if let Some(file) = LocalAssets::get(path) {
+            return Ok(Some(file.data));
+        }
+        gpui_component_assets::Assets.load(path)
+    }
+
+    fn list(&self, path: &str) -> gpui::Result<Vec<gpui::SharedString>> {
+        let mut list = gpui_component_assets::Assets.list(path).unwrap_or_default();
+        for file in LocalAssets::iter() {
+            if file.starts_with(path) {
+                list.push(file.to_string().into());
+            }
+        }
+        Ok(list)
+    }
+}
 
 fn main() {
     // 1. 初始化存储和加载配置
@@ -27,8 +52,7 @@ fn main() {
     // 3. 初始化系统托盘（包括托盘图标和菜单）
     let (tray_icon, toggle_id, quit_id) = tray::setup_tray().expect("系统托盘初始化失败");
 
-    use gpui_component_assets::Assets;
-    let app = Application::new().with_assets(Assets);
+    let app = Application::new().with_assets(AppAssets);
     let store_for_app = Arc::clone(&store);
 
     app.run(move |cx| {
@@ -38,11 +62,11 @@ fn main() {
 
         // 注册立即写盘回调，插件可调用 save_config_now(cx) 触发
         let store_for_save = Arc::clone(&store_for_app);
-        cx.set_global(widget_core::SaveCallback(
-            std::sync::Arc::new(move |cfg: &AppConfig| {
+        cx.set_global(widget_core::SaveCallback(std::sync::Arc::new(
+            move |cfg: &AppConfig| {
                 store_for_save.save_config(cfg);
-            })
-        ));
+            },
+        )));
 
         // 初始化窗口管理器，用于管理主窗口和所有插件窗口的生命周期和状态
         WindowManager::init(cx);
@@ -59,32 +83,44 @@ fn main() {
         // 提取所有 HWND 并注册到 thread_local（三步走，不嵌套）
         let store_for_hwnd = Arc::clone(&store_for_app);
         cx.spawn(async move |cx| {
-            cx.background_executor().timer(std::time::Duration::from_millis(300)).await;
+            cx.background_executor()
+                .timer(std::time::Duration::from_millis(300))
+                .await;
 
             // Step 1: 取出所有 handle（释放 WindowManager borrow）
-            let (plugin_handles, main_handle): (Vec<(String, AnyWindowHandle)>, Option<AnyWindowHandle>) =
-                match cx.update_global::<WindowManager, _>(|wm, _| {
-                    let ph = wm.widget_windows.iter()
-                        .map(|(id, (h, _))| (id.to_string(), h.clone()))
-                        .collect();
-                    let mh = wm.main_window.as_ref().map(|h| h.clone().into());
-                    (ph, mh)
-                }) { Ok(v) => v, Err(_) => return };
+            let (plugin_handles, main_handle): (
+                Vec<(String, AnyWindowHandle)>,
+                Option<AnyWindowHandle>,
+            ) = match cx.update_global::<WindowManager, _>(|wm, _| {
+                let ph = wm
+                    .widget_windows
+                    .iter()
+                    .map(|(id, (h, _))| (id.to_string(), h.clone()))
+                    .collect();
+                let mh = wm.main_window.as_ref().map(|h| h.clone().into());
+                (ph, mh)
+            }) {
+                Ok(v) => v,
+                Err(_) => return,
+            };
 
             // Step 2: 逐个读 HWND（无 WindowManager borrow）
             let mut id_hwnd: Vec<(String, isize)> = Vec::new();
             for (id, h) in &plugin_handles {
-                let hwnd = cx.update(|cx| {
-                    h.update(cx, |_, win, _| {
-                        use raw_window_handle::HasWindowHandle;
-                        if let Ok(wh) = win.window_handle() {
-                            if let raw_window_handle::RawWindowHandle::Win32(h) = wh.as_raw() {
-                                return h.hwnd.get() as isize;
+                let hwnd = cx
+                    .update(|cx| {
+                        h.update(cx, |_, win, _| {
+                            use raw_window_handle::HasWindowHandle;
+                            if let Ok(wh) = win.window_handle() {
+                                if let raw_window_handle::RawWindowHandle::Win32(h) = wh.as_raw() {
+                                    return h.hwnd.get() as isize;
+                                }
                             }
-                        }
-                        0isize
-                    }).unwrap_or(0)
-                }).unwrap_or(0);
+                            0isize
+                        })
+                        .unwrap_or(0)
+                    })
+                    .unwrap_or(0);
                 if hwnd != 0 {
                     println!("[main] 插件 {} HWND = {}", id, hwnd);
                     id_hwnd.push((id.clone(), hwnd));
@@ -101,26 +137,37 @@ fn main() {
                             }
                         }
                         0isize
-                    }).unwrap_or(0)
-                }).unwrap_or(0)
-            } else { 0 };
+                    })
+                    .unwrap_or(0)
+                })
+                .unwrap_or(0)
+            } else {
+                0
+            };
 
-            if main_hwnd != 0 { println!("[main] 主窗口 HWND = {}", main_hwnd); }
+            if main_hwnd != 0 {
+                println!("[main] 主窗口 HWND = {}", main_hwnd);
+            }
 
             // Step 3: 将 HWND 写回 WindowManager 并注册到 thread_local 供全局访问
             let _ = cx.update_global::<WindowManager, _>(|wm, _| {
                 for (id, hwnd) in &id_hwnd {
-                    if let Some(e) = wm.widget_windows.get_mut(id.as_str()) { e.1 = *hwnd; }
+                    if let Some(e) = wm.widget_windows.get_mut(id.as_str()) {
+                        e.1 = *hwnd;
+                    }
                     // 注册到 thread_local，供 widget-ui on_click 等跨线程操作直接使用
                     widget_core::register_plugin_hwnd(id, *hwnd);
                     // 防止 Win + D （显示桌面）操作导致小组件被隐藏
                     WindowManager::attach_to_desktop(*hwnd);
                 }
-                if main_hwnd != 0 { wm.main_hwnd = main_hwnd; }
+                if main_hwnd != 0 {
+                    wm.main_hwnd = main_hwnd;
+                }
             });
 
             let _ = store_for_hwnd;
-        }).detach();
+        })
+        .detach();
 
         // 启动托盘菜单事件的独立轮询循环（这是一个简单的轮询异步任务，避免借用嵌套）
         let store_for_tray = Arc::clone(&store_for_app);
@@ -132,13 +179,15 @@ fn main() {
                         // toggle_main_window_win32 纯 Win32，不嵌套
                         let next_visible = match cx.update_global::<WindowManager, _>(|wm, _| {
                             wm.toggle_main_window_win32()
-                        }) { Ok(v) => v, Err(_) => true };
+                        }) {
+                            Ok(v) => v,
+                            Err(_) => true,
+                        };
 
                         let _ = cx.update_global::<widget_core::UIState, _>(|s, _| {
                             s.is_visible = next_visible;
                         });
                         let _ = cx.update(|cx| cx.refresh_windows());
-
                     } else if event.id == quit_id {
                         let store_quit = Arc::clone(&store_for_tray);
                         // 退出前，保存所有插件窗口的当前位置和状态。
@@ -151,8 +200,11 @@ fn main() {
                         break;
                     }
                 }
-                cx.background_executor().timer(std::time::Duration::from_millis(50)).await;
+                cx.background_executor()
+                    .timer(std::time::Duration::from_millis(50))
+                    .await;
             }
-        }).detach();
+        })
+        .detach();
     });
 }

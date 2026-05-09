@@ -80,13 +80,17 @@ impl IntoElement for Badge {
         }
 
         if self.show_dot {
-            container = container.child(
-                div().w(px(6.0)).h(px(6.0)).rounded_full().bg(dot_color)
-            );
+            container = container.child(div().w(px(6.0)).h(px(6.0)).rounded_full().bg(dot_color));
         }
 
-        container.child(
-            div().text_xs().font_weight(FontWeight::MEDIUM).text_color(text_color).child(self.label)
-        ).into_any_element()
+        container
+            .child(
+                div()
+                    .text_xs()
+                    .font_weight(FontWeight::MEDIUM)
+                    .text_color(text_color)
+                    .child(self.label),
+            )
+            .into_any_element()
     }
 }

@@ -4,7 +4,7 @@ use gpui_component::{Icon, IconName};
 #[derive(Default, Clone, Copy, PartialEq, Eq)]
 pub enum ButtonVariant {
     #[default]
-    Default,     // primary
+    Default, // primary
     Secondary,
     Destructive,
     Outline,
@@ -117,7 +117,12 @@ impl IntoElement for Button {
             content = content.child(Icon::new(icon));
         }
 
-        content = content.child(div().text_sm().font_weight(FontWeight::MEDIUM).child(self.label));
+        content = content.child(
+            div()
+                .text_sm()
+                .font_weight(FontWeight::MEDIUM)
+                .child(self.label),
+        );
 
         container.child(content).into_any_element()
     }

@@ -1,7 +1,7 @@
 use gpui::*;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 use std::cell::RefCell;
+use std::collections::HashMap;
 
 /// 单个插件的位置与大小配置
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -66,9 +66,11 @@ pub fn save_config_now(cx: &mut App) {
     };
 
     // 2. 将 IO 操作派发到后台线程，完全绕开 GPUI RefCell
-    cx.background_executor().spawn(async move {
-        save_fn(&config);
-    }).detach();
+    cx.background_executor()
+        .spawn(async move {
+            save_fn(&config);
+        })
+        .detach();
 }
 
 /// UI 运行时状态（不持久化）

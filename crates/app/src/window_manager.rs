@@ -1,13 +1,13 @@
 use gpui::*;
-use widget_ui::main_window::MainWindow;
-use widget_core::{AppConfig, PluginConfig};
 use std::collections::HashMap;
+use widget_core::{AppConfig, PluginConfig};
+use widget_ui::main_window::MainWindow;
 
-use windows_sys::Win32::UI::WindowsAndMessaging::{
-    ShowWindow, GetWindowRect, FindWindowW, SetWindowLongPtrW, GWLP_HWNDPARENT,
-};
-use windows_sys::Win32::Foundation::RECT;
 use crate::store::Store;
+use windows_sys::Win32::Foundation::RECT;
+use windows_sys::Win32::UI::WindowsAndMessaging::{
+    FindWindowW, GetWindowRect, SetWindowLongPtrW, ShowWindow, GWLP_HWNDPARENT,
+};
 
 /// 窗口管理器
 ///
@@ -27,19 +27,23 @@ impl Global for WindowManager {}
 
 impl WindowManager {
     /// 初始化窗口管理器和主窗口
-    /// 
+    ///
     /// - 注册全局 UI 状态
     /// - 实例化并打开主窗口
     /// - 将 WindowManager 自身保存至应用的全局状态中
     pub fn init(cx: &mut App) {
-        cx.set_global(widget_core::UIState { is_visible: true, is_edit_mode: false, plugin_visibility: std::collections::HashMap::new() });
+        cx.set_global(widget_core::UIState {
+            is_visible: true,
+            is_edit_mode: false,
+            plugin_visibility: std::collections::HashMap::new(),
+        });
         cx.set_global(Self {
             main_window: None,
             main_hwnd: 0,
             widget_windows: HashMap::new(),
             is_visible: true,
         });
-        
+
         let options = WindowOptions {
             titlebar: Some(TitlebarOptions {
                 title: None,
@@ -47,15 +51,21 @@ impl WindowManager {
                 traffic_light_position: None,
             }),
             window_background: WindowBackgroundAppearance::Transparent,
-            window_bounds: Some(WindowBounds::Windowed(Bounds::centered(None, size(px(1200.0), px(800.0)), cx))),
+            window_bounds: Some(WindowBounds::Windowed(Bounds::centered(
+                None,
+                size(px(1200.0), px(800.0)),
+                cx,
+            ))),
             ..Default::default()
         };
 
-        let window = cx.open_window(options, |window, cx| {
-            let view = cx.new(|_| MainWindow::new());
-            cx.new(|cx| gpui_component::Root::new(view, window, cx))
-        }).unwrap();
-        
+        let window = cx
+            .open_window(options, |window, cx| {
+                let view = cx.new(|_| MainWindow::new());
+                cx.new(|cx| gpui_component::Root::new(view, window, cx))
+            })
+            .unwrap();
+
         cx.update_global::<Self, _>(|wm, _cx| {
             wm.main_window = Some(window);
         });
@@ -81,7 +91,7 @@ impl WindowManager {
     }
 
     /// 更新已注册的插件 HWND
-    /// 
+    ///
     /// 此方法通常在插件窗口渲染完成、可以通过底层 API 拿到真正系统句柄后调用。
     #[allow(dead_code)]
     pub fn set_hwnd(&mut self, id: &'static str, hwnd: isize) {
@@ -91,19 +101,21 @@ impl WindowManager {
     }
 
     /// 保存所有插件的当前屏幕位置和尺寸到配置文件
-    /// 
+    ///
     /// 通过 Win32 API `GetWindowRect` 读取各插件最新的屏幕坐标和大小，并持久化到 `Store`。
     pub fn save_all_plugin_bounds(&self, cx: &mut App, store: &Store) {
-        let mut config = cx
-            .try_global::<AppConfig>()
-            .cloned()
-            .unwrap_or_default();
+        let mut config = cx.try_global::<AppConfig>().cloned().unwrap_or_default();
 
         for (id, (_handle, hwnd)) in &self.widget_windows {
             if *hwnd == 0 {
                 continue;
             }
-            let mut rect = RECT { left: 0, top: 0, right: 0, bottom: 0 };
+            let mut rect = RECT {
+                left: 0,
+                top: 0,
+                right: 0,
+                bottom: 0,
+            };
             let ok = unsafe { GetWindowRect(*hwnd, &mut rect) };
             if ok != 0 {
                 config.plugins.insert(
@@ -117,7 +129,9 @@ impl WindowManager {
                 );
                 println!(
                     "[WindowManager] 保存插件 {} 位置: ({}, {}) {}x{}",
-                    id, rect.left, rect.top,
+                    id,
+                    rect.left,
+                    rect.top,
                     rect.right - rect.left,
                     rect.bottom - rect.top
                 );
@@ -130,25 +144,28 @@ impl WindowManager {
     }
 
     /// 获取指定插件的 Win32 HWND
-    /// 
+    ///
     /// 返回 `0` 表示插件不存在或 HWND 尚未加载。这主要用于在异步任务中安全地引用底层窗口句柄，
     /// 而无需锁定/借用整个 `WindowManager` 或 `Context`。
     #[allow(dead_code)]
     pub fn get_plugin_hwnd(&self, plugin_id: &str) -> isize {
-        self.widget_windows.iter()
+        self.widget_windows
+            .iter()
             .find(|(k, _)| **k == plugin_id)
             .map(|(_, (_, hwnd))| *hwnd)
             .unwrap_or(0)
     }
 
     /// 控制特定窗口（基于 HWND）的可见性
-    /// 
+    ///
     /// 此方法纯通过底层 Win32 API 操作，不依赖应用生命周期机制。
     #[allow(dead_code)]
     pub fn show_plugin_window(hwnd: isize, visible: bool) {
-        if hwnd == 0 { return; }
+        if hwnd == 0 {
+            return;
+        }
         unsafe {
-            use windows_sys::Win32::UI::WindowsAndMessaging::{SW_SHOW, SW_HIDE};
+            use windows_sys::Win32::UI::WindowsAndMessaging::{SW_HIDE, SW_SHOW};
             if visible {
                 ShowWindow(hwnd, SW_SHOW);
             } else {
@@ -162,13 +179,18 @@ impl WindowManager {
     #[allow(dead_code)]
     pub fn apply_always_on_top(&self, always_on_top: bool) {
         use windows_sys::Win32::UI::WindowsAndMessaging::{
-            SetWindowPos, HWND_TOPMOST, HWND_NOTOPMOST,
-            SWP_NOMOVE, SWP_NOSIZE,
+            SetWindowPos, HWND_NOTOPMOST, HWND_TOPMOST, SWP_NOMOVE, SWP_NOSIZE,
         };
         for (id, (_, hwnd)) in &self.widget_windows {
-            if *hwnd == 0 { continue; }
+            if *hwnd == 0 {
+                continue;
+            }
             unsafe {
-                let insert_after = if always_on_top { HWND_TOPMOST } else { HWND_NOTOPMOST };
+                let insert_after = if always_on_top {
+                    HWND_TOPMOST
+                } else {
+                    HWND_NOTOPMOST
+                };
                 SetWindowPos(*hwnd, insert_after, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE);
             }
             println!("[WindowManager] 插件 {} 置顶: {}", id, always_on_top);
@@ -178,12 +200,14 @@ impl WindowManager {
     /// 应用"鼠标穿透"设置到所有插件窗口
     #[allow(dead_code)]
     pub fn apply_mouse_passthrough(&self, passthrough: bool) {
+        use windows_sys::Win32::UI::WindowsAndMessaging::WS_EX_TRANSPARENT;
         use windows_sys::Win32::UI::WindowsAndMessaging::{
             GetWindowLongW, SetWindowLongW, GWL_EXSTYLE,
         };
-        use windows_sys::Win32::UI::WindowsAndMessaging::WS_EX_TRANSPARENT;
         for (id, (_, hwnd)) in &self.widget_windows {
-            if *hwnd == 0 { continue; }
+            if *hwnd == 0 {
+                continue;
+            }
             unsafe {
                 let ex_style = GetWindowLongW(*hwnd, GWL_EXSTYLE);
                 let new_style = if passthrough {
@@ -219,7 +243,7 @@ impl WindowManager {
     }
 
     /// 切换主窗口显示/隐藏
-    /// 
+    ///
     /// 此方法是纯粹基于系统底层 Win32 API (`ShowWindow`, `IsIconic` 等) 的实现，
     /// 能有效规避在部分操作闭包中获取框架级别 Window 可变引用造成的借用冲突。
     /// （前提：必须已通过某种方式正确设置了 `self.main_hwnd`）
@@ -230,8 +254,8 @@ impl WindowManager {
         }
         unsafe {
             use windows_sys::Win32::UI::WindowsAndMessaging::{
-                IsWindowVisible, IsIconic,
-                ShowWindow, SW_RESTORE, SW_SHOW, SW_HIDE, SetForegroundWindow
+                IsIconic, IsWindowVisible, SetForegroundWindow, ShowWindow, SW_HIDE, SW_RESTORE,
+                SW_SHOW,
             };
             let is_win_visible = IsWindowVisible(hwnd) != 0;
             let is_minimized = IsIconic(hwnd) != 0;
@@ -260,18 +284,23 @@ impl WindowManager {
 
     /// 将窗口附加到桌面（Progman），防止 Win + D 时被最小化
     pub fn attach_to_desktop(hwnd: isize) {
-        if hwnd == 0 { return; }
+        if hwnd == 0 {
+            return;
+        }
         unsafe {
             // "Progman" 的 UTF-16 编码
             let class_name: [u16; 8] = [
-                'P' as u16, 'r' as u16, 'o' as u16, 'g' as u16, 
-                'm' as u16, 'a' as u16, 'n' as u16, 0
+                'P' as u16, 'r' as u16, 'o' as u16, 'g' as u16, 'm' as u16, 'a' as u16, 'n' as u16,
+                0,
             ];
             let progman = FindWindowW(class_name.as_ptr(), std::ptr::null());
             if progman != 0 {
                 // 在 64 位系统上，GWLP_HWNDPARENT 用于设置 Owner
                 SetWindowLongPtrW(hwnd, GWLP_HWNDPARENT, progman);
-                println!("[WindowManager] 已将 HWND {} 附加到桌面 (Progman: {})", hwnd, progman);
+                println!(
+                    "[WindowManager] 已将 HWND {} 附加到桌面 (Progman: {})",
+                    hwnd, progman
+                );
             }
         }
     }
