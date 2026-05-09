@@ -4,9 +4,8 @@ use widget_core::{AppConfig, PluginConfig};
 use widget_ui::main_window::MainWindow;
 
 use crate::store::Store;
-use windows_sys::Win32::Foundation::RECT;
 use windows_sys::Win32::UI::WindowsAndMessaging::{
-    FindWindowW, GetWindowRect, SetWindowLongPtrW, ShowWindow, GWLP_HWNDPARENT,
+    FindWindowW, SetWindowLongPtrW, ShowWindow, GWLP_HWNDPARENT,
 };
 
 /// 窗口管理器
@@ -102,38 +101,31 @@ impl WindowManager {
 
     /// 保存所有插件的当前屏幕位置和尺寸到配置文件
     ///
-    /// 通过 Win32 API `GetWindowRect` 读取各插件最新的屏幕坐标和大小，并持久化到 `Store`。
+    /// 通过 GPUI 内部方法读取逻辑位置（DIPs），确保位置在不同 DPI 缩放下依然准确。
     pub fn save_all_plugin_bounds(&self, cx: &mut App, store: &Store) {
         let mut config = cx.try_global::<AppConfig>().cloned().unwrap_or_default();
 
-        for (id, (_handle, hwnd)) in &self.widget_windows {
-            if *hwnd == 0 {
-                continue;
-            }
-            let mut rect = RECT {
-                left: 0,
-                top: 0,
-                right: 0,
-                bottom: 0,
-            };
-            let ok = unsafe { GetWindowRect(*hwnd, &mut rect) };
-            if ok != 0 {
+        for (id, (handle, _hwnd)) in &self.widget_windows {
+            // 使用 GPUI 内部方法获取逻辑位置（DIPs），确保与 spawn_window 时的 px(x) 保持一致
+            // 这会自动处理 DPI 缩放问题
+            if let Ok(bounds) = handle.update(cx, |_, window, _| window.bounds()) {
+                let x = bounds.origin.x.into();
+                let y = bounds.origin.y.into();
+                let width = bounds.size.width.into();
+                let height = bounds.size.height.into();
+
                 config.plugins.insert(
                     id.to_string(),
                     PluginConfig {
-                        x: rect.left as f32,
-                        y: rect.top as f32,
-                        width: (rect.right - rect.left) as f32,
-                        height: (rect.bottom - rect.top) as f32,
+                        x,
+                        y,
+                        width,
+                        height,
                     },
                 );
                 println!(
-                    "[WindowManager] 保存插件 {} 位置: ({}, {}) {}x{}",
-                    id,
-                    rect.left,
-                    rect.top,
-                    rect.right - rect.left,
-                    rect.bottom - rect.top
+                    "[WindowManager] 保存插件 {} 逻辑位置: ({}, {}) {}x{}",
+                    id, x, y, width, height
                 );
             }
         }
