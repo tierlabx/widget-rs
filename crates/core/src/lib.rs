@@ -52,6 +52,10 @@ impl Global for AppConfig {}
 pub struct SaveCallback(pub std::sync::Arc<dyn Fn(&AppConfig) + Send + Sync>);
 impl Global for SaveCallback {}
 
+/// 插件位置保存回调
+pub struct SaveBoundsCallback(pub std::sync::Arc<dyn Fn(&mut App)>);
+impl Global for SaveBoundsCallback {}
+
 /// 立即落盘：克隆数据后交给后台执行器执行 IO，不阻塞 GPUI 主线程
 /// 在任何 GPUI 事件处理器（subscribe/listener）内都可安全调用
 pub fn save_config_now(cx: &mut App) {
@@ -71,6 +75,13 @@ pub fn save_config_now(cx: &mut App) {
             save_fn(&config);
         })
         .detach();
+}
+
+pub fn save_bounds_now(cx: &mut App) {
+    if let Some(cb) = cx.try_global::<SaveBoundsCallback>() {
+        let cb = cb.0.clone();
+        cb(cx);
+    }
 }
 
 /// UI 运行时状态（不持久化）

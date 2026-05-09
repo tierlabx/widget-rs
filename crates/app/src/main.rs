@@ -67,6 +67,15 @@ fn main() {
                 store_for_save.save_config(cfg);
             },
         )));
+        
+        let store_for_bounds = Arc::clone(&store_for_app);
+        cx.set_global(widget_core::SaveBoundsCallback(std::sync::Arc::new(
+            move |cx: &mut App| {
+                let _ = cx.update_global::<WindowManager, _>(|wm, cx| {
+                    wm.save_all_plugin_bounds(cx, &store_for_bounds);
+                });
+            },
+        )));
 
         // 初始化窗口管理器，用于管理主窗口和所有插件窗口的生命周期和状态
         WindowManager::init(cx);
