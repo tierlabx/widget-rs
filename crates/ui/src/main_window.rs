@@ -99,7 +99,7 @@ impl MainWindow {
                         }
                     })
                       .child(div().flex().items_center().gap(px(10.0)).ml(px(16.0))
-                        .child(gpui_component::Icon::empty().path("logos/icon.svg").size(px(24.0)).text_color(rgb(0x00d992)))
+                        .child(img("logos/icon.png").w(px(24.0)).h(px(24.0)))
                         )
             )
             .child(
