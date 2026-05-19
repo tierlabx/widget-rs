@@ -88,14 +88,21 @@ pub fn save_bounds_now(cx: &mut App) {
 pub struct UIState {
     pub is_visible: bool,
     pub is_edit_mode: bool,
-    /// 每个插件的可见状态，键为插件 ID
-    pub plugin_visibility: HashMap<String, bool>,
+    /// 每个插件的加载状态，键为插件 ID
+    pub plugin_loaded: HashMap<String, bool>,
+    /// 每个插件的启用状态，键为插件 ID
+    pub plugin_enabled: HashMap<String, bool>,
 }
 
 impl UIState {
-    /// 获取插件的可见状态（默认为 true）
-    pub fn is_plugin_visible(&self, plugin_id: &str) -> bool {
-        *self.plugin_visibility.get(plugin_id).unwrap_or(&true)
+    /// 获取插件的加载状态（默认为 true）
+    pub fn is_plugin_loaded(&self, plugin_id: &str) -> bool {
+        *self.plugin_loaded.get(plugin_id).unwrap_or(&true)
+    }
+
+    /// 获取插件的启用状态（默认为 true）
+    pub fn is_plugin_enabled(&self, plugin_id: &str) -> bool {
+        *self.plugin_enabled.get(plugin_id).unwrap_or(&true)
     }
 }
 

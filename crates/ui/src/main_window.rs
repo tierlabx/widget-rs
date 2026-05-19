@@ -2,7 +2,7 @@ use gpui::prelude::FluentBuilder;
 use gpui::*;
 use raw_window_handle::{HasWindowHandle, RawWindowHandle};
 use windows_sys::Win32::UI::WindowsAndMessaging::{
-    IsZoomed, SetForegroundWindow, ShowWindow, SW_HIDE, SW_SHOW,
+    IsZoomed, SetForegroundWindow, ShowWindow, SW_HIDE,
 };
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -256,12 +256,23 @@ impl MainWindow {
     }
 
     fn render_dashboard(&self, is_edit_mode: bool, cx: &mut Context<Self>) -> impl IntoElement {
-        let sticky_visible = cx
+        let sticky_loaded = cx
             .try_global::<widget_core::UIState>()
-            .map_or(true, |s| s.is_plugin_visible("sticky_widget"));
-        let todo_visible = cx
+            .map_or(true, |s| s.is_plugin_loaded("sticky_widget"));
+        let sticky_enabled = cx
             .try_global::<widget_core::UIState>()
-            .map_or(true, |s| s.is_plugin_visible("todo_widget"));
+            .map_or(true, |s| s.is_plugin_enabled("sticky_widget"));
+        let todo_loaded = cx
+            .try_global::<widget_core::UIState>()
+            .map_or(true, |s| s.is_plugin_loaded("todo_widget"));
+        let todo_enabled = cx
+            .try_global::<widget_core::UIState>()
+            .map_or(true, |s| s.is_plugin_enabled("todo_widget"));
+
+        let plugins = vec![(sticky_loaded, sticky_enabled), (todo_loaded, todo_enabled)];
+        let total_widgets = plugins.len();
+        let running_widgets = plugins.iter().filter(|(l, e)| *l && *e).count();
+        let stopped_widgets = total_widgets - running_widgets;
 
         div()
             .id("main-scroll")
@@ -354,7 +365,7 @@ impl MainWindow {
                     .gap(px(12.0))
                     .child(self.stat_card(
                         gpui_component::IconName::Star,
-                        "2",
+                        running_widgets.to_string(),
                         "运行中",
                         rgb(0x00d992),
                         rgba(0x00d9920d),
@@ -362,7 +373,7 @@ impl MainWindow {
                     ))
                     .child(self.stat_card(
                         gpui_component::IconName::CircleX,
-                        "0",
+                        stopped_widgets.to_string(),
                         "已停止",
                         rgb(0x8b949e),
                         rgba(0xffffff06),
@@ -370,7 +381,7 @@ impl MainWindow {
                     ))
                     .child(self.stat_card(
                         gpui_component::IconName::GalleryVerticalEnd,
-                        "2",
+                        total_widgets.to_string(),
                         "小部件总数",
                         rgb(0xb8b3b0),
                         rgba(0xffffff06),
@@ -412,14 +423,16 @@ impl MainWindow {
                                 "便签",
                                 "sticky_widget",
                                 gpui_component::IconName::File,
-                                sticky_visible,
+                                sticky_loaded,
+                                sticky_enabled,
                                 0,
                             ))
                             .child(self.widget_card(
                                 "待办事项",
                                 "todo_widget",
                                 gpui_component::IconName::CircleCheck,
-                                todo_visible,
+                                todo_loaded,
+                                todo_enabled,
                                 1,
                             )),
                     ),
@@ -429,7 +442,7 @@ impl MainWindow {
     fn stat_card(
         &self,
         icon: gpui_component::IconName,
-        num: &'static str,
+        num: impl Into<SharedString>,
         label: &'static str,
         ic: Rgba,
         bg: Rgba,
@@ -457,7 +470,7 @@ impl MainWindow {
                             .text_xl()
                             .font_weight(FontWeight::BOLD)
                             .text_color(rgb(0xf2f2f2))
-                            .child(num),
+                            .child(num.into()),
                     )
                     .child(
                         div()
@@ -474,14 +487,24 @@ impl MainWindow {
         title: &'static str,
         plugin_id: &'static str,
         icon: gpui_component::IconName,
-        is_visible: bool,
+        is_loaded: bool,
+        is_enabled: bool,
         kind: u8,
     ) -> impl IntoElement {
         use crate::components::badge::{Badge, BadgeVariant};
         use crate::components::button::{Button, ButtonVariant};
         use crate::components::card::Card;
 
-        let toggle_label: &'static str = if is_visible { "隐藏" } else { "显示" };
+        let load_label: &'static str = if is_loaded { "卸载" } else { "加载" };
+        let enable_label: &'static str = if is_enabled { "关闭" } else { "启用" };
+
+        let status_badge = if !is_loaded {
+            Badge::new("未加载").variant(BadgeVariant::Outline).show_dot(false)
+        } else if is_enabled {
+            Badge::new("运行中").variant(BadgeVariant::Default).show_dot(true)
+        } else {
+            Badge::new("已关闭").variant(BadgeVariant::Secondary).show_dot(true)
+        };
 
         let preview = if kind == 0 {
             div()
@@ -592,11 +615,7 @@ impl MainWindow {
                                     .child(title),
                             ),
                     )
-                    .child(
-                        Badge::new("运行中")
-                            .variant(BadgeVariant::Default)
-                            .show_dot(true),
-                    ),
+                    .child(status_badge),
             )
             .content(preview)
             .footer(
@@ -604,28 +623,53 @@ impl MainWindow {
                     .flex()
                     .w_full()
                     .justify_end()
-                    // 直接用 Win32 ShowWindow，不经过 GPUI 全局，彻底避免 RefCell 冲突
+                    .gap(px(8.0))
                     .child(
-                        Button::new(("btn-toggle", kind as usize), toggle_label)
-                            .variant(ButtonVariant::Secondary)
+                        Button::new(("btn-load", kind as usize), load_label)
+                            .variant(ButtonVariant::Outline)
                             .on_click(move |_, _, cx| {
-                                // 1. 更新 UIState 可见状态（&mut App，无 RefCell）
-                                let next_visible = !cx
+                                let next_loaded = !cx
                                     .try_global::<widget_core::UIState>()
-                                    .map_or(true, |s| s.is_plugin_visible(plugin_id));
+                                    .map_or(true, |s| s.is_plugin_loaded(plugin_id));
                                 cx.update_global::<widget_core::UIState, _>(|s, _| {
-                                    s.plugin_visibility
-                                        .insert(plugin_id.to_string(), next_visible);
+                                    s.plugin_loaded.insert(plugin_id.to_string(), next_loaded);
+                                    if !next_loaded {
+                                        s.plugin_enabled.insert(plugin_id.to_string(), false);
+                                    }
                                 });
-                                // 2. 读 HWND（thread_local，无 RefCell 冲突）
                                 let hwnd = widget_core::get_plugin_hwnd(plugin_id);
-                                // 3. 直接调 Win32 API
                                 if hwnd != 0 {
                                     unsafe {
-                                        if next_visible {
-                                            ShowWindow(hwnd, SW_SHOW);
+                                        if !next_loaded {
+                                            windows_sys::Win32::UI::WindowsAndMessaging::ShowWindow(hwnd, windows_sys::Win32::UI::WindowsAndMessaging::SW_HIDE);
+                                        }
+                                    }
+                                }
+                                cx.refresh_windows();
+                            }),
+                    )
+                    .child(
+                        Button::new(("btn-enable", kind as usize), enable_label)
+                            .variant(if is_enabled { ButtonVariant::Secondary } else { ButtonVariant::Default })
+                            .on_click(move |_, _, cx| {
+                                // 如果未加载，不允许点击启用
+                                let is_loaded = cx.try_global::<widget_core::UIState>().map_or(true, |s| s.is_plugin_loaded(plugin_id));
+                                if !is_loaded {
+                                    return;
+                                }
+                                let next_enabled = !cx
+                                    .try_global::<widget_core::UIState>()
+                                    .map_or(true, |s| s.is_plugin_enabled(plugin_id));
+                                cx.update_global::<widget_core::UIState, _>(|s, _| {
+                                    s.plugin_enabled.insert(plugin_id.to_string(), next_enabled);
+                                });
+                                let hwnd = widget_core::get_plugin_hwnd(plugin_id);
+                                if hwnd != 0 {
+                                    unsafe {
+                                        if next_enabled {
+                                            windows_sys::Win32::UI::WindowsAndMessaging::ShowWindow(hwnd, windows_sys::Win32::UI::WindowsAndMessaging::SW_SHOW);
                                         } else {
-                                            ShowWindow(hwnd, SW_HIDE);
+                                            windows_sys::Win32::UI::WindowsAndMessaging::ShowWindow(hwnd, windows_sys::Win32::UI::WindowsAndMessaging::SW_HIDE);
                                         }
                                     }
                                 }

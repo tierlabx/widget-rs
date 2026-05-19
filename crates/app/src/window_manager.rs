@@ -34,7 +34,8 @@ impl WindowManager {
         cx.set_global(widget_core::UIState {
             is_visible: true,
             is_edit_mode: false,
-            plugin_visibility: std::collections::HashMap::new(),
+            plugin_loaded: std::collections::HashMap::new(),
+            plugin_enabled: std::collections::HashMap::new(),
         });
         cx.set_global(Self {
             main_window: None,
