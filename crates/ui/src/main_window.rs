@@ -262,12 +262,29 @@ impl MainWindow {
         let sticky_enabled = cx
             .try_global::<widget_core::UIState>()
             .map_or(true, |s| s.is_plugin_enabled("sticky_widget"));
+        let sticky_top = cx
+            .try_global::<widget_core::AppConfig>()
+            .and_then(|c| c.plugins.get("sticky_widget"))
+            .map_or(false, |p| p.always_on_top);
+        let sticky_pass = cx
+            .try_global::<widget_core::AppConfig>()
+            .and_then(|c| c.plugins.get("sticky_widget"))
+            .map_or(false, |p| p.mouse_passthrough);
+
         let todo_loaded = cx
             .try_global::<widget_core::UIState>()
             .map_or(true, |s| s.is_plugin_loaded("todo_widget"));
         let todo_enabled = cx
             .try_global::<widget_core::UIState>()
             .map_or(true, |s| s.is_plugin_enabled("todo_widget"));
+        let todo_top = cx
+            .try_global::<widget_core::AppConfig>()
+            .and_then(|c| c.plugins.get("todo_widget"))
+            .map_or(false, |p| p.always_on_top);
+        let todo_pass = cx
+            .try_global::<widget_core::AppConfig>()
+            .and_then(|c| c.plugins.get("todo_widget"))
+            .map_or(false, |p| p.mouse_passthrough);
 
         let plugins = vec![(sticky_loaded, sticky_enabled), (todo_loaded, todo_enabled)];
         let total_widgets = plugins.len();
@@ -425,6 +442,8 @@ impl MainWindow {
                                 gpui_component::IconName::File,
                                 sticky_loaded,
                                 sticky_enabled,
+                                sticky_top,
+                                sticky_pass,
                                 0,
                             ))
                             .child(self.widget_card(
@@ -433,6 +452,8 @@ impl MainWindow {
                                 gpui_component::IconName::CircleCheck,
                                 todo_loaded,
                                 todo_enabled,
+                                todo_top,
+                                todo_pass,
                                 1,
                             )),
                     ),
@@ -489,6 +510,8 @@ impl MainWindow {
         icon: gpui_component::IconName,
         is_loaded: bool,
         is_enabled: bool,
+        always_on_top: bool,
+        mouse_passthrough: bool,
         kind: u8,
     ) -> impl IntoElement {
         use crate::components::badge::{Badge, BadgeVariant};
@@ -622,60 +645,146 @@ impl MainWindow {
                 div()
                     .flex()
                     .w_full()
-                    .justify_end()
-                    .gap(px(8.0))
+                    .justify_between()
+                    .items_center()
                     .child(
-                        Button::new(("btn-load", kind as usize), load_label)
-                            .variant(ButtonVariant::Outline)
-                            .on_click(move |_, _, cx| {
-                                let next_loaded = !cx
-                                    .try_global::<widget_core::UIState>()
-                                    .map_or(true, |s| s.is_plugin_loaded(plugin_id));
-                                cx.update_global::<widget_core::UIState, _>(|s, _| {
-                                    s.plugin_loaded.insert(plugin_id.to_string(), next_loaded);
-                                    if !next_loaded {
-                                        s.plugin_enabled.insert(plugin_id.to_string(), false);
-                                    }
-                                });
-                                let hwnd = widget_core::get_plugin_hwnd(plugin_id);
-                                if hwnd != 0 {
-                                    unsafe {
-                                        if !next_loaded {
-                                            windows_sys::Win32::UI::WindowsAndMessaging::ShowWindow(hwnd, windows_sys::Win32::UI::WindowsAndMessaging::SW_HIDE);
+                        div()
+                            .flex()
+                            .gap(px(8.0))
+                            .child(
+                                div()
+                                    .id(SharedString::from(format!("{}-pin", plugin_id)))
+                                    .flex()
+                                    .items_center()
+                                    .gap(px(4.0))
+                                    .p(px(6.0))
+                                    .rounded(px(6.0))
+                                    .cursor_pointer()
+                                    .bg(if always_on_top { rgba(0x00d99230) } else { rgba(0xffffff0a) })
+                                    .text_color(if always_on_top { rgb(0x00d992) } else { rgb(0x8b949e) })
+                                    .hover(move |s| s.bg(if always_on_top { rgba(0x00d99240) } else { rgba(0xffffff15) }))
+                                    .on_click(move |_, _, cx| {
+                                        cx.update_global::<widget_core::AppConfig, _>(|c, _| {
+                                            let p = c.plugins.entry(plugin_id.to_string()).or_insert_with(|| widget_core::PluginConfig {
+                                                x: 0.0, y: 0.0, width: 300.0, height: 300.0, always_on_top: false, mouse_passthrough: false
+                                            });
+                                            p.always_on_top = !always_on_top;
+                                        });
+                                        let hwnd = widget_core::get_plugin_hwnd(plugin_id);
+                                        if hwnd != 0 {
+                                            unsafe {
+                                                use windows_sys::Win32::UI::WindowsAndMessaging::{
+                                                    SetWindowPos, HWND_NOTOPMOST, HWND_TOPMOST, SWP_NOMOVE, SWP_NOSIZE,
+                                                };
+                                                let insert_after = if !always_on_top { HWND_TOPMOST } else { HWND_NOTOPMOST };
+                                                SetWindowPos(hwnd, insert_after, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE);
+                                            }
                                         }
-                                    }
-                                }
-                                cx.refresh_windows();
-                            }),
+                                        widget_core::save_config_now(cx);
+                                        cx.refresh_windows();
+                                    })
+                                    .child(div().text_sm().font_weight(FontWeight::MEDIUM).child("📌 置顶"))
+                            )
+                            .child(
+                                div()
+                                    .id(SharedString::from(format!("{}-ghost", plugin_id)))
+                                    .flex()
+                                    .items_center()
+                                    .gap(px(4.0))
+                                    .p(px(6.0))
+                                    .rounded(px(6.0))
+                                    .cursor_pointer()
+                                    .bg(if mouse_passthrough { rgba(0x00d99230) } else { rgba(0xffffff0a) })
+                                    .text_color(if mouse_passthrough { rgb(0x00d992) } else { rgb(0x8b949e) })
+                                    .hover(move |s| s.bg(if mouse_passthrough { rgba(0x00d99240) } else { rgba(0xffffff15) }))
+                                    .on_click(move |_, _, cx| {
+                                        cx.update_global::<widget_core::AppConfig, _>(|c, _| {
+                                            let p = c.plugins.entry(plugin_id.to_string()).or_insert_with(|| widget_core::PluginConfig {
+                                                x: 0.0, y: 0.0, width: 300.0, height: 300.0, always_on_top: false, mouse_passthrough: false
+                                            });
+                                            p.mouse_passthrough = !mouse_passthrough;
+                                        });
+                                        let hwnd = widget_core::get_plugin_hwnd(plugin_id);
+                                        if hwnd != 0 {
+                                            unsafe {
+                                                use windows_sys::Win32::UI::WindowsAndMessaging::{
+                                                    GetWindowLongW, SetWindowLongW, GWL_EXSTYLE, WS_EX_TRANSPARENT,
+                                                };
+                                                let style = GetWindowLongW(hwnd, GWL_EXSTYLE);
+                                                SetWindowLongW(
+                                                    hwnd,
+                                                    GWL_EXSTYLE,
+                                                    if !mouse_passthrough {
+                                                        style | WS_EX_TRANSPARENT as i32
+                                                    } else {
+                                                        style & !(WS_EX_TRANSPARENT as i32)
+                                                    },
+                                                );
+                                            }
+                                        }
+                                        widget_core::save_config_now(cx);
+                                        cx.refresh_windows();
+                                    })
+                                    .child(div().text_sm().font_weight(FontWeight::MEDIUM).child("👻 穿透"))
+                            )
                     )
                     .child(
-                        Button::new(("btn-enable", kind as usize), enable_label)
-                            .variant(if is_enabled { ButtonVariant::Secondary } else { ButtonVariant::Default })
-                            .on_click(move |_, _, cx| {
-                                // 如果未加载，不允许点击启用
-                                let is_loaded = cx.try_global::<widget_core::UIState>().map_or(true, |s| s.is_plugin_loaded(plugin_id));
-                                if !is_loaded {
-                                    return;
-                                }
-                                let next_enabled = !cx
-                                    .try_global::<widget_core::UIState>()
-                                    .map_or(true, |s| s.is_plugin_enabled(plugin_id));
-                                cx.update_global::<widget_core::UIState, _>(|s, _| {
-                                    s.plugin_enabled.insert(plugin_id.to_string(), next_enabled);
-                                });
-                                let hwnd = widget_core::get_plugin_hwnd(plugin_id);
-                                if hwnd != 0 {
-                                    unsafe {
-                                        if next_enabled {
-                                            windows_sys::Win32::UI::WindowsAndMessaging::ShowWindow(hwnd, windows_sys::Win32::UI::WindowsAndMessaging::SW_SHOW);
-                                        } else {
-                                            windows_sys::Win32::UI::WindowsAndMessaging::ShowWindow(hwnd, windows_sys::Win32::UI::WindowsAndMessaging::SW_HIDE);
+                        div()
+                            .flex()
+                            .gap(px(8.0))
+                            .child(
+                                Button::new(("btn-load", kind as usize), load_label)
+                                    .variant(ButtonVariant::Outline)
+                                    .on_click(move |_, _, cx| {
+                                        let next_loaded = !cx
+                                            .try_global::<widget_core::UIState>()
+                                            .map_or(true, |s| s.is_plugin_loaded(plugin_id));
+                                        cx.update_global::<widget_core::UIState, _>(|s, _| {
+                                            s.plugin_loaded.insert(plugin_id.to_string(), next_loaded);
+                                            if !next_loaded {
+                                                s.plugin_enabled.insert(plugin_id.to_string(), false);
+                                            }
+                                        });
+                                        let hwnd = widget_core::get_plugin_hwnd(plugin_id);
+                                        if hwnd != 0 {
+                                            unsafe {
+                                                if !next_loaded {
+                                                    windows_sys::Win32::UI::WindowsAndMessaging::ShowWindow(hwnd, windows_sys::Win32::UI::WindowsAndMessaging::SW_HIDE);
+                                                }
+                                            }
                                         }
-                                    }
-                                }
-                                cx.refresh_windows();
-                            }),
-                    ),
+                                        cx.refresh_windows();
+                                    }),
+                            )
+                            .child(
+                                Button::new(("btn-enable", kind as usize), enable_label)
+                                    .variant(if is_enabled { ButtonVariant::Secondary } else { ButtonVariant::Default })
+                                    .on_click(move |_, _, cx| {
+                                        // 如果未加载，不允许点击启用
+                                        let is_loaded = cx.try_global::<widget_core::UIState>().map_or(true, |s| s.is_plugin_loaded(plugin_id));
+                                        if !is_loaded {
+                                            return;
+                                        }
+                                        let next_enabled = !cx
+                                            .try_global::<widget_core::UIState>()
+                                            .map_or(true, |s| s.is_plugin_enabled(plugin_id));
+                                        cx.update_global::<widget_core::UIState, _>(|s, _| {
+                                            s.plugin_enabled.insert(plugin_id.to_string(), next_enabled);
+                                        });
+                                        let hwnd = widget_core::get_plugin_hwnd(plugin_id);
+                                        if hwnd != 0 {
+                                            unsafe {
+                                                if next_enabled {
+                                                    windows_sys::Win32::UI::WindowsAndMessaging::ShowWindow(hwnd, windows_sys::Win32::UI::WindowsAndMessaging::SW_SHOW);
+                                                } else {
+                                                    windows_sys::Win32::UI::WindowsAndMessaging::ShowWindow(hwnd, windows_sys::Win32::UI::WindowsAndMessaging::SW_HIDE);
+                                                }
+                                            }
+                                        }
+                                        cx.refresh_windows();
+                                    }),
+                            ),
+                    )
             )
     }
 
@@ -752,12 +861,9 @@ impl MainWindow {
     }
 
     fn render_settings_page(&self, cx: &mut Context<Self>) -> impl IntoElement {
-        let always_on_top = cx
+        let auto_start = cx
             .try_global::<widget_core::AppConfig>()
-            .map_or(false, |c| c.always_on_top);
-        let mouse_passthrough = cx
-            .try_global::<widget_core::AppConfig>()
-            .map_or(false, |c| c.mouse_passthrough);
+            .map_or(false, |c| c.auto_start);
 
         div()
             .flex_1()
@@ -786,60 +892,30 @@ impl MainWindow {
                     ),
             )
             .child(self.setting_toggle(
-                "始终置顶",
-                "所有小部件窗口始终显示在其他窗口之上",
-                "always-on-top",
-                always_on_top,
+                "开机自启动",
+                "系统启动时自动运行应用",
+                "auto-start",
+                auto_start,
                 move |val, cx| {
                     cx.update_global::<widget_core::AppConfig, _>(|c, _| {
-                        c.always_on_top = val;
+                        c.auto_start = val;
                     });
-                    // 直接用 thread_local HWND 批量置顶（无 RefCell 冲突）
-                    for hwnd in widget_core::get_all_plugin_hwnds() {
-                        if hwnd == 0 {
-                            continue;
-                        }
-                        unsafe {
-                            use windows_sys::Win32::UI::WindowsAndMessaging::{
-                                SetWindowPos, HWND_NOTOPMOST, HWND_TOPMOST, SWP_NOMOVE, SWP_NOSIZE,
-                            };
-                            let insert_after = if val { HWND_TOPMOST } else { HWND_NOTOPMOST };
-                            SetWindowPos(hwnd, insert_after, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE);
+                    if let Ok(exe_path) = std::env::current_exe() {
+                        if let Some(exe_str) = exe_path.to_str() {
+                            let auto = auto_launch::AutoLaunchBuilder::new()
+                                .set_app_name("WidgetRS")
+                                .set_app_path(exe_str)
+                                .set_use_launch_agent(true)
+                                .build()
+                                .unwrap();
+                            if val {
+                                let _ = auto.enable();
+                            } else {
+                                let _ = auto.disable();
+                            }
                         }
                     }
-                    cx.refresh_windows();
-                },
-            ))
-            .child(self.setting_toggle(
-                "鼠标穿透",
-                "鼠标点击将穿透小部件，可点击到桌面和其他窗口",
-                "mouse-passthrough",
-                mouse_passthrough,
-                move |val, cx| {
-                    cx.update_global::<widget_core::AppConfig, _>(|c, _| {
-                        c.mouse_passthrough = val;
-                    });
-                    for hwnd in widget_core::get_all_plugin_hwnds() {
-                        if hwnd == 0 {
-                            continue;
-                        }
-                        unsafe {
-                            use windows_sys::Win32::UI::WindowsAndMessaging::{
-                                GetWindowLongW, SetWindowLongW, GWL_EXSTYLE, WS_EX_TRANSPARENT,
-                            };
-                            let style = GetWindowLongW(hwnd, GWL_EXSTYLE);
-                            SetWindowLongW(
-                                hwnd,
-                                GWL_EXSTYLE,
-                                if val {
-                                    style | WS_EX_TRANSPARENT as i32
-                                } else {
-                                    style & !(WS_EX_TRANSPARENT as i32)
-                                },
-                            );
-                        }
-                    }
-                    cx.refresh_windows();
+                    widget_core::save_config_now(cx);
                 },
             ))
     }

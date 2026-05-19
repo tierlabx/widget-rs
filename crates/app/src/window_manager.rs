@@ -115,15 +115,18 @@ impl WindowManager {
                 let width = bounds.size.width.into();
                 let height = bounds.size.height.into();
 
-                config.plugins.insert(
-                    id.to_string(),
-                    PluginConfig {
-                        x,
-                        y,
-                        width,
-                        height,
-                    },
-                );
+                let entry = config.plugins.entry(id.to_string()).or_insert_with(|| PluginConfig {
+                    x,
+                    y,
+                    width,
+                    height,
+                    always_on_top: false,
+                    mouse_passthrough: false,
+                });
+                entry.x = x;
+                entry.y = y;
+                entry.width = width;
+                entry.height = height;
                 println!(
                     "[WindowManager] 保存插件 {} 逻辑位置: ({}, {}) {}x{}",
                     id, x, y, width, height

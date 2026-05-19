@@ -4,6 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+auto-launch = "0.5.0"
 gpui.workspace = true
 gpui-component.workspace = true
 raw-window-handle.workspace = true

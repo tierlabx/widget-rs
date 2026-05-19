@@ -159,7 +159,8 @@ fn main() {
             }
 
             // Step 3: 将 HWND 写回 WindowManager 并注册到 thread_local 供全局访问
-            let _ = cx.update_global::<WindowManager, _>(|wm, _| {
+            let _ = cx.update_global::<WindowManager, _>(|wm, cx| {
+                let config = cx.try_global::<widget_core::AppConfig>().cloned();
                 for (id, hwnd) in &id_hwnd {
                     if let Some(e) = wm.widget_windows.get_mut(id.as_str()) {
                         e.1 = *hwnd;
@@ -168,6 +169,33 @@ fn main() {
                     widget_core::register_plugin_hwnd(id, *hwnd);
                     // 防止 Win + D （显示桌面）操作导致小组件被隐藏
                     WindowManager::attach_to_desktop(*hwnd);
+                    
+                    // 恢复独立设置（置顶和鼠标穿透）
+                    if let Some(cfg) = &config {
+                        if let Some(plugin_cfg) = cfg.plugins.get(id.as_str()) {
+                            unsafe {
+                                use windows_sys::Win32::UI::WindowsAndMessaging::{
+                                    SetWindowPos, HWND_NOTOPMOST, HWND_TOPMOST, SWP_NOMOVE, SWP_NOSIZE,
+                                    GetWindowLongW, SetWindowLongW, GWL_EXSTYLE, WS_EX_TRANSPARENT,
+                                };
+                                // 恢复始终置顶
+                                let insert_after = if plugin_cfg.always_on_top { HWND_TOPMOST } else { HWND_NOTOPMOST };
+                                SetWindowPos(*hwnd, insert_after, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE);
+
+                                // 恢复鼠标穿透
+                                let style = GetWindowLongW(*hwnd, GWL_EXSTYLE);
+                                SetWindowLongW(
+                                    *hwnd,
+                                    GWL_EXSTYLE,
+                                    if plugin_cfg.mouse_passthrough {
+                                        style | WS_EX_TRANSPARENT as i32
+                                    } else {
+                                        style & !(WS_EX_TRANSPARENT as i32)
+                                    },
+                                );
+                            }
+                        }
+                    }
                 }
                 if main_hwnd != 0 {
                     wm.main_hwnd = main_hwnd;

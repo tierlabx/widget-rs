@@ -10,6 +10,10 @@ pub struct PluginConfig {
     pub y: f32,
     pub width: f32,
     pub height: f32,
+    #[serde(default)]
+    pub always_on_top: bool,
+    #[serde(default)]
+    pub mouse_passthrough: bool,
 }
 
 /// 持久化的待办条目
@@ -22,8 +26,8 @@ pub struct TodoItemData {
 /// 应用全局配置（可被序列化存储）
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct AppConfig {
-    pub always_on_top: bool,
-    pub mouse_passthrough: bool,
+    #[serde(default)]
+    pub auto_start: bool,
     /// 各插件位置，键为插件 ID，例如 "sticky_widget"
     pub plugins: HashMap<String, PluginConfig>,
     /// 便签内容
@@ -37,8 +41,7 @@ pub struct AppConfig {
 impl Default for AppConfig {
     fn default() -> Self {
         Self {
-            always_on_top: false,
-            mouse_passthrough: false,
+            auto_start: false,
             plugins: HashMap::new(),
             sticky_content: String::new(),
             todo_items: Vec::new(),
