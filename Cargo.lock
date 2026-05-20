@@ -7434,6 +7434,7 @@ name = "widget-rs"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "auto-launch",
  "directories",
  "gpui",
  "gpui-component",

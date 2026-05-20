@@ -903,7 +903,7 @@ impl MainWindow {
                     if let Ok(exe_path) = std::env::current_exe() {
                         if let Some(exe_str) = exe_path.to_str() {
                             let auto = auto_launch::AutoLaunchBuilder::new()
-                                .set_app_name("WidgetRS")
+                                .set_app_name("Widget RS")
                                 .set_app_path(exe_str)
                                 .set_use_launch_agent(true)
                                 .build()

@@ -8,6 +8,7 @@ gpui.workspace = true
 gpui-component.workspace = true
 widget-core.workspace = true
 widget-ui.workspace = true
+auto-launch = "0.5.0"
 sticky_plugin.workspace = true
 todo_plugin.workspace = true
 serde.workspace = true
