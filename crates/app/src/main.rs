@@ -47,33 +47,32 @@ fn main() {
     // 同步开机自启动状态（比如安装包勾选了自启动，或者用户手动在注册表删了）
     if let Ok(exe_path) = std::env::current_exe() {
         if let Some(exe_str) = exe_path.to_str() {
-            // 1.1 清理旧的自启动项 "WidgetRS" (无空格)
-            let old_auto = auto_launch::AutoLaunchBuilder::new()
-                .set_app_name("WidgetRS")
-                .set_app_path(exe_str)
-                .set_use_launch_agent(true)
-                .build();
-            if let Ok(old_auto) = old_auto {
-                if old_auto.is_enabled().unwrap_or(false) {
-                    let _ = old_auto.disable();
-                    println!("[main] 已清理旧的开机启动项 WidgetRS");
-                }
-            }
+            let exe_path_quoted = format!("\"{}\"", exe_str);
+            let hkcu = winreg::RegKey::predef(winreg::enums::HKEY_CURRENT_USER);
+            if let Ok(run_key) = hkcu.open_subkey_with_flags(
+                "Software\\Microsoft\\Windows\\CurrentVersion\\Run",
+                winreg::enums::KEY_ALL_ACCESS,
+            ) {
+                let current_val: Result<String, _> = run_key.get_value("WidgetRS");
+                let mut is_enabled = false;
+                
+                let _ = run_key.delete_value("Widget RS");
 
-            // 1.2 同步新的自启动项 "Widget RS" (带空格) 的状态到配置
-            let auto = auto_launch::AutoLaunchBuilder::new()
-                .set_app_name("Widget RS")
-                .set_app_path(exe_str)
-                .set_use_launch_agent(true)
-                .build();
-            if let Ok(auto) = auto {
-                let actual_auto_start = auto.is_enabled().unwrap_or(false);
-                if config.auto_start != actual_auto_start {
-                    config.auto_start = actual_auto_start;
+                if let Ok(val) = current_val {
+                    if val == exe_path_quoted {
+                        is_enabled = true;
+                    } else if val.contains(exe_str) {
+                        let _ = run_key.set_value("WidgetRS", &exe_path_quoted);
+                        is_enabled = true;
+                    }
+                }
+
+                if config.auto_start != is_enabled {
+                    config.auto_start = is_enabled;
                     store.save_config(&config);
                     println!(
                         "[main] 开机自启动状态与系统注册表不一致，已同步配置 auto_start = {}",
-                        actual_auto_start
+                        is_enabled
                     );
                 }
             }

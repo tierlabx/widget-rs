@@ -902,16 +902,18 @@ impl MainWindow {
                     });
                     if let Ok(exe_path) = std::env::current_exe() {
                         if let Some(exe_str) = exe_path.to_str() {
-                            let auto = auto_launch::AutoLaunchBuilder::new()
-                                .set_app_name("Widget RS")
-                                .set_app_path(exe_str)
-                                .set_use_launch_agent(true)
-                                .build()
-                                .unwrap();
-                            if val {
-                                let _ = auto.enable();
-                            } else {
-                                let _ = auto.disable();
+                            let hkcu = winreg::RegKey::predef(winreg::enums::HKEY_CURRENT_USER);
+                            if let Ok(run_key) = hkcu.open_subkey_with_flags(
+                                "Software\\Microsoft\\Windows\\CurrentVersion\\Run",
+                                winreg::enums::KEY_ALL_ACCESS,
+                            ) {
+                                if val {
+                                    let exe_path_quoted = format!("\"{}\"", exe_str);
+                                    let _ = run_key.set_value("WidgetRS", &exe_path_quoted);
+                                } else {
+                                    let _ = run_key.delete_value("WidgetRS");
+                                }
+                                let _ = run_key.delete_value("Widget RS");
                             }
                         }
                     }
