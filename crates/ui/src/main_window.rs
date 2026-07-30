@@ -73,7 +73,7 @@ impl Render for MainWindow {
                         NavPage::Dashboard => {
                             self.render_dashboard(is_edit_mode, cx).into_any_element()
                         }
-                        NavPage::Widgets => self.render_widgets_page().into_any_element(),
+                        NavPage::Widgets => self.render_widgets_page(cx).into_any_element(),
                         NavPage::Settings => self.render_settings_page(cx).into_any_element(),
                     }),
             )
@@ -794,7 +794,14 @@ impl MainWindow {
             )
     }
 
-    fn render_widgets_page(&self) -> impl IntoElement {
+    fn render_widgets_page(&self, cx: &mut Context<Self>) -> impl IntoElement {
+        let sticky_loaded = cx
+            .try_global::<widget_core::UIState>()
+            .map_or(true, |s| s.is_plugin_loaded("sticky_widget"));
+        let todo_loaded = cx
+            .try_global::<widget_core::UIState>()
+            .map_or(true, |s| s.is_plugin_loaded("todo_widget"));
+
         div()
             .flex_1()
             .h_full()
@@ -831,17 +838,123 @@ impl MainWindow {
             )
             .child(
                 div()
-                    .flex_1()
-                    .w_full()
                     .flex()
-                    .flex_col()
-                    .items_center()
-                    .justify_center()
+                    .w_full()
                     .gap(px(16.0))
-                    .text_color(rgb(0x8b949e))
-                    .child(gpui_component::Icon::new(gpui_component::IconName::Inbox).size(px(48.0)))
-                    .child(div().text_lg().child("插件市场正在建设中..."))
-                    .child(div().text_sm().child("暂无可用在线插件")),
+                    .flex_wrap()
+                    .pb(px(24.0))
+                    .child(self.market_plugin_card(
+                        "极客便签", 
+                        "sticky_widget", 
+                        "将随手记下的灵感、备忘录以极客形式贴在桌面。", 
+                        gpui_component::IconName::File, 
+                        "v1.0.0", 
+                        "VoltTeam (内置)",
+                        sticky_loaded
+                    ))
+                    .child(self.market_plugin_card(
+                        "待办事项", 
+                        "todo_widget", 
+                        "极简高效的任务清单，助你轻松掌控今日核心目标。", 
+                        gpui_component::IconName::CircleCheck, 
+                        "v1.0.0", 
+                        "VoltTeam (内置)",
+                        todo_loaded
+                    ))
+            )
+    }
+
+    fn market_plugin_card(
+        &self,
+        name: &'static str,
+        id_str: &'static str,
+        desc: &'static str,
+        icon: gpui_component::IconName,
+        version: &'static str,
+        author: &'static str,
+        is_loaded: bool,
+    ) -> impl IntoElement {
+        use crate::components::button::{Button, ButtonVariant};
+        div()
+            .flex()
+            .flex_col()
+            .w(px(320.0))
+            .p(px(20.0))
+            .gap(px(16.0))
+            .bg(rgb(0x101010))
+            .border_1()
+            .border_color(rgb(0x3d3a39))
+            .rounded(px(8.0))
+            .hover(|s| s.border_color(rgba(0x00d99280)))
+            .child(
+                div()
+                    .flex()
+                    .items_start()
+                    .gap(px(12.0))
+                    .child(
+                        div()
+                            .w(px(40.0))
+                            .h(px(40.0))
+                            .rounded(px(8.0))
+                            .bg(rgba(0xffffff0a))
+                            .flex()
+                            .justify_center()
+                            .items_center()
+                            .child(div().text_color(rgb(0xb8b3b0)).child(gpui_component::Icon::new(icon))),
+                    )
+                    .child(
+                        div()
+                            .flex()
+                            .flex_col()
+                            .gap(px(4.0))
+                            .child(
+                                div().text_lg().font_weight(FontWeight::SEMIBOLD).text_color(rgb(0xf2f2f2)).child(name)
+                            )
+                            .child(
+                                div().text_sm().font_weight(FontWeight::MEDIUM).text_color(rgb(0x8b949e)).child(id_str)
+                            ),
+                    ),
+            )
+            .child(
+                div().h(px(48.0)).text_sm().text_color(rgb(0xb8b3b0)).child(desc)
+            )
+            .child(
+                div()
+                    .flex()
+                    .w_full()
+                    .justify_between()
+                    .items_center()
+                    .child(
+                        div()
+                            .flex()
+                            .items_center()
+                            .gap(px(8.0))
+                            .child(div().text_xs().text_color(rgb(0x8b949e)).child(author))
+                            .child(div().w(px(4.0)).h(px(4.0)).rounded_full().bg(rgb(0x3d3a39)))
+                            .child(div().text_xs().text_color(rgb(0x8b949e)).child(version)),
+                    )
+                    .child(
+                        Button::new(id_str, if is_loaded { "卸载" } else { "获取/安装" })
+                            .variant(if is_loaded { ButtonVariant::Outline } else { ButtonVariant::Default })
+                            .on_click(move |_, _, cx| {
+                                let next_loaded = !is_loaded;
+                                cx.update_global::<widget_core::UIState, _>(|s, _| {
+                                    s.plugin_loaded.insert(id_str.to_string(), next_loaded);
+                                    if !next_loaded {
+                                        s.plugin_enabled.insert(id_str.to_string(), false);
+                                    }
+                                });
+                                let hwnd = widget_core::get_plugin_hwnd(id_str);
+                                if hwnd != 0 {
+                                    unsafe {
+                                        if !next_loaded {
+                                            windows_sys::Win32::UI::WindowsAndMessaging::ShowWindow(hwnd, windows_sys::Win32::UI::WindowsAndMessaging::SW_HIDE);
+                                        }
+                                    }
+                                }
+                                cx.refresh_windows();
+                            })
+                    )
             )
     }
 
