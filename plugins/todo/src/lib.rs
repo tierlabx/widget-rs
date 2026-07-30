@@ -328,11 +328,14 @@ impl Render for TodoWidget {
                         .flex()
                         .items_center()
                         .w_full()
-                        .px(px(10.0))
-                        .py(px(8.0))
-                        .gap(px(8.0))
-                        .bg(rgb(0x1a1a1c))
+                        .px(px(12.0))
+                        .py(px(10.0))
+                        .gap(px(12.0))
+                        .bg(rgb(0x101010)) // VoltAgent Carbon Surface
+                        .border_1()
+                        .border_color(rgb(0x3d3a39)) // VoltAgent Warm Charcoal
                         .rounded(px(6.0))
+                        .hover(|s| s.border_color(rgba(0x00d99240)))
                         // 勾选圆圈
                         .child(
                             div()
@@ -412,12 +415,12 @@ impl Render for TodoWidget {
             .flex()
             .flex_col()
             .size_full()
-            .bg(rgba(0x111113f0))
+            .bg(rgba(0x050507f2)) // VoltAgent Abyss Black with slight transparency
             .border_1()
             .border_color(if is_edit_mode {
                 rgb(0x00d992)
             } else {
-                rgb(0x2e2e32)
+                rgb(0x3d3a39) // VoltAgent Warm Charcoal
             })
             .rounded(px(8.0))
             .children(drag_handle)
@@ -428,10 +431,10 @@ impl Render for TodoWidget {
                     .items_center()
                     .justify_between()
                     .w_full()
-                    .px(px(14.0))
-                    .py(px(11.0))
+                    .px(px(16.0))
+                    .bg(rgb(0x050507)) // VoltAgent Abyss Black
                     .border_b_1()
-                    .border_color(rgb(0x2e2e32))
+                    .border_color(rgb(0x3d3a39)) // VoltAgent Warm Charcoal
                     .child(
                         div()
                             .flex()
@@ -439,7 +442,7 @@ impl Render for TodoWidget {
                             .gap(px(8.0))
                             .child(
                                 div()
-                                    .text_color(rgb(0x00d992))
+                                    .text_color(rgb(0x00d992)) // VoltAgent Emerald Green
                                     .child(Icon::new(IconName::CircleCheck).size(px(16.0))),
                             )
                             .child(
@@ -508,13 +511,14 @@ impl Render for TodoWidget {
                     .items_center()
                     .w_full()
                     .px(px(12.0))
-                    .py(px(9.0))
+                    .py(px(12.0))
                     .gap(px(6.0))
                     .border_t_1()
-                    .border_color(rgb(0x2e2e32))
+                    .border_color(rgb(0x3d3a39)) // VoltAgent Warm Charcoal
+                    .bg(rgb(0x050507))
                     .cursor_pointer()
                     .id("todo-add-btn")
-                    .hover(|s| s.bg(rgba(0x00d99212)))
+                    .hover(|s| s.bg(rgba(0x00d9921a)))
                     .on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
                         this.show_input = !this.show_input;
                         if this.show_input {

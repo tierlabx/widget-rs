@@ -82,11 +82,13 @@ impl Render for StickyWidget {
                 div()
                     .w_full()
                     .h(px(28.0))
-                    .bg(rgb(0x00d992))
+                    .bg(rgb(0x00d992)) // Emerald Signal Green
                     .flex()
                     .justify_center()
                     .items_center()
                     .id("sticky-drag")
+                    .cursor_pointer()
+                    .hover(|s| s.bg(rgba(0x00d992cc)))
                     .on_mouse_down(MouseButton::Left, |_, window, _| {
                         if let Ok(handle) = window.window_handle() {
                             if let raw_window_handle::RawWindowHandle::Win32(h) = handle.as_raw() {
@@ -138,9 +140,9 @@ impl Render for StickyWidget {
                     .w_full()
                     .px(px(14.0))
                     .py(px(10.0))
-                    .bg(rgb(0xfef3c7))
+                    .bg(rgb(0xfef3c7)) // 保持暖黄
                     .border_b_1()
-                    .border_color(rgba(0xf59e0b60))
+                    .border_color(rgba(0xf59e0b80)) // 加深下划线
                     .child(
                         div()
                             .text_color(rgb(0x92400e))
@@ -149,7 +151,7 @@ impl Render for StickyWidget {
                     .child(
                         div()
                             .text_sm()
-                            .font_weight(FontWeight::SEMIBOLD)
+                            .font_weight(FontWeight::BOLD)
                             .text_color(rgb(0x78350f))
                             .child("便签"),
                     ),
@@ -162,16 +164,19 @@ impl Render for StickyWidget {
                     .flex_1()
                     .w_full()
                     .bg(rgb(0xfef3c7))
-                    .p(px(10.0))
+                    .p(px(8.0))
                     .child(
                         div()
                             .flex_1()
                             .w_full()
                             .h_full()
-                            .bg(rgba(0xffffff80))
+                            .bg(rgba(0xffffffa0)) // 让便签输入框底色更白一些以示输入区
+                            .border_1()
+                            .border_color(rgba(0xf59e0b20))
                             .rounded(px(4.0))
-                            .p(px(6.0))
+                            .p(px(8.0))
                             .text_color(rgb(0x3d2000))
+                            .hover(|s| s.border_color(rgba(0xf59e0b60))) // hover时有略深边框
                             .child(Input::new(input).h_full().appearance(false).bordered(false)),
                     ),
             )
