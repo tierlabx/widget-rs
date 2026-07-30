@@ -1,7 +1,11 @@
 use gpui::*;
 use serde::{Deserialize, Serialize};
 use std::cell::RefCell;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
+use std::sync::atomic::{AtomicBool, Ordering};
+
+/// 原生级别的全局编辑模式状态，供 WindowProc 直接读取
+pub static NATIVE_EDIT_MODE: AtomicBool = AtomicBool::new(false);
 
 /// 单个插件的位置与大小配置
 #[derive(Serialize, Deserialize, Debug, Clone)]

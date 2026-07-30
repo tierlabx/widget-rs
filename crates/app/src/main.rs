@@ -7,11 +7,54 @@ mod window_manager;
 
 use gpui::*;
 use plugin_manager::PluginManager;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex, OnceLock};
 use store::Store;
 use tray_icon::menu::MenuEvent;
 use widget_core::AppConfig;
 use window_manager::WindowManager;
+
+static WND_PROCS: OnceLock<Mutex<std::collections::HashMap<isize, isize>>> = OnceLock::new();
+
+unsafe extern "system" fn plugin_wnd_proc(
+    hwnd: isize,
+    msg: u32,
+    wparam: usize,
+    lparam: isize,
+) -> isize {
+    let old_proc = {
+        let procs = WND_PROCS.get_or_init(|| Mutex::new(std::collections::HashMap::new()));
+        let guard = procs.lock().unwrap();
+        *guard.get(&hwnd).unwrap_or(&0)
+    };
+
+    if old_proc == 0 {
+        return windows_sys::Win32::UI::WindowsAndMessaging::DefWindowProcW(hwnd, msg, wparam, lparam);
+    }
+
+    let old_proc_fn: unsafe extern "system" fn(isize, u32, usize, isize) -> isize =
+        std::mem::transmute(old_proc);
+
+    let res = windows_sys::Win32::UI::WindowsAndMessaging::CallWindowProcW(
+        Some(old_proc_fn),
+        hwnd,
+        msg,
+        wparam,
+        lparam,
+    );
+
+    if msg == windows_sys::Win32::UI::WindowsAndMessaging::WM_NCHITTEST {
+        if !widget_core::NATIVE_EDIT_MODE.load(std::sync::atomic::Ordering::SeqCst) {
+            match res {
+                10 | 11 | 12 | 13 | 14 | 15 | 16 | 17 => {
+                    return 1; // HTCLIENT
+                }
+                _ => {}
+            }
+        }
+    }
+
+    res
+}
 
 #[derive(rust_embed::RustEmbed)]
 #[folder = "../../assets"]
@@ -205,7 +248,24 @@ fn main() {
                     widget_core::register_plugin_hwnd(id, *hwnd);
                     // 防止 Win + D （显示桌面）操作导致小组件被隐藏
                     WindowManager::attach_to_desktop(*hwnd);
-                    
+                    // 移除默认的 WS_THICKFRAME 并子类化窗口以彻底禁用原生缩放
+                    unsafe {
+                        use windows_sys::Win32::UI::WindowsAndMessaging::{
+                            GetWindowLongW, SetWindowLongW, SetWindowPos, GWL_STYLE, WS_THICKFRAME,
+                            SWP_FRAMECHANGED, SWP_NOMOVE, SWP_NOSIZE, SWP_NOZORDER, SetWindowLongPtrW, GWLP_WNDPROC
+                        };
+                        let style = GetWindowLongW(*hwnd, GWL_STYLE);
+                        SetWindowLongW(*hwnd, GWL_STYLE, style & !(WS_THICKFRAME as i32));
+                        SetWindowPos(*hwnd, 0, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_FRAMECHANGED);
+
+                        // 注入自定义窗口过程
+                        let old_proc = SetWindowLongPtrW(*hwnd, GWLP_WNDPROC, plugin_wnd_proc as isize);
+                        if old_proc != 0 {
+                            let procs = WND_PROCS.get_or_init(|| Mutex::new(std::collections::HashMap::new()));
+                            procs.lock().unwrap().insert(*hwnd, old_proc);
+                        }
+                    }
+
                     // 恢复独立设置（置顶和鼠标穿透）
                     if let Some(cfg) = &config {
                         if let Some(plugin_cfg) = cfg.plugins.get(id.as_str()) {

@@ -344,10 +344,14 @@ impl MainWindow {
                                 .hover(|s| s.bg(rgba(0x00d99230)))
                                 .on_click(|_, _, cx| {
                                     let mut was_edit_mode = false;
+                                    let mut is_edit = false;
                                     cx.update_global::<widget_core::UIState, _>(|s, _| {
                                         was_edit_mode = s.is_edit_mode;
                                         s.is_edit_mode = !s.is_edit_mode;
+                                        is_edit = s.is_edit_mode;
                                     });
+                                    widget_core::NATIVE_EDIT_MODE.store(is_edit, std::sync::atomic::Ordering::SeqCst);
+                                    
                                     if was_edit_mode {
                                         if let Some(cb) = cx.try_global::<widget_core::SaveBoundsCallback>() {
                                             let cb = cb.0.clone();
