@@ -1,6 +1,6 @@
 use gpui::prelude::FluentBuilder;
 use gpui::*;
-use gpui_component::scroll::ScrollableElement;
+
 use raw_window_handle::{HasWindowHandle, RawWindowHandle};
 use windows_sys::Win32::UI::WindowsAndMessaging::{
     IsZoomed, SetForegroundWindow, ShowWindow, SW_HIDE,
@@ -437,26 +437,31 @@ impl MainWindow {
                             .flex()
                             .w_full()
                             .gap(px(16.0))
-                            .child(self.widget_card(
-                                "便签",
-                                "sticky_widget",
-                                gpui_component::IconName::File,
-                                sticky_loaded,
-                                sticky_enabled,
-                                sticky_top,
-                                sticky_pass,
-                                0,
-                            ))
-                            .child(self.widget_card(
-                                "待办事项",
-                                "todo_widget",
-                                gpui_component::IconName::CircleCheck,
-                                todo_loaded,
-                                todo_enabled,
-                                todo_top,
-                                todo_pass,
-                                1,
-                            )),
+                            .flex_wrap()
+                            .children(sticky_loaded.then(|| {
+                                self.widget_card(
+                                    "便签",
+                                    "sticky_widget",
+                                    gpui_component::IconName::File,
+                                    sticky_loaded,
+                                    sticky_enabled,
+                                    sticky_top,
+                                    sticky_pass,
+                                    0,
+                                )
+                            }))
+                            .children(todo_loaded.then(|| {
+                                self.widget_card(
+                                    "待办事项",
+                                    "todo_widget",
+                                    gpui_component::IconName::CircleCheck,
+                                    todo_loaded,
+                                    todo_enabled,
+                                    todo_top,
+                                    todo_pass,
+                                    1,
+                                )
+                            })),
                     ),
             )
     }
@@ -709,16 +714,16 @@ impl MainWindow {
                                         if hwnd != 0 {
                                             unsafe {
                                                 use windows_sys::Win32::UI::WindowsAndMessaging::{
-                                                    GetWindowLongW, SetWindowLongW, GWL_EXSTYLE, WS_EX_TRANSPARENT,
+                                                    GetWindowLongW, SetWindowLongW, GWL_EXSTYLE, WS_EX_TRANSPARENT, WS_EX_LAYERED,
                                                 };
                                                 let style = GetWindowLongW(hwnd, GWL_EXSTYLE);
                                                 SetWindowLongW(
                                                     hwnd,
                                                     GWL_EXSTYLE,
                                                     if !mouse_passthrough {
-                                                        style | WS_EX_TRANSPARENT as i32
+                                                        style | WS_EX_TRANSPARENT as i32 | WS_EX_LAYERED as i32
                                                     } else {
-                                                        style & !(WS_EX_TRANSPARENT as i32)
+                                                        style & !(WS_EX_TRANSPARENT as i32 | WS_EX_LAYERED as i32)
                                                     },
                                                 );
                                             }
@@ -797,6 +802,7 @@ impl MainWindow {
             .flex_col()
             .p(px(24.0))
             .gap(px(16.0))
+            .overflow_hidden()
             .child(
                 div()
                     .flex()
@@ -822,109 +828,20 @@ impl MainWindow {
                                     .child("发现并安装社区开发的桌面功能扩展"),
                             ),
                     )
-                    .child(
-                        div()
-                            .flex()
-                            .items_center()
-                            .gap(px(8.0))
-                            .px(px(16.0))
-                            .py(px(8.0))
-                            .bg(rgb(0x101010))
-                            .border_1()
-                            .border_color(rgb(0x3d3a39))
-                            .rounded(px(6.0))
-                            .child(div().text_color(rgb(0x8b949e)).child(gpui_component::Icon::new(gpui_component::IconName::Search)))
-                            .child(div().text_sm().text_color(rgb(0x8b949e)).child("搜索插件...")),
-                    ),
             )
             .child(
                 div()
-                    .flex()
+                    .flex_1()
                     .w_full()
-                    .gap(px(16.0))
-                    .flex_wrap()
-                    .overflow_y_scrollbar()
-                    .pb(px(24.0))
-                    // 模拟插件市场项目
-                    .child(self.market_plugin_card("系统监控", "Hardware Monitor", "实时监控 CPU、内存、网络状态，并在桌面悬浮显示极客仪表盘。", gpui_component::IconName::Settings, "v1.2.0", "VoltTeam"))
-                    .child(self.market_plugin_card("每日诗词", "Poetry Widget", "每天为你推送一句精美的诗词或金句，修身养性。", gpui_component::IconName::File, "v0.9.1", "Community"))
-                    .child(self.market_plugin_card("天气预报", "Weather Station", "简约的气象站小部件，支持多城市与未来 7 天预报。", gpui_component::IconName::Star, "v2.0.0", "VoltTeam"))
-                    .child(self.market_plugin_card("股票行情", "Stock Ticker", "极简股市跑马灯，盯盘必备利器，支持自定义股票池。", gpui_component::IconName::LayoutDashboard, "v1.0.5", "Community"))
-            )
-    }
-
-    fn market_plugin_card(
-        &self,
-        name: &'static str,
-        id_str: &'static str,
-        desc: &'static str,
-        icon: gpui_component::IconName,
-        version: &'static str,
-        author: &'static str,
-    ) -> impl IntoElement {
-        use crate::components::button::{Button, ButtonVariant};
-        div()
-            .flex()
-            .flex_col()
-            .w(px(320.0))
-            .p(px(20.0))
-            .gap(px(16.0))
-            .bg(rgb(0x101010))
-            .border_1()
-            .border_color(rgb(0x3d3a39))
-            .rounded(px(8.0))
-            .hover(|s| s.border_color(rgba(0x00d99280))) // 悬浮时边框呈现微绿泛光
-            .child(
-                div()
                     .flex()
-                    .items_start()
-                    .gap(px(12.0))
-                    .child(
-                        div()
-                            .w(px(40.0))
-                            .h(px(40.0))
-                            .rounded(px(8.0))
-                            .bg(rgba(0xffffff0a))
-                            .flex()
-                            .justify_center()
-                            .items_center()
-                            .child(div().text_color(rgb(0xb8b3b0)).child(gpui_component::Icon::new(icon))),
-                    )
-                    .child(
-                        div()
-                            .flex()
-                            .flex_col()
-                            .gap(px(4.0))
-                            .child(
-                                div().text_lg().font_weight(FontWeight::SEMIBOLD).text_color(rgb(0xf2f2f2)).child(name)
-                            )
-                            .child(
-                                div().text_sm().font_weight(FontWeight::MEDIUM).text_color(rgb(0x8b949e)).child(id_str)
-                            ),
-                    ),
-            )
-            .child(
-                div().h(px(48.0)).text_sm().text_color(rgb(0xb8b3b0)).child(desc)
-            )
-            .child(
-                div()
-                    .flex()
-                    .w_full()
-                    .justify_between()
+                    .flex_col()
                     .items_center()
-                    .child(
-                        div()
-                            .flex()
-                            .items_center()
-                            .gap(px(8.0))
-                            .child(div().text_xs().text_color(rgb(0x8b949e)).child(author))
-                            .child(div().w(px(4.0)).h(px(4.0)).rounded_full().bg(rgb(0x3d3a39)))
-                            .child(div().text_xs().text_color(rgb(0x8b949e)).child(version)),
-                    )
-                    .child(
-                        Button::new(id_str, "下载安装")
-                            .variant(ButtonVariant::Default)
-                    )
+                    .justify_center()
+                    .gap(px(16.0))
+                    .text_color(rgb(0x8b949e))
+                    .child(gpui_component::Icon::new(gpui_component::IconName::Inbox).size(px(48.0)))
+                    .child(div().text_lg().child("插件市场正在建设中..."))
+                    .child(div().text_sm().child("暂无可用在线插件")),
             )
     }
 

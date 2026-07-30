@@ -84,6 +84,7 @@ fn main() {
     pm.register(Arc::new(sticky_plugin::StickyWidgetPlugin));
     pm.register(Arc::new(todo_plugin::TodoWidgetPlugin));
 
+
     // 3. 初始化系统托盘（包括托盘图标和菜单）
     let (tray_icon, toggle_id, quit_id) = tray::setup_tray().expect("系统托盘初始化失败");
 
@@ -211,21 +212,22 @@ fn main() {
                             unsafe {
                                 use windows_sys::Win32::UI::WindowsAndMessaging::{
                                     SetWindowPos, HWND_NOTOPMOST, HWND_TOPMOST, SWP_NOMOVE, SWP_NOSIZE,
-                                    GetWindowLongW, SetWindowLongW, GWL_EXSTYLE, WS_EX_TRANSPARENT,
                                 };
                                 // 恢复始终置顶
                                 let insert_after = if plugin_cfg.always_on_top { HWND_TOPMOST } else { HWND_NOTOPMOST };
                                 SetWindowPos(*hwnd, insert_after, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE);
 
-                                // 恢复鼠标穿透
+                                use windows_sys::Win32::UI::WindowsAndMessaging::{
+                                    GetWindowLongW, SetWindowLongW, GWL_EXSTYLE, WS_EX_TRANSPARENT, WS_EX_LAYERED,
+                                };
                                 let style = GetWindowLongW(*hwnd, GWL_EXSTYLE);
                                 SetWindowLongW(
                                     *hwnd,
                                     GWL_EXSTYLE,
                                     if plugin_cfg.mouse_passthrough {
-                                        style | WS_EX_TRANSPARENT as i32
+                                        style | WS_EX_TRANSPARENT as i32 | WS_EX_LAYERED as i32
                                     } else {
-                                        style & !(WS_EX_TRANSPARENT as i32)
+                                        style & !(WS_EX_TRANSPARENT as i32 | WS_EX_LAYERED as i32)
                                     },
                                 );
                             }
