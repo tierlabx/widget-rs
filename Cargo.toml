@@ -17,6 +17,11 @@ opt-level = 3
 # 出现 panic 直接中止，不展开栈
 panic = "abort"
 
+# The profile that 'dist' will build with
+[profile.dist]
+inherits = "release"
+lto = "thin"
+
 [workspace.dependencies]
 gpui = "0.2.2"
 gpui-component = "0.5.1"
