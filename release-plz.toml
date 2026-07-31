@@ -1,0 +1,30 @@
+[workspace]
+
+# Disable publishing and changelogs for the internal plugin/core crates
+[[package]]
+name = "widget-core"
+changelog_update = false
+publish = false
+
+[[package]]
+name = "widget-ui"
+changelog_update = false
+publish = false
+
+[[package]]
+name = "sticky_plugin"
+changelog_update = false
+publish = false
+
+[[package]]
+name = "todo_plugin"
+changelog_update = false
+publish = false
+
+# Configure the main app crate to hold the unified changelog
+[[package]]
+name = "widget-rs"
+# Place the changelog in the root of the workspace instead of crates/app/
+changelog_path = "../../CHANGELOG.md"
+# Include commits from all internal crates in this unified changelog
+changelog_include = ["widget-core", "widget-ui", "sticky_plugin", "todo_plugin"]
