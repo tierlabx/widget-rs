@@ -277,7 +277,7 @@ impl WindowManager {
             };
             let is_win_visible = IsWindowVisible(hwnd) != 0;
             let is_minimized = IsIconic(hwnd) != 0;
-            let next_visible = !(is_win_visible && !is_minimized);
+            let next_visible = !is_win_visible || is_minimized;
             self.is_visible = next_visible;
             if next_visible {
                 if IsIconic(hwnd) != 0 {

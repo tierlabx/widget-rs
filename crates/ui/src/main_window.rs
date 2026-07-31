@@ -522,6 +522,7 @@ impl MainWindow {
             )
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn widget_card(
         &self,
         title: &'static str,
@@ -883,6 +884,7 @@ impl MainWindow {
             )
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn market_plugin_card(
         &self,
         name: &'static str,

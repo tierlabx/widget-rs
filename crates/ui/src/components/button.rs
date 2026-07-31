@@ -11,12 +11,14 @@ pub enum ButtonVariant {
     Ghost,
 }
 
+pub type ClickHandler = Box<dyn Fn(&ClickEvent, &mut Window, &mut App) + 'static>;
+
 pub struct Button {
     variant: ButtonVariant,
     label: SharedString,
     icon: Option<IconName>,
     id: ElementId,
-    on_click: Option<Box<dyn Fn(&ClickEvent, &mut Window, &mut App) + 'static>>,
+    on_click: Option<ClickHandler>,
 }
 
 impl Button {

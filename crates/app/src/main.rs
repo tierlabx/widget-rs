@@ -47,11 +47,8 @@ unsafe extern "system" fn plugin_wnd_proc(
     if msg == windows_sys::Win32::UI::WindowsAndMessaging::WM_NCHITTEST
         && !widget_core::NATIVE_EDIT_MODE.load(std::sync::atomic::Ordering::SeqCst)
     {
-        match res {
-            10..=17 => {
-                return 1; // HTCLIENT
-            }
-            _ => {}
+        if let 10..=17 = res {
+            return 1; // HTCLIENT
         }
     }
 
