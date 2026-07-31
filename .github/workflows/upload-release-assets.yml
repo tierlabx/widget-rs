@@ -3,7 +3,7 @@ name: Upload Release Assets
 on:
   push:
     tags:
-      - 'v*' # Trigger when release-plz creates a new version tag
+      - '*' # Trigger on any tag creation (release-plz pushes tags like 0.1.0 or v0.1.0)
 
 jobs:
   build-and-upload:
