@@ -115,12 +115,12 @@ impl Render for TodoWidget {
     fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let is_edit_mode = cx
             .try_global::<widget_core::UIState>()
-            .map_or(false, |s| s.is_edit_mode);
+            .is_some_and(|s| s.is_edit_mode);
 
         // ── Win32 HWND / 边框逻辑 ─────────────────────────────────
         if let Ok(handle) = _window.window_handle() {
             if let raw_window_handle::RawWindowHandle::Win32(h) = handle.as_raw() {
-                let hwnd = h.hwnd.get() as isize;
+                let hwnd = h.hwnd.get();
                 if !self.hwnd_reported {
                     self.hwnd_reported = true;
                     let _ = hwnd;
@@ -158,7 +158,7 @@ impl Render for TodoWidget {
                                 unsafe {
                                     windows_sys::Win32::UI::Input::KeyboardAndMouse::ReleaseCapture();
                                     windows_sys::Win32::UI::WindowsAndMessaging::PostMessageW(
-                                        h.hwnd.get() as isize,
+                                        h.hwnd.get(),
                                         windows_sys::Win32::UI::WindowsAndMessaging::WM_NCLBUTTONDOWN,
                                         windows_sys::Win32::UI::WindowsAndMessaging::HTCAPTION as usize,
                                         0,

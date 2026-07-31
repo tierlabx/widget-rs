@@ -7,6 +7,12 @@ pub struct Card {
     height: Option<Pixels>,
 }
 
+impl Default for Card {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Card {
     pub fn new() -> Self {
         Self {

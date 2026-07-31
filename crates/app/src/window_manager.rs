@@ -118,36 +118,57 @@ impl WindowManager {
                 // 边缘吸附逻辑 (Edge Snapping)
                 let snap = 20.0;
                 let mut snapped = false;
-                if let Some(display) = cx.displays().into_iter().find(|d| d.bounds().intersects(&bounds)) {
+                if let Some(display) = cx
+                    .displays()
+                    .into_iter()
+                    .find(|d| d.bounds().intersects(&bounds))
+                {
                     let d_bounds = display.bounds();
                     let d_left: f32 = d_bounds.origin.x.into();
                     let d_top: f32 = d_bounds.origin.y.into();
                     let d_right: f32 = d_left + f32::from(d_bounds.size.width);
                     let d_bottom: f32 = d_top + f32::from(d_bounds.size.height);
 
-                    if (x - d_left).abs() < snap { x = d_left; snapped = true; }
-                    if (d_right - (x + width)).abs() < snap { x = d_right - width; snapped = true; }
-                    if (y - d_top).abs() < snap { y = d_top; snapped = true; }
-                    if (d_bottom - (y + height)).abs() < snap { y = d_bottom - height; snapped = true; }
+                    if (x - d_left).abs() < snap {
+                        x = d_left;
+                        snapped = true;
+                    }
+                    if (d_right - (x + width)).abs() < snap {
+                        x = d_right - width;
+                        snapped = true;
+                    }
+                    if (y - d_top).abs() < snap {
+                        y = d_top;
+                        snapped = true;
+                    }
+                    if (d_bottom - (y + height)).abs() < snap {
+                        y = d_bottom - height;
+                        snapped = true;
+                    }
                 }
 
                 if snapped && *hwnd != 0 {
                     let px_x = x.round() as i32;
                     let px_y = y.round() as i32;
                     unsafe {
-                        use windows_sys::Win32::UI::WindowsAndMessaging::{SetWindowPos, SWP_NOSIZE, SWP_NOZORDER};
+                        use windows_sys::Win32::UI::WindowsAndMessaging::{
+                            SetWindowPos, SWP_NOSIZE, SWP_NOZORDER,
+                        };
                         SetWindowPos(*hwnd, 0, px_x, px_y, 0, 0, SWP_NOSIZE | SWP_NOZORDER);
                     }
                 }
 
-                let entry = config.plugins.entry(id.to_string()).or_insert_with(|| PluginConfig {
-                    x,
-                    y,
-                    width,
-                    height,
-                    always_on_top: false,
-                    mouse_passthrough: false,
-                });
+                let entry = config
+                    .plugins
+                    .entry(id.to_string())
+                    .or_insert_with(|| PluginConfig {
+                        x,
+                        y,
+                        width,
+                        height,
+                        always_on_top: false,
+                        mouse_passthrough: false,
+                    });
                 entry.x = x;
                 entry.y = y;
                 entry.width = width;
@@ -217,8 +238,6 @@ impl WindowManager {
             println!("[WindowManager] 插件 {} 置顶: {}", id, always_on_top);
         }
     }
-
-
 
     /// 获取主窗口的 HWND（避免在 update_global 闭包内嵌套调用）
     #[allow(dead_code)]

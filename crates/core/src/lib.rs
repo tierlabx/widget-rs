@@ -1,8 +1,8 @@
 use gpui::*;
 use serde::{Deserialize, Serialize};
 use std::cell::RefCell;
-use std::collections::{HashMap, HashSet};
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::collections::HashMap;
+use std::sync::atomic::AtomicBool;
 
 /// 原生级别的全局编辑模式状态，供 WindowProc 直接读取
 pub static NATIVE_EDIT_MODE: AtomicBool = AtomicBool::new(false);
@@ -28,7 +28,7 @@ pub struct TodoItemData {
 }
 
 /// 应用全局配置（可被序列化存储）
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, Default)]
 pub struct AppConfig {
     #[serde(default)]
     pub auto_start: bool,
@@ -40,17 +40,6 @@ pub struct AppConfig {
     /// 待办事项列表
     #[serde(default)]
     pub todo_items: Vec<TodoItemData>,
-}
-
-impl Default for AppConfig {
-    fn default() -> Self {
-        Self {
-            auto_start: false,
-            plugins: HashMap::new(),
-            sticky_content: String::new(),
-            todo_items: Vec::new(),
-        }
-    }
 }
 
 impl Global for AppConfig {}
@@ -127,7 +116,7 @@ pub trait Plugin: Send + Sync {
 
 thread_local! {
     static PLUGIN_HWNDS: RefCell<HashMap<String, isize>> = RefCell::new(HashMap::new());
-    static ALL_PLUGIN_HWND_LIST: RefCell<Vec<isize>> = RefCell::new(Vec::new());
+    static ALL_PLUGIN_HWND_LIST: RefCell<Vec<isize>> = const { RefCell::new(Vec::new()) };
 }
 
 /// 注册插件 HWND（由 app crate 在 HWND 提取后调用）

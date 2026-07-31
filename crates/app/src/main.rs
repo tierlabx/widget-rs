@@ -28,7 +28,9 @@ unsafe extern "system" fn plugin_wnd_proc(
     };
 
     if old_proc == 0 {
-        return windows_sys::Win32::UI::WindowsAndMessaging::DefWindowProcW(hwnd, msg, wparam, lparam);
+        return windows_sys::Win32::UI::WindowsAndMessaging::DefWindowProcW(
+            hwnd, msg, wparam, lparam,
+        );
     }
 
     let old_proc_fn: unsafe extern "system" fn(isize, u32, usize, isize) -> isize =
@@ -42,14 +44,14 @@ unsafe extern "system" fn plugin_wnd_proc(
         lparam,
     );
 
-    if msg == windows_sys::Win32::UI::WindowsAndMessaging::WM_NCHITTEST {
-        if !widget_core::NATIVE_EDIT_MODE.load(std::sync::atomic::Ordering::SeqCst) {
-            match res {
-                10 | 11 | 12 | 13 | 14 | 15 | 16 | 17 => {
-                    return 1; // HTCLIENT
-                }
-                _ => {}
+    if msg == windows_sys::Win32::UI::WindowsAndMessaging::WM_NCHITTEST
+        && !widget_core::NATIVE_EDIT_MODE.load(std::sync::atomic::Ordering::SeqCst)
+    {
+        match res {
+            10..=17 => {
+                return 1; // HTCLIENT
             }
+            _ => {}
         }
     }
 
@@ -98,7 +100,7 @@ fn main() {
             ) {
                 let current_val: Result<String, _> = run_key.get_value("WidgetRS");
                 let mut is_enabled = false;
-                
+
                 let _ = run_key.delete_value("Widget RS");
 
                 if let Ok(val) = current_val {
@@ -127,7 +129,6 @@ fn main() {
     pm.register(Arc::new(sticky_plugin::StickyWidgetPlugin));
     pm.register(Arc::new(todo_plugin::TodoWidgetPlugin));
 
-
     // 3. 初始化系统托盘（包括托盘图标和菜单）
     let (tray_icon, toggle_id, quit_id) = tray::setup_tray().expect("系统托盘初始化失败");
 
@@ -146,11 +147,11 @@ fn main() {
                 store_for_save.save_config(cfg);
             },
         )));
-        
+
         let store_for_bounds = Arc::clone(&store_for_app);
         cx.set_global(widget_core::SaveBoundsCallback(std::sync::Arc::new(
             move |cx: &mut App| {
-                let _ = cx.update_global::<WindowManager, _>(|wm, cx| {
+                cx.update_global::<WindowManager, _>(|wm, cx| {
                     wm.save_all_plugin_bounds(cx, &store_for_bounds);
                 });
             },
@@ -183,9 +184,9 @@ fn main() {
                 let ph = wm
                     .widget_windows
                     .iter()
-                    .map(|(id, (h, _))| (id.to_string(), h.clone()))
+                    .map(|(id, (h, _))| (id.to_string(), *h))
                     .collect();
-                let mh = wm.main_window.as_ref().map(|h| h.clone().into());
+                let mh = wm.main_window.as_ref().map(|h| (*h).into());
                 (ph, mh)
             }) {
                 Ok(v) => v,
@@ -201,7 +202,7 @@ fn main() {
                             use raw_window_handle::HasWindowHandle;
                             if let Ok(wh) = win.window_handle() {
                                 if let raw_window_handle::RawWindowHandle::Win32(h) = wh.as_raw() {
-                                    return h.hwnd.get() as isize;
+                                    return h.hwnd.get();
                                 }
                             }
                             0isize
@@ -221,7 +222,7 @@ fn main() {
                         use raw_window_handle::HasWindowHandle;
                         if let Ok(wh) = win.window_handle() {
                             if let raw_window_handle::RawWindowHandle::Win32(h) = wh.as_raw() {
-                                return h.hwnd.get() as isize;
+                                return h.hwnd.get();
                             }
                         }
                         0isize
@@ -251,17 +252,31 @@ fn main() {
                     // 移除默认的 WS_THICKFRAME 并子类化窗口以彻底禁用原生缩放
                     unsafe {
                         use windows_sys::Win32::UI::WindowsAndMessaging::{
-                            GetWindowLongW, SetWindowLongW, SetWindowPos, GWL_STYLE, WS_THICKFRAME,
-                            SWP_FRAMECHANGED, SWP_NOMOVE, SWP_NOSIZE, SWP_NOZORDER, SetWindowLongPtrW, GWLP_WNDPROC
+                            GetWindowLongW, SetWindowLongPtrW, SetWindowLongW, SetWindowPos,
+                            GWLP_WNDPROC, GWL_STYLE, SWP_FRAMECHANGED, SWP_NOMOVE, SWP_NOSIZE,
+                            SWP_NOZORDER, WS_THICKFRAME,
                         };
                         let style = GetWindowLongW(*hwnd, GWL_STYLE);
                         SetWindowLongW(*hwnd, GWL_STYLE, style & !(WS_THICKFRAME as i32));
-                        SetWindowPos(*hwnd, 0, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_FRAMECHANGED);
+                        SetWindowPos(
+                            *hwnd,
+                            0,
+                            0,
+                            0,
+                            0,
+                            0,
+                            SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_FRAMECHANGED,
+                        );
 
                         // 注入自定义窗口过程
-                        let old_proc = SetWindowLongPtrW(*hwnd, GWLP_WNDPROC, plugin_wnd_proc as isize);
+                        let old_proc = SetWindowLongPtrW(
+                            *hwnd,
+                            GWLP_WNDPROC,
+                            plugin_wnd_proc as *const () as isize,
+                        );
                         if old_proc != 0 {
-                            let procs = WND_PROCS.get_or_init(|| Mutex::new(std::collections::HashMap::new()));
+                            let procs = WND_PROCS
+                                .get_or_init(|| Mutex::new(std::collections::HashMap::new()));
                             procs.lock().unwrap().insert(*hwnd, old_proc);
                         }
                     }
@@ -271,14 +286,28 @@ fn main() {
                         if let Some(plugin_cfg) = cfg.plugins.get(id.as_str()) {
                             unsafe {
                                 use windows_sys::Win32::UI::WindowsAndMessaging::{
-                                    SetWindowPos, HWND_NOTOPMOST, HWND_TOPMOST, SWP_NOMOVE, SWP_NOSIZE,
+                                    SetWindowPos, HWND_NOTOPMOST, HWND_TOPMOST, SWP_NOMOVE,
+                                    SWP_NOSIZE,
                                 };
                                 // 恢复始终置顶
-                                let insert_after = if plugin_cfg.always_on_top { HWND_TOPMOST } else { HWND_NOTOPMOST };
-                                SetWindowPos(*hwnd, insert_after, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE);
+                                let insert_after = if plugin_cfg.always_on_top {
+                                    HWND_TOPMOST
+                                } else {
+                                    HWND_NOTOPMOST
+                                };
+                                SetWindowPos(
+                                    *hwnd,
+                                    insert_after,
+                                    0,
+                                    0,
+                                    0,
+                                    0,
+                                    SWP_NOMOVE | SWP_NOSIZE,
+                                );
 
                                 use windows_sys::Win32::UI::WindowsAndMessaging::{
-                                    GetWindowLongW, SetWindowLongW, GWL_EXSTYLE, WS_EX_TRANSPARENT, WS_EX_LAYERED,
+                                    GetWindowLongW, SetWindowLongW, GWL_EXSTYLE, WS_EX_LAYERED,
+                                    WS_EX_TRANSPARENT,
                                 };
                                 let style = GetWindowLongW(*hwnd, GWL_EXSTYLE);
                                 SetWindowLongW(
@@ -311,12 +340,11 @@ fn main() {
                 if let Ok(event) = MenuEvent::receiver().try_recv() {
                     if event.id == toggle_id {
                         // toggle_main_window_win32 纯 Win32，不嵌套
-                        let next_visible = match cx.update_global::<WindowManager, _>(|wm, _| {
-                            wm.toggle_main_window_win32()
-                        }) {
-                            Ok(v) => v,
-                            Err(_) => true,
-                        };
+                        let next_visible = cx
+                            .update_global::<WindowManager, _>(|wm, _| {
+                                wm.toggle_main_window_win32()
+                            })
+                            .unwrap_or(true);
 
                         let _ = cx.update_global::<widget_core::UIState, _>(|s, _| {
                             s.is_visible = next_visible;

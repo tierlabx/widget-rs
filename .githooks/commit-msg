@@ -1,0 +1,34 @@
+#!/usr/bin/env bash
+
+# commit-msg hook
+# Checks if the commit message follows Conventional Commits format.
+
+commit_msg_file=$1
+commit_msg=$(cat "$commit_msg_file")
+
+# 允许 Merge commit
+if [[ "$commit_msg" =~ ^Merge.* ]]; then
+    exit 0
+fi
+
+# 约定式提交的正则表达式
+regex="^(feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert)(\([A-Za-z0-9_-]+\))?: .+"
+
+if ! [[ "$commit_msg" =~ $regex ]]; then
+    echo "❌ 错误: 提交信息不符合约定式提交规范 (Conventional Commits)！"
+    echo ""
+    echo "推荐的格式: <type>(<scope>): <subject>"
+    echo "例如: feat: 增加桌面吸附功能"
+    echo "      fix(ui): 修复窗口大小调整失效的问题"
+    echo ""
+    echo "允许的 <type> 包括: feat, fix, docs, style, refactor, perf, test, build, ci, chore, revert."
+    echo ""
+    echo "您当前的提交信息是:"
+    echo "------------------------"
+    echo "$commit_msg"
+    echo "------------------------"
+    exit 1
+fi
+
+echo "✅ 提交信息格式检查通过！"
+exit 0

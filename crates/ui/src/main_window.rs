@@ -18,6 +18,12 @@ pub struct MainWindow {
     nav_page: NavPage,
 }
 
+impl Default for MainWindow {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl MainWindow {
     pub fn new() -> Self {
         Self {
@@ -31,15 +37,15 @@ impl Render for MainWindow {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let is_visible = cx
             .try_global::<widget_core::UIState>()
-            .map_or(true, |s| s.is_visible);
+            .is_none_or(|s| s.is_visible);
         let is_edit_mode = cx
             .try_global::<widget_core::UIState>()
-            .map_or(false, |s| s.is_edit_mode);
+            .is_some_and(|s| s.is_edit_mode);
         let nav_page = self.nav_page;
 
         let is_maximized = if let Ok(h) = window.window_handle() {
             if let RawWindowHandle::Win32(h) = h.as_raw() {
-                unsafe { IsZoomed(h.hwnd.get() as isize) != 0 }
+                unsafe { IsZoomed(h.hwnd.get()) != 0 }
             } else {
                 false
             }
@@ -93,7 +99,7 @@ impl MainWindow {
                             if let RawWindowHandle::Win32(h) = h.as_raw() { unsafe {
                                 windows_sys::Win32::UI::Input::KeyboardAndMouse::ReleaseCapture();
                                 windows_sys::Win32::UI::WindowsAndMessaging::PostMessageW(
-                                    h.hwnd.get() as isize,
+                                    h.hwnd.get(),
                                     windows_sys::Win32::UI::WindowsAndMessaging::WM_NCLBUTTONDOWN,
                                     windows_sys::Win32::UI::WindowsAndMessaging::HTCAPTION as usize, 0);
                             }}
@@ -115,7 +121,7 @@ impl MainWindow {
                             let mut hwnd_opt = None;
                             if let Ok(h) = win.window_handle() {
                                 if let RawWindowHandle::Win32(h) = h.as_raw() { unsafe {
-                                    let hwnd = h.hwnd.get() as isize; hwnd_opt = Some(hwnd);
+                                    let hwnd = h.hwnd.get(); hwnd_opt = Some(hwnd);
                                     if IsZoomed(hwnd) != 0 {
                                         windows_sys::Win32::UI::WindowsAndMessaging::PostMessageW(hwnd, windows_sys::Win32::UI::WindowsAndMessaging::WM_SYSCOMMAND, windows_sys::Win32::UI::WindowsAndMessaging::SC_RESTORE as usize, 0);
                                     } else {
@@ -140,7 +146,7 @@ impl MainWindow {
                             cx.update_global::<widget_core::UIState, _>(|s, _| { s.is_visible = false; });
                             if let Ok(h) = win.window_handle() {
                                 if let RawWindowHandle::Win32(h) = h.as_raw() {
-                                    unsafe { ShowWindow(h.hwnd.get() as isize, SW_HIDE); }
+                                    unsafe { ShowWindow(h.hwnd.get(), SW_HIDE); }
                                 }
                             }
                         })
@@ -259,35 +265,35 @@ impl MainWindow {
     fn render_dashboard(&self, is_edit_mode: bool, cx: &mut Context<Self>) -> impl IntoElement {
         let sticky_loaded = cx
             .try_global::<widget_core::UIState>()
-            .map_or(true, |s| s.is_plugin_loaded("sticky_widget"));
+            .is_none_or(|s| s.is_plugin_loaded("sticky_widget"));
         let sticky_enabled = cx
             .try_global::<widget_core::UIState>()
-            .map_or(true, |s| s.is_plugin_enabled("sticky_widget"));
+            .is_none_or(|s| s.is_plugin_enabled("sticky_widget"));
         let sticky_top = cx
             .try_global::<widget_core::AppConfig>()
             .and_then(|c| c.plugins.get("sticky_widget"))
-            .map_or(false, |p| p.always_on_top);
+            .is_some_and(|p| p.always_on_top);
         let sticky_pass = cx
             .try_global::<widget_core::AppConfig>()
             .and_then(|c| c.plugins.get("sticky_widget"))
-            .map_or(false, |p| p.mouse_passthrough);
+            .is_some_and(|p| p.mouse_passthrough);
 
         let todo_loaded = cx
             .try_global::<widget_core::UIState>()
-            .map_or(true, |s| s.is_plugin_loaded("todo_widget"));
+            .is_none_or(|s| s.is_plugin_loaded("todo_widget"));
         let todo_enabled = cx
             .try_global::<widget_core::UIState>()
-            .map_or(true, |s| s.is_plugin_enabled("todo_widget"));
+            .is_none_or(|s| s.is_plugin_enabled("todo_widget"));
         let todo_top = cx
             .try_global::<widget_core::AppConfig>()
             .and_then(|c| c.plugins.get("todo_widget"))
-            .map_or(false, |p| p.always_on_top);
+            .is_some_and(|p| p.always_on_top);
         let todo_pass = cx
             .try_global::<widget_core::AppConfig>()
             .and_then(|c| c.plugins.get("todo_widget"))
-            .map_or(false, |p| p.mouse_passthrough);
+            .is_some_and(|p| p.mouse_passthrough);
 
-        let plugins = vec![(sticky_loaded, sticky_enabled), (todo_loaded, todo_enabled)];
+        let plugins = [(sticky_loaded, sticky_enabled), (todo_loaded, todo_enabled)];
         let total_widgets = plugins.len();
         let running_widgets = plugins.iter().filter(|(l, e)| *l && *e).count();
         let stopped_widgets = total_widgets - running_widgets;
@@ -350,10 +356,13 @@ impl MainWindow {
                                         s.is_edit_mode = !s.is_edit_mode;
                                         is_edit = s.is_edit_mode;
                                     });
-                                    widget_core::NATIVE_EDIT_MODE.store(is_edit, std::sync::atomic::Ordering::SeqCst);
-                                    
+                                    widget_core::NATIVE_EDIT_MODE
+                                        .store(is_edit, std::sync::atomic::Ordering::SeqCst);
+
                                     if was_edit_mode {
-                                        if let Some(cb) = cx.try_global::<widget_core::SaveBoundsCallback>() {
+                                        if let Some(cb) =
+                                            cx.try_global::<widget_core::SaveBoundsCallback>()
+                                        {
                                             let cb = cb.0.clone();
                                             cb(cx);
                                         }
@@ -532,11 +541,17 @@ impl MainWindow {
         let enable_label: &'static str = if is_enabled { "关闭" } else { "启用" };
 
         let status_badge = if !is_loaded {
-            Badge::new("未加载").variant(BadgeVariant::Outline).show_dot(false)
+            Badge::new("未加载")
+                .variant(BadgeVariant::Outline)
+                .show_dot(false)
         } else if is_enabled {
-            Badge::new("运行中").variant(BadgeVariant::Default).show_dot(true)
+            Badge::new("运行中")
+                .variant(BadgeVariant::Default)
+                .show_dot(true)
         } else {
-            Badge::new("已关闭").variant(BadgeVariant::Secondary).show_dot(true)
+            Badge::new("已关闭")
+                .variant(BadgeVariant::Secondary)
+                .show_dot(true)
         };
 
         let preview = if kind == 0 {
@@ -748,7 +763,7 @@ impl MainWindow {
                                     .on_click(move |_, _, cx| {
                                         let next_loaded = !cx
                                             .try_global::<widget_core::UIState>()
-                                            .map_or(true, |s| s.is_plugin_loaded(plugin_id));
+                                            .is_none_or(|s| s.is_plugin_loaded(plugin_id));
                                         cx.update_global::<widget_core::UIState, _>(|s, _| {
                                             s.plugin_loaded.insert(plugin_id.to_string(), next_loaded);
                                             if !next_loaded {
@@ -771,13 +786,13 @@ impl MainWindow {
                                     .variant(if is_enabled { ButtonVariant::Secondary } else { ButtonVariant::Default })
                                     .on_click(move |_, _, cx| {
                                         // 如果未加载，不允许点击启用
-                                        let is_loaded = cx.try_global::<widget_core::UIState>().map_or(true, |s| s.is_plugin_loaded(plugin_id));
+                                        let is_loaded = cx.try_global::<widget_core::UIState>().is_none_or(|s| s.is_plugin_loaded(plugin_id));
                                         if !is_loaded {
                                             return;
                                         }
                                         let next_enabled = !cx
                                             .try_global::<widget_core::UIState>()
-                                            .map_or(true, |s| s.is_plugin_enabled(plugin_id));
+                                            .is_none_or(|s| s.is_plugin_enabled(plugin_id));
                                         cx.update_global::<widget_core::UIState, _>(|s, _| {
                                             s.plugin_enabled.insert(plugin_id.to_string(), next_enabled);
                                         });
@@ -801,10 +816,10 @@ impl MainWindow {
     fn render_widgets_page(&self, cx: &mut Context<Self>) -> impl IntoElement {
         let sticky_loaded = cx
             .try_global::<widget_core::UIState>()
-            .map_or(true, |s| s.is_plugin_loaded("sticky_widget"));
+            .is_none_or(|s| s.is_plugin_loaded("sticky_widget"));
         let todo_loaded = cx
             .try_global::<widget_core::UIState>()
-            .map_or(true, |s| s.is_plugin_loaded("todo_widget"));
+            .is_none_or(|s| s.is_plugin_loaded("todo_widget"));
 
         div()
             .flex_1()
@@ -838,7 +853,7 @@ impl MainWindow {
                                     .text_color(rgb(0xb8b3b0))
                                     .child("发现并安装社区开发的桌面功能扩展"),
                             ),
-                    )
+                    ),
             )
             .child(
                 div()
@@ -848,23 +863,23 @@ impl MainWindow {
                     .flex_wrap()
                     .pb(px(24.0))
                     .child(self.market_plugin_card(
-                        "极客便签", 
-                        "sticky_widget", 
-                        "将随手记下的灵感、备忘录以极客形式贴在桌面。", 
-                        gpui_component::IconName::File, 
-                        "v1.0.0", 
-                        "VoltTeam (内置)",
-                        sticky_loaded
+                        "极客便签",
+                        "sticky_widget",
+                        "将随手记下的灵感、备忘录以极客形式贴在桌面。",
+                        gpui_component::IconName::File,
+                        "v1.0.0",
+                        "官方 (内置)",
+                        sticky_loaded,
                     ))
                     .child(self.market_plugin_card(
-                        "待办事项", 
-                        "todo_widget", 
-                        "极简高效的任务清单，助你轻松掌控今日核心目标。", 
-                        gpui_component::IconName::CircleCheck, 
-                        "v1.0.0", 
-                        "VoltTeam (内置)",
-                        todo_loaded
-                    ))
+                        "待办事项",
+                        "todo_widget",
+                        "极简高效的任务清单，助你轻松掌控今日核心目标。",
+                        gpui_component::IconName::CircleCheck,
+                        "v1.0.0",
+                        "官方 (内置)",
+                        todo_loaded,
+                    )),
             )
     }
 
@@ -965,7 +980,7 @@ impl MainWindow {
     fn render_settings_page(&self, cx: &mut Context<Self>) -> impl IntoElement {
         let auto_start = cx
             .try_global::<widget_core::AppConfig>()
-            .map_or(false, |c| c.auto_start);
+            .is_some_and(|c| c.auto_start);
 
         div()
             .flex_1()
