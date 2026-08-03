@@ -21,7 +21,7 @@ release = false
 [[package]]
 name = "widget-rs"
 # Place the changelog in the root of the workspace
-changelog_path = "CHANGELOG.md"
+changelog_path = "../../CHANGELOG.md"
 # Disable publishing to crates.io (we only want GitHub releases)
 publish = false
 # Include commits from all internal crates in this unified changelog
