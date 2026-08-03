@@ -39,6 +39,39 @@ unsafe extern "system" fn plugin_wnd_proc(
     let old_proc_fn: unsafe extern "system" fn(isize, u32, usize, isize) -> isize =
         std::mem::transmute(old_proc);
 
+    if msg == windows_sys::Win32::UI::WindowsAndMessaging::WM_WINDOWPOSCHANGING
+        && widget_core::NATIVE_EDIT_MODE.load(std::sync::atomic::Ordering::SeqCst)
+    {
+        unsafe {
+            use windows_sys::Win32::Graphics::Gdi::{
+                GetMonitorInfoW, MonitorFromWindow, MONITORINFO, MONITOR_DEFAULTTONEAREST,
+            };
+            use windows_sys::Win32::UI::WindowsAndMessaging::WINDOWPOS;
+            let pos = &mut *(lparam as *mut WINDOWPOS);
+            if (pos.flags & windows_sys::Win32::UI::WindowsAndMessaging::SWP_NOMOVE) == 0 {
+                let hmonitor = MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST);
+                let mut info: MONITORINFO = std::mem::zeroed();
+                info.cbSize = std::mem::size_of::<MONITORINFO>() as u32;
+                if GetMonitorInfoW(hmonitor, &mut info) != 0 {
+                    let snap = 20;
+                    let work_rect = info.rcWork;
+
+                    if (pos.x - work_rect.left).abs() < snap {
+                        pos.x = work_rect.left;
+                    } else if (work_rect.right - (pos.x + pos.cx)).abs() < snap {
+                        pos.x = work_rect.right - pos.cx;
+                    }
+
+                    if (pos.y - work_rect.top).abs() < snap {
+                        pos.y = work_rect.top;
+                    } else if (work_rect.bottom - (pos.y + pos.cy)).abs() < snap {
+                        pos.y = work_rect.bottom - pos.cy;
+                    }
+                }
+            }
+        }
+    }
+
     let res = windows_sys::Win32::UI::WindowsAndMessaging::CallWindowProcW(
         Some(old_proc_fn),
         hwnd,

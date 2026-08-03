@@ -116,18 +116,15 @@ impl WindowManager {
                 let mut height: f32 = bounds.size.height.into();
 
                 let scale = handle
-                    .update(cx, |_, window, _| {
-                        window.display().map(|d| d.scale_factor()).unwrap_or(1.0)
-                    })
+                    .update(cx, |_, window, _| window.scale_factor())
                     .unwrap_or(1.0);
 
                 // 优先使用物理 client rect 来修正由于 WS_THICKFRAME 引起的 GPUI 偏差
                 if *hwnd != 0 {
                     unsafe {
                         use windows_sys::Win32::Foundation::{POINT, RECT};
-                        use windows_sys::Win32::UI::WindowsAndMessaging::{
-                            ClientToScreen, GetClientRect,
-                        };
+                        use windows_sys::Win32::Graphics::Gdi::ClientToScreen;
+                        use windows_sys::Win32::UI::WindowsAndMessaging::GetClientRect;
                         let mut rect: RECT = std::mem::zeroed();
                         if GetClientRect(*hwnd, &mut rect) != 0 {
                             let mut pt = POINT { x: 0, y: 0 };
@@ -138,49 +135,6 @@ impl WindowManager {
                             width = (rect.right - rect.left) as f32 / scale;
                             height = (rect.bottom - rect.top) as f32 / scale;
                         }
-                    }
-                }
-
-                // 边缘吸附逻辑 (Edge Snapping)
-                let snap = 20.0;
-                let mut snapped = false;
-                if let Some(display) = cx
-                    .displays()
-                    .into_iter()
-                    .find(|d| d.bounds().intersects(&bounds))
-                {
-                    let d_bounds = display.bounds();
-                    let d_left: f32 = d_bounds.origin.x.into();
-                    let d_top: f32 = d_bounds.origin.y.into();
-                    let d_right: f32 = d_left + f32::from(d_bounds.size.width);
-                    let d_bottom: f32 = d_top + f32::from(d_bounds.size.height);
-
-                    if (x - d_left).abs() < snap {
-                        x = d_left;
-                        snapped = true;
-                    }
-                    if (d_right - (x + width)).abs() < snap {
-                        x = d_right - width;
-                        snapped = true;
-                    }
-                    if (y - d_top).abs() < snap {
-                        y = d_top;
-                        snapped = true;
-                    }
-                    if (d_bottom - (y + height)).abs() < snap {
-                        y = d_bottom - height;
-                        snapped = true;
-                    }
-                }
-
-                if snapped && *hwnd != 0 {
-                    let px_x = (x * scale).round() as i32;
-                    let px_y = (y * scale).round() as i32;
-                    unsafe {
-                        use windows_sys::Win32::UI::WindowsAndMessaging::{
-                            SetWindowPos, SWP_NOSIZE, SWP_NOZORDER,
-                        };
-                        SetWindowPos(*hwnd, 0, px_x, px_y, 0, 0, SWP_NOSIZE | SWP_NOZORDER);
                     }
                 }
 
