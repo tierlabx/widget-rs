@@ -69,6 +69,7 @@
 
         <Package Id='*'
             Keywords='Installer'
+            Description='A lightweight desktop widget platform based on Rust and GPUI.'
             Manufacturer='tierlabx'
             InstallerVersion='450'
             Languages='1033'
