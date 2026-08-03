@@ -6,6 +6,7 @@ repository = "https://github.com/tierlabx/widget-rs.git"
 license = "MIT"
 
 [dependencies]
+mimalloc = { version = "0.1", default-features = false }
 gpui.workspace = true
 gpui-component.workspace = true
 widget-core.workspace = true

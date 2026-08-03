@@ -1,5 +1,8 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+#[global_allocator]
+static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
+
 mod plugin_manager;
 mod store;
 mod tray;
@@ -412,7 +415,7 @@ fn main() {
                 }
 
                 cx.background_executor()
-                    .timer(std::time::Duration::from_millis(50))
+                    .timer(std::time::Duration::from_millis(200))
                     .await;
             }
         })

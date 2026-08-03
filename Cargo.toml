@@ -12,8 +12,8 @@ lto = true
 codegen-units = 1
 # 去除调试符号，减小体积
 strip = true
-# 优化级别：速度
-opt-level = 3
+# 优化级别：偏向体积和启动内存
+opt-level = "s"
 # 出现 panic 直接中止，不展开栈
 panic = "abort"
 
