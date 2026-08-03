@@ -72,7 +72,8 @@ cargo run -p widget-cli -- plugin remove sticky_plugin
 想要开发自己的插件，你只需要：
 1. 创建一个新的 Rust 库 (`cargo new --lib plugins/my_plugin`)
 2. 引入 `widget-core` 依赖
-3. 实现 `widget_core::Plugin` Trait 并提供标准的 `create_plugin` 函数，例如：
+3. 遵循 **UI与逻辑分离规范**，建立 `model.rs` 存放数据逻辑，`view.rs` 存放渲染代码。
+4. 在 `lib.rs` 中实现 `widget_core::Plugin` Trait 并提供标准的 `create_plugin` 函数，例如：
 ```rust
 pub fn create_plugin() -> std::sync::Arc<dyn widget_core::Plugin> {
     std::sync::Arc::new(MyPlugin)

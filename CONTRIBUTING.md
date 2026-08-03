@@ -37,11 +37,15 @@
 
 ## 🧩 如何开发一个新的插件 (Plugin)
 
-本项目采用插件化架构，开发一个新的桌面部件非常简单：
+本项目采用插件化架构，开发一个新的桌面部件非常简单。为了保持代码可维护性，我们**强制要求在插件开发中采用 UI 与逻辑分离 (MVC 模式)**。
 
 1. 在 `plugins/` 目录下新建一个 Cargo 包：`cargo new --lib plugins/my_plugin`
-2. 让你的插件入口实现 `widget_core::Plugin` Trait (提供 `spawn_window`, `on_load` 等方法)。
-3. 在插件代码根目录（通常是 `lib.rs`）暴露统一入口点：
+2. 按照分离规范组织代码结构：
+   - `src/model.rs`: 纯数据结构定义、状态管理与持久化逻辑。
+   - `src/view.rs`: 具体的 `GPUI` 渲染树实现 (实现 `Render` Trait)。
+   - `src/lib.rs`: 作为模块入口，暴露插件和统一装配。
+3. 让你的插件入口实现 `widget_core::Plugin` Trait (提供 `spawn_window`, `on_load` 等方法)。
+4. 在插件代码根目录（通常是 `lib.rs`）暴露统一入口点：
    ```rust
    pub fn create_plugin() -> std::sync::Arc<dyn widget_core::Plugin> {
        std::sync::Arc::new(MyPlugin)
