@@ -436,27 +436,25 @@ fn main() {
                 }
 
                 // 托盘图标左键点击事件
-                if let Ok(event) = tray_icon::TrayIconEvent::receiver().try_recv() {
-                    if let tray_icon::TrayIconEvent::Click {
-                        button,
-                        button_state,
-                        ..
-                    } = event
+                if let Ok(tray_icon::TrayIconEvent::Click {
+                    button,
+                    button_state,
+                    ..
+                }) = tray_icon::TrayIconEvent::receiver().try_recv()
+                {
+                    if button == tray_icon::MouseButton::Left
+                        && button_state == tray_icon::MouseButtonState::Up
                     {
-                        if button == tray_icon::MouseButton::Left
-                            && button_state == tray_icon::MouseButtonState::Up
-                        {
-                            let next_visible = cx
-                                .update_global::<WindowManager, _>(|wm, _| {
-                                    wm.toggle_main_window_win32()
-                                })
-                                .unwrap_or(true);
+                        let next_visible = cx
+                            .update_global::<WindowManager, _>(|wm, _| {
+                                wm.toggle_main_window_win32()
+                            })
+                            .unwrap_or(true);
 
-                            let _ = cx.update_global::<widget_core::UIState, _>(|s, _| {
-                                s.is_visible = next_visible;
-                            });
-                            let _ = cx.update(|cx| cx.refresh_windows());
-                        }
+                        let _ = cx.update_global::<widget_core::UIState, _>(|s, _| {
+                            s.is_visible = next_visible;
+                        });
+                        let _ = cx.update(|cx| cx.refresh_windows());
                     }
                 }
 

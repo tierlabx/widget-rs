@@ -1,5 +1,0 @@
-# lint 检查配置，避免过于严苛的规则影响开发
-[lints.clippy]
-# 允许一些常见的习惯写法
-too_many_arguments = "allow"
-type_complexity = "allow"

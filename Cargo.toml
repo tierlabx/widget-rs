@@ -32,6 +32,10 @@ windows-sys = {
 }
 winres = "0.1"
 
+[workspace.lints.clippy]
+too_many_arguments = "allow"
+type_complexity = "allow"
+
 [profile.release]
 # 优化级别：偏向体积和启动内存
 opt-level = "s"

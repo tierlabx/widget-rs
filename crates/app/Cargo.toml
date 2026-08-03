@@ -5,6 +5,7 @@ edition = "2021"
 repository = "https://github.com/tierlabx/widget-rs.git"
 authors = ["tierlabx"]
 license = "MIT"
+description = "A lightweight desktop widget platform based on Rust and GPUI."
 
 [package.metadata.wix]
 upgrade-guid = "F4306D34-5A01-4EF2-B092-8734E92C6396"

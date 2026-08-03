@@ -1,7 +1,7 @@
 use clap::{Parser, Subcommand};
 use std::fs;
 use std::path::PathBuf;
-use toml_edit::{value, DocumentMut, Item};
+use toml_edit::{value, DocumentMut};
 
 #[derive(Parser)]
 #[command(name = "widget-cli")]
