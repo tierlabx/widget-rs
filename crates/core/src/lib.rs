@@ -20,13 +20,6 @@ pub struct PluginConfig {
     pub mouse_passthrough: bool,
 }
 
-/// 持久化的待办条目
-#[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct TodoItemData {
-    pub text: String,
-    pub done: bool,
-}
-
 /// 应用全局配置（可被序列化存储）
 #[derive(Serialize, Deserialize, Debug, Clone, Default)]
 pub struct AppConfig {
@@ -34,12 +27,23 @@ pub struct AppConfig {
     pub auto_start: bool,
     /// 各插件位置，键为插件 ID，例如 "sticky_widget"
     pub plugins: HashMap<String, PluginConfig>,
-    /// 便签内容
+    /// 插件自定义数据
     #[serde(default)]
-    pub sticky_content: String,
-    /// 待办事项列表
-    #[serde(default)]
-    pub todo_items: Vec<TodoItemData>,
+    pub plugin_data: HashMap<String, serde_json::Value>,
+}
+
+impl AppConfig {
+    pub fn get_plugin_data<T: serde::de::DeserializeOwned>(&self, plugin_id: &str) -> Option<T> {
+        self.plugin_data
+            .get(plugin_id)
+            .and_then(|v| serde_json::from_value(v.clone()).ok())
+    }
+
+    pub fn set_plugin_data<T: serde::Serialize>(&mut self, plugin_id: &str, data: &T) {
+        if let Ok(value) = serde_json::to_value(data) {
+            self.plugin_data.insert(plugin_id.to_string(), value);
+        }
+    }
 }
 
 impl Global for AppConfig {}
@@ -107,7 +111,18 @@ impl Global for UIState {}
 /// 插件 trait
 pub trait Plugin: Send + Sync {
     fn id(&self) -> &'static str;
+
+    fn name(&self) -> &'static str {
+        self.id()
+    }
+
+    #[allow(unused_variables)]
+    fn on_load(&self, cx: &mut App) {}
+
     fn spawn_window(&self, cx: &mut App) -> AnyWindowHandle;
+
+    #[allow(unused_variables)]
+    fn on_unload(&self, cx: &mut App) {}
 }
 
 // ─── 线程本地 HWND 存储 ───────────────────────────────────────────────────────
@@ -140,4 +155,62 @@ pub fn get_plugin_hwnd(id: &str) -> isize {
 /// 获取所有插件的 HWND 列表（用于批量操作）
 pub fn get_all_plugin_hwnds() -> Vec<isize> {
     ALL_PLUGIN_HWND_LIST.with(|v| v.borrow().clone())
+}
+
+pub fn start_window_drag(window: &mut Window) {
+    use raw_window_handle::HasWindowHandle;
+    if let Ok(handle) = HasWindowHandle::window_handle(window) {
+        if let raw_window_handle::RawWindowHandle::Win32(h) = handle.as_raw() {
+            unsafe {
+                windows_sys::Win32::UI::Input::KeyboardAndMouse::ReleaseCapture();
+                windows_sys::Win32::UI::WindowsAndMessaging::PostMessageW(
+                    h.hwnd.get(),
+                    windows_sys::Win32::UI::WindowsAndMessaging::WM_NCLBUTTONDOWN,
+                    windows_sys::Win32::UI::WindowsAndMessaging::HTCAPTION as usize,
+                    0,
+                );
+            }
+        }
+    }
+}
+
+pub fn update_window_edit_mode(window: &mut Window, is_edit_mode: bool) {
+    use raw_window_handle::HasWindowHandle;
+    if let Ok(handle) = HasWindowHandle::window_handle(window) {
+        if let raw_window_handle::RawWindowHandle::Win32(h) = handle.as_raw() {
+            let hwnd = h.hwnd.get();
+            unsafe {
+                use windows_sys::Win32::UI::WindowsAndMessaging::{
+                    GetWindowLongW, SetWindowLongW, SetWindowPos, GWL_STYLE, SWP_FRAMECHANGED,
+                    SWP_NOMOVE, SWP_NOSIZE, SWP_NOZORDER, WS_THICKFRAME,
+                };
+                let style = GetWindowLongW(hwnd, GWL_STYLE);
+                if is_edit_mode {
+                    if (style & WS_THICKFRAME as i32) == 0 {
+                        SetWindowLongW(hwnd, GWL_STYLE, style | WS_THICKFRAME as i32);
+                        SetWindowPos(
+                            hwnd,
+                            0,
+                            0,
+                            0,
+                            0,
+                            0,
+                            SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_FRAMECHANGED,
+                        );
+                    }
+                } else if (style & WS_THICKFRAME as i32) != 0 {
+                    SetWindowLongW(hwnd, GWL_STYLE, style & !(WS_THICKFRAME as i32));
+                    SetWindowPos(
+                        hwnd,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_FRAMECHANGED,
+                    );
+                }
+            }
+        }
+    }
 }

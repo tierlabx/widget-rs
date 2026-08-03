@@ -195,12 +195,17 @@ fn main() {
 
         // 启动并注册所有已加载的插件窗口
         let plugins = pm.get_plugins().to_vec();
+        for plugin in &plugins {
+            plugin.on_load(cx);
+        }
+
         cx.update_global::<WindowManager, _>(|wm, cx| {
             for plugin in &plugins {
                 let handle = plugin.spawn_window(cx);
                 wm.register_widget_window(plugin.id(), handle);
             }
         });
+        cx.set_global(pm);
 
         // 提取所有 HWND 并注册到 thread_local（三步走，不嵌套）
         let store_for_hwnd = Arc::clone(&store_for_app);
@@ -415,6 +420,14 @@ fn main() {
                         // 这里直接操作 try_global / set_global，不涉及复杂的锁嵌套
                         let _ = cx.update_global::<WindowManager, _>(|wm, cx| {
                             wm.save_all_plugin_bounds(cx, &store_quit);
+                        });
+                        let _ = cx.update(|cx| {
+                            if let Some(pm) = cx.try_global::<PluginManager>() {
+                                let plugins = pm.get_plugins().to_vec();
+                                for plugin in plugins {
+                                    plugin.on_unload(cx);
+                                }
+                            }
                         });
                         drop(_tray);
                         let _ = cx.update(|cx| cx.quit());

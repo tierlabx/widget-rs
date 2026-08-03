@@ -12,3 +12,5 @@ gpui-component.workspace = true
 raw-window-handle.workspace = true
 widget-core.workspace = true
 windows-sys = { workspace = true, features = ["Win32_UI_WindowsAndMessaging", "Win32_UI_Input_KeyboardAndMouse"] }
+serde = { workspace = true, features = ["derive"] }
+serde_json.workspace = true

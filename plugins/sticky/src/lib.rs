@@ -14,7 +14,7 @@ impl StickyWidget {
         // 从全局配置读取已保存的便签内容
         let saved_content = cx
             .try_global::<AppConfig>()
-            .map(|c| c.sticky_content.clone())
+            .and_then(|c| c.get_plugin_data::<String>("sticky_widget"))
             .unwrap_or_default();
 
         let input = cx.new(|cx| {
@@ -33,7 +33,7 @@ impl StickyWidget {
                 if let InputEvent::Change = event {
                     let text = input.read(cx).value().to_string();
                     cx.update_global::<AppConfig, _>(|config, _| {
-                        config.sticky_content = text;
+                        config.set_plugin_data("sticky_widget", &text);
                     });
                     widget_core::save_config_now(cx);
                 }
@@ -61,45 +61,9 @@ impl Render for StickyWidget {
                     self.hwnd_reported = true;
                     let _ = hwnd;
                 }
-                unsafe {
-                    use windows_sys::Win32::UI::WindowsAndMessaging::{
-                        GetWindowLongW, SetWindowLongW, GWL_STYLE, WS_THICKFRAME,
-                    };
-                    let style = GetWindowLongW(hwnd, GWL_STYLE);
-                    if is_edit_mode {
-                        if (style & WS_THICKFRAME as i32) == 0 {
-                            SetWindowLongW(hwnd, GWL_STYLE, style | WS_THICKFRAME as i32);
-                            windows_sys::Win32::UI::WindowsAndMessaging::SetWindowPos(
-                                hwnd,
-                                0,
-                                0,
-                                0,
-                                0,
-                                0,
-                                windows_sys::Win32::UI::WindowsAndMessaging::SWP_NOMOVE
-                                    | windows_sys::Win32::UI::WindowsAndMessaging::SWP_NOSIZE
-                                    | windows_sys::Win32::UI::WindowsAndMessaging::SWP_NOZORDER
-                                    | windows_sys::Win32::UI::WindowsAndMessaging::SWP_FRAMECHANGED,
-                            );
-                        }
-                    } else if (style & WS_THICKFRAME as i32) != 0 {
-                        SetWindowLongW(hwnd, GWL_STYLE, style & !(WS_THICKFRAME as i32));
-                        windows_sys::Win32::UI::WindowsAndMessaging::SetWindowPos(
-                            hwnd,
-                            0,
-                            0,
-                            0,
-                            0,
-                            0,
-                            windows_sys::Win32::UI::WindowsAndMessaging::SWP_NOMOVE
-                                | windows_sys::Win32::UI::WindowsAndMessaging::SWP_NOSIZE
-                                | windows_sys::Win32::UI::WindowsAndMessaging::SWP_NOZORDER
-                                | windows_sys::Win32::UI::WindowsAndMessaging::SWP_FRAMECHANGED,
-                        );
-                    }
-                }
             }
         }
+        widget_core::update_window_edit_mode(_window, is_edit_mode);
 
         let drag_handle = if is_edit_mode {
             Some(
@@ -114,19 +78,7 @@ impl Render for StickyWidget {
                     .cursor_pointer()
                     .hover(|s| s.bg(rgba(0x00d992cc)))
                     .on_mouse_down(MouseButton::Left, |_, window, _| {
-                        if let Ok(handle) = window.window_handle() {
-                            if let raw_window_handle::RawWindowHandle::Win32(h) = handle.as_raw() {
-                                unsafe {
-                                    windows_sys::Win32::UI::Input::KeyboardAndMouse::ReleaseCapture();
-                                    windows_sys::Win32::UI::WindowsAndMessaging::PostMessageW(
-                                        h.hwnd.get(),
-                                        windows_sys::Win32::UI::WindowsAndMessaging::WM_NCLBUTTONDOWN,
-                                        windows_sys::Win32::UI::WindowsAndMessaging::HTCAPTION as usize,
-                                        0,
-                                    );
-                                }
-                            }
-                        }
+                        widget_core::start_window_drag(window);
                     })
                     .child(
                         div()

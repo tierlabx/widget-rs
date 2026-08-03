@@ -4,10 +4,11 @@ use gpui_component::input::{Input, InputEvent, InputState};
 use gpui_component::scroll::ScrollableElement;
 use gpui_component::{Icon, IconName};
 use raw_window_handle::HasWindowHandle;
-use widget_core::{AppConfig, Plugin, TodoItemData};
+use serde::{Deserialize, Serialize};
+use widget_core::{AppConfig, Plugin};
 
 /// 单条待办任务
-#[derive(Clone)]
+#[derive(Clone, Serialize, Deserialize)]
 struct TodoItem {
     text: String,
     done: bool,
@@ -27,15 +28,8 @@ pub struct TodoWidget {
 impl TodoWidget {
     /// 将当前 items 写入全局 AppConfig 并立即落盘
     fn save_to_config(items: &[TodoItem], cx: &mut App) {
-        let data: Vec<TodoItemData> = items
-            .iter()
-            .map(|i| TodoItemData {
-                text: i.text.clone(),
-                done: i.done,
-            })
-            .collect();
         cx.update_global::<AppConfig, _>(|cfg, _| {
-            cfg.todo_items = data;
+            cfg.set_plugin_data("todo_widget", &items);
         });
         // 立即写盘
         widget_core::save_config_now(cx);
@@ -45,34 +39,24 @@ impl TodoWidget {
         // 从全局配置加载已持久化的待办数据
         let saved_items: Vec<TodoItem> = cx
             .try_global::<AppConfig>()
-            .map(|cfg| {
-                if cfg.todo_items.is_empty() {
-                    // 首次启动使用示例数据
-                    vec![
-                        TodoItem {
-                            text: "完成项目设计".into(),
-                            done: false,
-                        },
-                        TodoItem {
-                            text: "编写文档".into(),
-                            done: true,
-                        },
-                        TodoItem {
-                            text: "代码审查".into(),
-                            done: false,
-                        },
-                    ]
-                } else {
-                    cfg.todo_items
-                        .iter()
-                        .map(|d| TodoItem {
-                            text: d.text.clone(),
-                            done: d.done,
-                        })
-                        .collect()
-                }
-            })
-            .unwrap_or_default();
+            .and_then(|cfg| cfg.get_plugin_data::<Vec<TodoItem>>("todo_widget"))
+            .unwrap_or_else(|| {
+                // 首次启动使用示例数据
+                vec![
+                    TodoItem {
+                        text: "完成项目设计".into(),
+                        done: false,
+                    },
+                    TodoItem {
+                        text: "编写文档".into(),
+                        done: true,
+                    },
+                    TodoItem {
+                        text: "代码审查".into(),
+                        done: false,
+                    },
+                ]
+            });
 
         // ── 新增输入框 ──────────────────────────────────────────────
         let new_input =
@@ -125,45 +109,9 @@ impl Render for TodoWidget {
                     self.hwnd_reported = true;
                     let _ = hwnd;
                 }
-                unsafe {
-                    use windows_sys::Win32::UI::WindowsAndMessaging::{
-                        GetWindowLongW, SetWindowLongW, GWL_STYLE, WS_THICKFRAME,
-                    };
-                    let style = GetWindowLongW(hwnd, GWL_STYLE);
-                    if is_edit_mode {
-                        if (style & WS_THICKFRAME as i32) == 0 {
-                            SetWindowLongW(hwnd, GWL_STYLE, style | WS_THICKFRAME as i32);
-                            windows_sys::Win32::UI::WindowsAndMessaging::SetWindowPos(
-                                hwnd,
-                                0,
-                                0,
-                                0,
-                                0,
-                                0,
-                                windows_sys::Win32::UI::WindowsAndMessaging::SWP_NOMOVE
-                                    | windows_sys::Win32::UI::WindowsAndMessaging::SWP_NOSIZE
-                                    | windows_sys::Win32::UI::WindowsAndMessaging::SWP_NOZORDER
-                                    | windows_sys::Win32::UI::WindowsAndMessaging::SWP_FRAMECHANGED,
-                            );
-                        }
-                    } else if (style & WS_THICKFRAME as i32) != 0 {
-                        SetWindowLongW(hwnd, GWL_STYLE, style & !(WS_THICKFRAME as i32));
-                        windows_sys::Win32::UI::WindowsAndMessaging::SetWindowPos(
-                            hwnd,
-                            0,
-                            0,
-                            0,
-                            0,
-                            0,
-                            windows_sys::Win32::UI::WindowsAndMessaging::SWP_NOMOVE
-                                | windows_sys::Win32::UI::WindowsAndMessaging::SWP_NOSIZE
-                                | windows_sys::Win32::UI::WindowsAndMessaging::SWP_NOZORDER
-                                | windows_sys::Win32::UI::WindowsAndMessaging::SWP_FRAMECHANGED,
-                        );
-                    }
-                }
             }
         }
+        widget_core::update_window_edit_mode(_window, is_edit_mode);
 
         // ── 编辑模式拖拽条 ────────────────────────────────────────
         let drag_handle = if is_edit_mode {
@@ -177,19 +125,7 @@ impl Render for TodoWidget {
                     .items_center()
                     .id("todo-drag")
                     .on_mouse_down(MouseButton::Left, |_, window, _| {
-                        if let Ok(handle) = window.window_handle() {
-                            if let raw_window_handle::RawWindowHandle::Win32(h) = handle.as_raw() {
-                                unsafe {
-                                    windows_sys::Win32::UI::Input::KeyboardAndMouse::ReleaseCapture();
-                                    windows_sys::Win32::UI::WindowsAndMessaging::PostMessageW(
-                                        h.hwnd.get(),
-                                        windows_sys::Win32::UI::WindowsAndMessaging::WM_NCLBUTTONDOWN,
-                                        windows_sys::Win32::UI::WindowsAndMessaging::HTCAPTION as usize,
-                                        0,
-                                    );
-                                }
-                            }
-                        }
+                        widget_core::start_window_drag(window);
                     })
                     .child(
                         div()

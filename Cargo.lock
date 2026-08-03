@@ -6680,6 +6680,8 @@ dependencies = [
  "gpui",
  "gpui-component",
  "raw-window-handle 0.6.2",
+ "serde",
+ "serde_json",
  "widget-core",
  "windows-sys 0.52.0",
 ]
@@ -7514,8 +7516,10 @@ version = "0.1.0"
 dependencies = [
  "gpui",
  "gpui-component",
+ "raw-window-handle 0.6.2",
  "serde",
  "serde_json",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
