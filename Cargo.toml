@@ -4,6 +4,7 @@ members = [
   "crates/*",
   "plugins/*",
 ]
+default-members = ["crates/app"]
 
 [workspace.dependencies]
 gpui = "0.2.2"

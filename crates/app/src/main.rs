@@ -4,6 +4,7 @@
 static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
 
 mod plugin_manager;
+mod plugin_registry;
 mod store;
 mod tray;
 mod window_manager;
@@ -159,8 +160,7 @@ fn main() {
 
     // 2. 初始化插件管理器并注册内置小组件
     let mut pm = PluginManager::new();
-    pm.register(Arc::new(sticky_plugin::StickyWidgetPlugin));
-    pm.register(Arc::new(todo_plugin::TodoWidgetPlugin));
+    plugin_registry::register_all_plugins(&mut pm);
 
     // 3. 初始化系统托盘（包括托盘图标和菜单）
     let (tray_icon, toggle_id, quit_id) = tray::setup_tray().expect("系统托盘初始化失败");

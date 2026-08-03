@@ -193,3 +193,8 @@ impl Plugin for StickyWidgetPlugin {
         .into()
     }
 }
+
+/// 标准插件入口函数，供 widget-cli 和主程序注入使用
+pub fn create_plugin() -> std::sync::Arc<dyn Plugin> {
+    std::sync::Arc::new(StickyWidgetPlugin)
+}

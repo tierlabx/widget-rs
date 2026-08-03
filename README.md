@@ -51,6 +51,37 @@ cargo build --release
 
 ---
 
+## 🧩 插件管理 (CLI)
+
+Widget-RS 提供了一个强大的命令行工具 `widget-cli`，用于源码级别的插件一键安装与卸载，确保你在享受原生高性能渲染的同时，轻松扩展功能。
+
+### 安装与卸载插件
+```bash
+# 添加一个本地插件 (自动注入 Cargo.toml 与 源码注册表)
+cargo run -p widget-cli -- plugin add <插件名称> --path <本地路径>
+# 示例：
+cargo run -p widget-cli -- plugin add my_clock --path ../plugins/my_clock
+
+# 卸载一个已安装的插件
+cargo run -p widget-cli -- plugin remove <插件名称>
+# 示例：
+cargo run -p widget-cli -- plugin remove sticky_plugin
+```
+
+### 开发你自己的插件
+想要开发自己的插件，你只需要：
+1. 创建一个新的 Rust 库 (`cargo new --lib plugins/my_plugin`)
+2. 引入 `widget-core` 依赖
+3. 实现 `widget_core::Plugin` Trait 并提供标准的 `create_plugin` 函数，例如：
+```rust
+pub fn create_plugin() -> std::sync::Arc<dyn widget_core::Plugin> {
+    std::sync::Arc::new(MyPlugin)
+}
+```
+4. 使用 CLI 将其添加到主程序中编译运行！
+
+---
+
 ## 🛠 技术栈
 
 | 领域 | 核心技术 | 说明 |

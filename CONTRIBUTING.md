@@ -40,12 +40,17 @@
 本项目采用插件化架构，开发一个新的桌面部件非常简单：
 
 1. 在 `plugins/` 目录下新建一个 Cargo 包：`cargo new --lib plugins/my_plugin`
-2. 在 `Cargo.toml` 中将其加入 `workspace.members`
-3. 让你的插件入口实现 `widget_core::Plugin` Trait：
-   - 实现 `id()` 返回唯一标识。
-   - 实现 `render()` 来定义在 GPUI 中的界面。
-   - 实现 `on_event()` 处理业务逻辑。
-4. 在 `crates/app/src/main.rs` 中通过 `PluginManager::register` 注册你的插件。
+2. 让你的插件入口实现 `widget_core::Plugin` Trait (提供 `spawn_window`, `on_load` 等方法)。
+3. 在插件代码根目录（通常是 `lib.rs`）暴露统一入口点：
+   ```rust
+   pub fn create_plugin() -> std::sync::Arc<dyn widget_core::Plugin> {
+       std::sync::Arc::new(MyPlugin)
+   }
+   ```
+4. 使用提供的命令行工具自动化注册插件：
+   ```bash
+   cargo run -p widget-cli -- plugin add my_plugin --path plugins/my_plugin
+   ```
 
 如果你在开发中遇到任何架构设计上的疑问，请参考 `docs/PRD.md` 和 `README.md` 中的架构图。
 
