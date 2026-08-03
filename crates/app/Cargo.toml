@@ -3,7 +3,14 @@ name = "widget-rs"
 version = "0.1.1"
 edition = "2021"
 repository = "https://github.com/tierlabx/widget-rs.git"
+authors = ["tierlabx"]
 license = "MIT"
+
+[package.metadata.wix]
+upgrade-guid = "F4306D34-5A01-4EF2-B092-8734E92C6396"
+path-guid = "86135684-15A6-4DF1-862E-FB93B28A682D"
+license = false
+eula = false
 
 [dependencies]
 mimalloc = { version = "0.1", default-features = false }
