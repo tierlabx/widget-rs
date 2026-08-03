@@ -169,33 +169,68 @@ fn main() {
         // 提取所有 HWND 并注册到 thread_local（三步走，不嵌套）
         let store_for_hwnd = Arc::clone(&store_for_app);
         cx.spawn(async move |cx| {
-            cx.background_executor()
-                .timer(std::time::Duration::from_millis(300))
-                .await;
-
-            // Step 1: 取出所有 handle（释放 WindowManager borrow）
-            let (plugin_handles, main_handle): (
-                Vec<(String, AnyWindowHandle)>,
-                Option<AnyWindowHandle>,
-            ) = match cx.update_global::<WindowManager, _>(|wm, _| {
-                let ph = wm
-                    .widget_windows
-                    .iter()
-                    .map(|(id, (h, _))| (id.to_string(), *h))
-                    .collect();
-                let mh = wm.main_window.as_ref().map(|h| (*h).into());
-                (ph, mh)
-            }) {
-                Ok(v) => v,
-                Err(_) => return,
-            };
-
-            // Step 2: 逐个读 HWND（无 WindowManager borrow）
             let mut id_hwnd: Vec<(String, isize)> = Vec::new();
-            for (id, h) in &plugin_handles {
-                let hwnd = cx
-                    .update(|cx| {
-                        h.update(cx, |_, win, _| {
+            let mut main_hwnd = 0;
+
+            // 使用重试循环等待所有窗口句柄准备完毕
+            for _ in 0..50 {
+                cx.background_executor()
+                    .timer(std::time::Duration::from_millis(100))
+                    .await;
+
+                // Step 1: 取出所有 handle（释放 WindowManager borrow）
+                let (plugin_handles, main_handle): (
+                    Vec<(String, AnyWindowHandle)>,
+                    Option<AnyWindowHandle>,
+                ) = match cx.update_global::<WindowManager, _>(|wm, _| {
+                    let ph = wm
+                        .widget_windows
+                        .iter()
+                        .map(|(id, (h, _))| (id.to_string(), *h))
+                        .collect();
+                    let mh = wm.main_window.as_ref().map(|h| (*h).into());
+                    (ph, mh)
+                }) {
+                    Ok(v) => v,
+                    Err(_) => return,
+                };
+
+                // Step 2: 逐个读 HWND（无 WindowManager borrow）
+                let mut all_ready = true;
+                id_hwnd.clear();
+
+                for (id, h) in &plugin_handles {
+                    let hwnd = cx
+                        .update(|cx| {
+                            h.update(cx, |_, win, _| {
+                                use raw_window_handle::HasWindowHandle;
+                                if let Ok(wh) = win.window_handle() {
+                                    if let raw_window_handle::RawWindowHandle::Win32(h) =
+                                        wh.as_raw()
+                                    {
+                                        return h.hwnd.get();
+                                    }
+                                }
+                                0isize
+                            })
+                            .unwrap_or(0)
+                        })
+                        .unwrap_or(0);
+                    if hwnd == 0 {
+                        all_ready = false;
+                        break;
+                    } else {
+                        id_hwnd.push((id.clone(), hwnd));
+                    }
+                }
+
+                if !all_ready {
+                    continue;
+                }
+
+                main_hwnd = if let Some(mh) = main_handle {
+                    cx.update(|cx| {
+                        mh.update(cx, |_, win, _| {
                             use raw_window_handle::HasWindowHandle;
                             if let Ok(wh) = win.window_handle() {
                                 if let raw_window_handle::RawWindowHandle::Win32(h) = wh.as_raw() {
@@ -206,33 +241,23 @@ fn main() {
                         })
                         .unwrap_or(0)
                     })
-                    .unwrap_or(0);
-                if hwnd != 0 {
-                    println!("[main] 插件 {} HWND = {}", id, hwnd);
-                    id_hwnd.push((id.clone(), hwnd));
+                    .unwrap_or(0)
+                } else {
+                    0
+                };
+
+                if main_hwnd != 0 {
+                    break; // 所有句柄都已成功获取
                 }
             }
 
-            let main_hwnd = if let Some(mh) = main_handle {
-                cx.update(|cx| {
-                    mh.update(cx, |_, win, _| {
-                        use raw_window_handle::HasWindowHandle;
-                        if let Ok(wh) = win.window_handle() {
-                            if let raw_window_handle::RawWindowHandle::Win32(h) = wh.as_raw() {
-                                return h.hwnd.get();
-                            }
-                        }
-                        0isize
-                    })
-                    .unwrap_or(0)
-                })
-                .unwrap_or(0)
-            } else {
-                0
-            };
-
+            for (id, hwnd) in &id_hwnd {
+                println!("[main] 插件 {} HWND = {}", id, hwnd);
+            }
             if main_hwnd != 0 {
                 println!("[main] 主窗口 HWND = {}", main_hwnd);
+            } else {
+                println!("[main] 警告：未能获取主窗口 HWND");
             }
 
             // Step 3: 将 HWND 写回 WindowManager 并注册到 thread_local 供全局访问
@@ -334,6 +359,7 @@ fn main() {
         cx.spawn(async move |cx| {
             let _tray = tray_icon;
             loop {
+                // 托盘菜单事件
                 if let Ok(event) = MenuEvent::receiver().try_recv() {
                     if event.id == toggle_id {
                         // toggle_main_window_win32 纯 Win32，不嵌套
@@ -359,6 +385,32 @@ fn main() {
                         break;
                     }
                 }
+
+                // 托盘图标左键点击事件
+                if let Ok(event) = tray_icon::TrayIconEvent::receiver().try_recv() {
+                    if let tray_icon::TrayIconEvent::Click {
+                        button,
+                        button_state,
+                        ..
+                    } = event
+                    {
+                        if button == tray_icon::MouseButton::Left
+                            && button_state == tray_icon::MouseButtonState::Up
+                        {
+                            let next_visible = cx
+                                .update_global::<WindowManager, _>(|wm, _| {
+                                    wm.toggle_main_window_win32()
+                                })
+                                .unwrap_or(true);
+
+                            let _ = cx.update_global::<widget_core::UIState, _>(|s, _| {
+                                s.is_visible = next_visible;
+                            });
+                            let _ = cx.update(|cx| cx.refresh_windows());
+                        }
+                    }
+                }
+
                 cx.background_executor()
                     .timer(std::time::Duration::from_millis(50))
                     .await;
