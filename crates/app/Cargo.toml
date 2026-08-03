@@ -1,6 +1,6 @@
 [package]
 name = "widget-rs"
-version = "0.1.1"
+version = "0.1.2"
 edition = "2021"
 repository = "https://github.com/tierlabx/widget-rs.git"
 authors = ["tierlabx"]
@@ -13,25 +13,25 @@ license = false
 eula = false
 
 [dependencies]
-mimalloc = { version = "0.1", default-features = false }
 gpui.workspace = true
 gpui-component.workspace = true
-widget-core.workspace = true
-widget-ui.workspace = true
+mimalloc = { version = "0.1", default-features = false }
 sticky_plugin.workspace = true
 todo_plugin.workspace = true
+widget-core.workspace = true
+widget-ui.workspace = true
 
+anyhow = "1.0"
+directories.workspace = true
+gpui-component-assets = "0.5.1"
+image.workspace = true
+raw-window-handle.workspace = true
+rust-embed = "8.5"
 serde.workspace = true
 serde_json.workspace = true
-directories.workspace = true
-tray-icon.workspace = true
 tao.workspace = true
-raw-window-handle.workspace = true
-image.workspace = true
+tray-icon.workspace = true
 windows-sys.workspace = true
-gpui-component-assets = "0.5.1"
-rust-embed = "8.5"
-anyhow = "1.0"
 winreg = "0.56.0"
 
 [build-dependencies]
