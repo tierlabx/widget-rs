@@ -1,46 +1,49 @@
 [workspace]
-members = [
-    "crates/*",
-    "plugins/*",
-]
 resolver = "2"
+members = [
+  "crates/*",
+  "plugins/*",
+]
+
+[workspace.dependencies]
+gpui = "0.2.2"
+gpui-component = "0.5.1"
+sticky_plugin = { path = "plugins/sticky" }
+todo_plugin = { path = "plugins/todo" }
+widget-core = { path = "crates/core" }
+widget-ui = { path = "crates/ui" }
+
+directories = "5.0"
+image = { version = "0.24", default-features = false, features = ["png"] }
+raw-window-handle = "0.6"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+tao = "0.28"
+tray-icon = "0.14"
+windows-sys = {
+  version = "0.52",
+  features = [
+    "Win32_Foundation",
+    "Win32_Graphics_Gdi",
+    "Win32_System_Threading",
+    "Win32_UI_WindowsAndMessaging",
+  ]
+}
+winres = "0.1"
 
 [profile.release]
-# 启用链接时优化，大幅减小可执行文件体积
-lto = true
-# 单个代码生成单元，优化更彻底（编译更慢）
-codegen-units = 1
-# 去除调试符号，减小体积
-strip = true
 # 优化级别：偏向体积和启动内存
 opt-level = "s"
+# 去除调试符号，减小体积
+strip = true
+# 启用链接时优化，大幅减小可执行文件体积
+lto = true
 # 出现 panic 直接中止，不展开栈
 panic = "abort"
+# 单个代码生成单元，优化更彻底（编译更慢）
+codegen-units = 1
 
 # The profile that 'dist' will build with
 [profile.dist]
 inherits = "release"
 lto = "thin"
-
-[workspace.dependencies]
-gpui = "0.2.2"
-gpui-component = "0.5.1"
-widget-core = { path = "crates/core" }
-widget-ui = { path = "crates/ui" }
-sticky_plugin = { path = "plugins/sticky" }
-todo_plugin = { path = "plugins/todo" }
-
-serde = { version = "1.0", features = ["derive"] }
-serde_json = "1.0"
-directories = "5.0"
-tray-icon = "0.14"
-tao = "0.28"
-raw-window-handle = "0.6"
-image = { version = "0.24", default-features = false, features = ["png"] }
-windows-sys = { version = "0.52", features = [
-    "Win32_Foundation",
-    "Win32_UI_WindowsAndMessaging",
-    "Win32_System_Threading",
-    "Win32_Graphics_Gdi",
-] }
-winres = "0.1"

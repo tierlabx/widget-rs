@@ -22,31 +22,9 @@
 
 Widget-RS 采用分层与插件化架构，保证核心稳定性的同时允许极大的扩展自由：
 
-```mermaid
-graph TD
-    subgraph App Layer [应用程序主层]
-        Main[主入口 main.rs] --> Tray[系统托盘 TrayIcon]
-        Main --> WindowManager[窗口与原生事件管理]
-        Main --> PluginManager[插件管理器]
-    end
-
-    subgraph Plugin System [插件系统]
-        PluginManager --> PluginTrait((Plugin Trait))
-        PluginTrait -.-> StickyPlugin[便签插件 Sticky]
-        PluginTrait -.-> TodoPlugin[待办插件 Todo]
-        PluginTrait -.-> CustomPlugin[自定义扩展...]
-    end
-
-    subgraph Core & UI [核心模型与 UI 渲染]
-        UI[widget-ui 组件库] --> GPUI[(GPUI 渲染引擎)]
-        StickyPlugin --> UI
-        TodoPlugin --> UI
-        Core[widget-core 状态/配置] --> PluginManager
-        Core --> UI
-    end
-
-    WindowManager -->|WM_WINDOWPOSCHANGING| EdgeSnapping(原生多屏边缘吸附)
-```
+<p align="center">
+  <img src="assets/architecture.svg" alt="Widget-RS Architecture" width="100%">
+</p>
 
 ---
 
