@@ -112,8 +112,34 @@ impl WindowManager {
             if let Ok(bounds) = handle.update(cx, |_, window, _| window.bounds()) {
                 let mut x: f32 = bounds.origin.x.into();
                 let mut y: f32 = bounds.origin.y.into();
-                let width: f32 = bounds.size.width.into();
-                let height: f32 = bounds.size.height.into();
+                let mut width: f32 = bounds.size.width.into();
+                let mut height: f32 = bounds.size.height.into();
+
+                let scale = handle
+                    .update(cx, |_, window, _| {
+                        window.display().map(|d| d.scale_factor()).unwrap_or(1.0)
+                    })
+                    .unwrap_or(1.0);
+
+                // 优先使用物理 client rect 来修正由于 WS_THICKFRAME 引起的 GPUI 偏差
+                if *hwnd != 0 {
+                    unsafe {
+                        use windows_sys::Win32::Foundation::{POINT, RECT};
+                        use windows_sys::Win32::UI::WindowsAndMessaging::{
+                            ClientToScreen, GetClientRect,
+                        };
+                        let mut rect: RECT = std::mem::zeroed();
+                        if GetClientRect(*hwnd, &mut rect) != 0 {
+                            let mut pt = POINT { x: 0, y: 0 };
+                            ClientToScreen(*hwnd, &mut pt);
+
+                            x = pt.x as f32 / scale;
+                            y = pt.y as f32 / scale;
+                            width = (rect.right - rect.left) as f32 / scale;
+                            height = (rect.bottom - rect.top) as f32 / scale;
+                        }
+                    }
+                }
 
                 // 边缘吸附逻辑 (Edge Snapping)
                 let snap = 20.0;
@@ -148,8 +174,8 @@ impl WindowManager {
                 }
 
                 if snapped && *hwnd != 0 {
-                    let px_x = x.round() as i32;
-                    let px_y = y.round() as i32;
+                    let px_x = (x * scale).round() as i32;
+                    let px_y = (y * scale).round() as i32;
                     unsafe {
                         use windows_sys::Win32::UI::WindowsAndMessaging::{
                             SetWindowPos, SWP_NOSIZE, SWP_NOZORDER,

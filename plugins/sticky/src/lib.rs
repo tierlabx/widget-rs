@@ -69,9 +69,33 @@ impl Render for StickyWidget {
                     if is_edit_mode {
                         if (style & WS_THICKFRAME as i32) == 0 {
                             SetWindowLongW(hwnd, GWL_STYLE, style | WS_THICKFRAME as i32);
+                            windows_sys::Win32::UI::WindowsAndMessaging::SetWindowPos(
+                                hwnd,
+                                0,
+                                0,
+                                0,
+                                0,
+                                0,
+                                windows_sys::Win32::UI::WindowsAndMessaging::SWP_NOMOVE
+                                    | windows_sys::Win32::UI::WindowsAndMessaging::SWP_NOSIZE
+                                    | windows_sys::Win32::UI::WindowsAndMessaging::SWP_NOZORDER
+                                    | windows_sys::Win32::UI::WindowsAndMessaging::SWP_FRAMECHANGED,
+                            );
                         }
                     } else if (style & WS_THICKFRAME as i32) != 0 {
                         SetWindowLongW(hwnd, GWL_STYLE, style & !(WS_THICKFRAME as i32));
+                        windows_sys::Win32::UI::WindowsAndMessaging::SetWindowPos(
+                            hwnd,
+                            0,
+                            0,
+                            0,
+                            0,
+                            0,
+                            windows_sys::Win32::UI::WindowsAndMessaging::SWP_NOMOVE
+                                | windows_sys::Win32::UI::WindowsAndMessaging::SWP_NOSIZE
+                                | windows_sys::Win32::UI::WindowsAndMessaging::SWP_NOZORDER
+                                | windows_sys::Win32::UI::WindowsAndMessaging::SWP_FRAMECHANGED,
+                        );
                     }
                 }
             }
