@@ -1,6 +1,6 @@
 use gpui::*;
 use std::collections::HashMap;
-use widget_core::{AppConfig, PluginConfig};
+use widget_core::AppConfig;
 use widget_ui::main_window::MainWindow;
 
 use crate::store::Store;
@@ -29,11 +29,21 @@ impl WindowManager {
     /// - 实例化并打开主窗口
     /// - 将 WindowManager 自身保存至应用的全局状态中
     pub fn init(cx: &mut App) {
+        let mut plugin_loaded = std::collections::HashMap::new();
+        let mut plugin_enabled = std::collections::HashMap::new();
+
+        if let Some(config) = cx.try_global::<AppConfig>() {
+            for (id, plugin_cfg) in &config.plugins {
+                plugin_loaded.insert(id.clone(), plugin_cfg.loaded);
+                plugin_enabled.insert(id.clone(), plugin_cfg.enabled);
+            }
+        }
+
         cx.set_global(widget_core::UIState {
             is_visible: true,
             is_edit_mode: false,
-            plugin_loaded: std::collections::HashMap::new(),
-            plugin_enabled: std::collections::HashMap::new(),
+            plugin_loaded,
+            plugin_enabled,
         });
         cx.set_global(Self {
             main_window: None,
@@ -76,6 +86,11 @@ impl WindowManager {
         // 尝试从窗口句柄中提取 HWND，默认先给 0
         let hwnd = Self::extract_hwnd(&handle);
         self.widget_windows.insert(id, (handle, hwnd));
+    }
+
+    /// 移除插件窗口记录
+    pub fn remove_widget_window(&mut self, id: &str) {
+        self.widget_windows.remove(id);
     }
 
     /// 从 `AnyWindowHandle` 中尝试提取 Win32 HWND
@@ -136,17 +151,18 @@ impl WindowManager {
                     }
                 }
 
-                let entry = config
-                    .plugins
-                    .entry(id.to_string())
-                    .or_insert_with(|| PluginConfig {
-                        x,
-                        y,
-                        width,
-                        height,
-                        always_on_top: false,
-                        mouse_passthrough: false,
-                    });
+                let config_for_id = config.plugins.get(*id).cloned();
+                let plugin_cfg = config_for_id.unwrap_or_else(|| widget_core::PluginConfig {
+                    x: 0.0,
+                    y: 0.0,
+                    width: 0.0,
+                    height: 0.0,
+                    always_on_top: false,
+                    mouse_passthrough: false,
+                    loaded: true,
+                    enabled: true,
+                });
+                let entry = config.plugins.entry(id.to_string()).or_insert(plugin_cfg);
                 entry.x = x;
                 entry.y = y;
                 entry.width = width;

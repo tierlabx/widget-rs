@@ -13,6 +13,7 @@ pub struct PetWidget {
 
 impl PetWidget {
     pub fn new(_window: &mut Window, cx: &mut Context<Self>) -> Self {
+        println!("[PetWidget] new instance created!");
         let widget = Self {
             image_source: None,
             engine_rx: None,
@@ -22,6 +23,7 @@ impl PetWidget {
     }
 
     fn start_receiving(&self, cx: &mut Context<Self>) {
+        println!("[PetWidget] start_receiving called!");
         let timer_executor = cx.background_executor().clone();
         let foreground = cx.foreground_executor().clone();
         let widget = cx.weak_entity();
@@ -101,7 +103,13 @@ impl Render for PetWidget {
                         .object_fit(ObjectFit::Contain),
                 )
         } else {
-            div().size_full().flex().items_center().justify_center()
+            div()
+                .size_full()
+                .flex()
+                .items_center()
+                .justify_center()
+                .bg(gpui::rgb(0xff0000))
+                .child("Wait for pet...")
         }
     }
 }

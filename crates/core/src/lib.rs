@@ -7,6 +7,10 @@ use std::sync::atomic::AtomicBool;
 /// 原生级别的全局编辑模式状态，供 WindowProc 直接读取
 pub static NATIVE_EDIT_MODE: AtomicBool = AtomicBool::new(false);
 
+fn default_true() -> bool {
+    true
+}
+
 /// 单个插件的位置与大小配置
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct PluginConfig {
@@ -18,6 +22,10 @@ pub struct PluginConfig {
     pub always_on_top: bool,
     #[serde(default)]
     pub mouse_passthrough: bool,
+    #[serde(default = "default_true")]
+    pub loaded: bool,
+    #[serde(default = "default_true")]
+    pub enabled: bool,
 }
 
 /// 应用全局配置（可被序列化存储）
@@ -55,6 +63,11 @@ impl Global for SaveCallback {}
 /// 插件位置保存回调
 pub struct SaveBoundsCallback(pub std::sync::Arc<dyn Fn(&mut App)>);
 impl Global for SaveBoundsCallback {}
+
+/// 插件加载卸载切换回调
+#[derive(Clone)]
+pub struct TogglePluginCallback(pub std::sync::Arc<dyn Fn(&mut App, &str, bool)>);
+impl Global for TogglePluginCallback {}
 
 /// 立即落盘：克隆数据后交给后台执行器执行 IO，不阻塞 GPUI 主线程
 /// 在任何 GPUI 事件处理器（subscribe/listener）内都可安全调用

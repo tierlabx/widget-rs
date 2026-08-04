@@ -672,7 +672,7 @@ impl MainWindow {
                                     .on_click(move |_, _, cx| {
                                         cx.update_global::<widget_core::AppConfig, _>(|c, _| {
                                             let p = c.plugins.entry(plugin_id.to_string()).or_insert_with(|| widget_core::PluginConfig {
-                                                x: 0.0, y: 0.0, width: 300.0, height: 300.0, always_on_top: false, mouse_passthrough: false
+                                                x: 0.0, y: 0.0, width: 300.0, height: 300.0, always_on_top: false, mouse_passthrough: false, loaded: true, enabled: true
                                             });
                                             p.always_on_top = !always_on_top;
                                         });
@@ -706,7 +706,7 @@ impl MainWindow {
                                     .on_click(move |_, _, cx| {
                                         cx.update_global::<widget_core::AppConfig, _>(|c, _| {
                                             let p = c.plugins.entry(plugin_id.to_string()).or_insert_with(|| widget_core::PluginConfig {
-                                                x: 0.0, y: 0.0, width: 300.0, height: 300.0, always_on_top: false, mouse_passthrough: false
+                                                x: 0.0, y: 0.0, width: 300.0, height: 300.0, always_on_top: false, mouse_passthrough: false, loaded: true, enabled: true
                                             });
                                             p.mouse_passthrough = !mouse_passthrough;
                                         });
@@ -749,16 +749,38 @@ impl MainWindow {
                                             s.plugin_loaded.insert(plugin_id.to_string(), next_loaded);
                                             if !next_loaded {
                                                 s.plugin_enabled.insert(plugin_id.to_string(), false);
+                                            } else {
+                                                s.plugin_enabled.insert(plugin_id.to_string(), true);
                                             }
                                         });
-                                        let hwnd = widget_core::get_plugin_hwnd(plugin_id);
-                                        if hwnd != 0 {
-                                            unsafe {
-                                                if !next_loaded {
-                                                    windows_sys::Win32::UI::WindowsAndMessaging::ShowWindow(hwnd, windows_sys::Win32::UI::WindowsAndMessaging::SW_HIDE);
-                                                }
+
+                                        cx.update_global::<widget_core::AppConfig, _>(|c, _| {
+                                            let cfg = c.plugins.entry(plugin_id.to_string()).or_insert_with(|| widget_core::PluginConfig {
+                                                x: 0.0,
+                                                y: 0.0,
+                                                width: 0.0,
+                                                height: 0.0,
+                                                always_on_top: false,
+                                                mouse_passthrough: false,
+                                                loaded: next_loaded,
+                                                enabled: next_loaded,
+                                            });
+                                            cfg.loaded = next_loaded;
+                                            if !next_loaded {
+                                                cfg.enabled = false;
+                                            } else {
+                                                cfg.enabled = true;
                                             }
+                                        });
+                                        widget_core::save_config_now(cx);
+
+                                        let plugin_id_string = plugin_id.to_string();
+                                        if let Some(cb) = cx.try_global::<widget_core::TogglePluginCallback>().cloned() {
+                                            cx.defer(move |cx| {
+                                                (cb.0)(cx, &plugin_id_string, next_loaded);
+                                            });
                                         }
+
                                         cx.refresh_windows();
                                     }),
                             )
@@ -777,6 +799,14 @@ impl MainWindow {
                                         cx.update_global::<widget_core::UIState, _>(|s, _| {
                                             s.plugin_enabled.insert(plugin_id.to_string(), next_enabled);
                                         });
+
+                                        cx.update_global::<widget_core::AppConfig, _>(|c, _| {
+                                            if let Some(cfg) = c.plugins.get_mut(plugin_id) {
+                                                cfg.enabled = next_enabled;
+                                            }
+                                        });
+                                        widget_core::save_config_now(cx);
+
                                         let hwnd = widget_core::get_plugin_hwnd(plugin_id);
                                         if hwnd != 0 {
                                             unsafe {
@@ -895,7 +925,11 @@ impl MainWindow {
                             .flex()
                             .justify_center()
                             .items_center()
-                            .child(div().text_color(rgb(0xb8b3b0)).child(gpui_component::Icon::new(icon))),
+                            .child(
+                                div()
+                                    .text_color(rgb(0xb8b3b0))
+                                    .child(gpui_component::Icon::new(icon)),
+                            ),
                     )
                     .child(
                         div()
@@ -903,15 +937,27 @@ impl MainWindow {
                             .flex_col()
                             .gap(px(4.0))
                             .child(
-                                div().text_lg().font_weight(FontWeight::SEMIBOLD).text_color(rgb(0xf2f2f2)).child(name)
+                                div()
+                                    .text_lg()
+                                    .font_weight(FontWeight::SEMIBOLD)
+                                    .text_color(rgb(0xf2f2f2))
+                                    .child(name),
                             )
                             .child(
-                                div().text_sm().font_weight(FontWeight::MEDIUM).text_color(rgb(0x8b949e)).child(id_str)
+                                div()
+                                    .text_sm()
+                                    .font_weight(FontWeight::MEDIUM)
+                                    .text_color(rgb(0x8b949e))
+                                    .child(id_str),
                             ),
                     ),
             )
             .child(
-                div().h(px(48.0)).text_sm().text_color(rgb(0xb8b3b0)).child(desc)
+                div()
+                    .h(px(48.0))
+                    .text_sm()
+                    .text_color(rgb(0xb8b3b0))
+                    .child(desc),
             )
             .child(
                 div()
@@ -930,26 +976,58 @@ impl MainWindow {
                     )
                     .child(
                         Button::new(id_str, if is_loaded { "卸载" } else { "获取/安装" })
-                            .variant(if is_loaded { ButtonVariant::Outline } else { ButtonVariant::Default })
+                            .variant(if is_loaded {
+                                ButtonVariant::Outline
+                            } else {
+                                ButtonVariant::Default
+                            })
                             .on_click(move |_, _, cx| {
                                 let next_loaded = !is_loaded;
                                 cx.update_global::<widget_core::UIState, _>(|s, _| {
                                     s.plugin_loaded.insert(id_str.to_string(), next_loaded);
                                     if !next_loaded {
                                         s.plugin_enabled.insert(id_str.to_string(), false);
+                                    } else {
+                                        s.plugin_enabled.insert(id_str.to_string(), true);
                                     }
                                 });
-                                let hwnd = widget_core::get_plugin_hwnd(id_str);
-                                if hwnd != 0 {
-                                    unsafe {
-                                        if !next_loaded {
-                                            windows_sys::Win32::UI::WindowsAndMessaging::ShowWindow(hwnd, windows_sys::Win32::UI::WindowsAndMessaging::SW_HIDE);
-                                        }
+
+                                cx.update_global::<widget_core::AppConfig, _>(|c, _| {
+                                    let cfg =
+                                        c.plugins.entry(id_str.to_string()).or_insert_with(|| {
+                                            widget_core::PluginConfig {
+                                                x: 0.0,
+                                                y: 0.0,
+                                                width: 300.0,
+                                                height: 300.0,
+                                                always_on_top: false,
+                                                mouse_passthrough: false,
+                                                loaded: next_loaded,
+                                                enabled: next_loaded,
+                                            }
+                                        });
+                                    cfg.loaded = next_loaded;
+                                    if !next_loaded {
+                                        cfg.enabled = false;
+                                    } else {
+                                        cfg.enabled = true;
                                     }
+                                });
+                                widget_core::save_config_now(cx);
+
+                                let id_string = id_str.to_string();
+                                if let Some(cb) = cx
+                                    .try_global::<widget_core::TogglePluginCallback>()
+                                    .cloned()
+                                {
+                                    cx.defer(move |cx| {
+                                        (cb.0)(cx, &id_string, next_loaded);
+                                    });
                                 }
+
                                 cx.refresh_windows();
-                            })
-                    )
+                            }),
+                    ),
             )
     }
 

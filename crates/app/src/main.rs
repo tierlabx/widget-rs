@@ -156,6 +156,87 @@ impl gpui::AssetSource for AppAssets {
     }
 }
 
+pub fn apply_plugin_window_styles(hwnd: isize, id: &str, config: Option<&widget_core::AppConfig>) {
+    // 防止 Win + D （显示桌面）操作导致小组件被隐藏
+    WindowManager::attach_to_desktop(hwnd);
+    // 移除默认的 WS_THICKFRAME 并子类化窗口以彻底禁用原生缩放
+    unsafe {
+        use windows_sys::Win32::UI::WindowsAndMessaging::{
+            GetWindowLongW, SetWindowLongPtrW, SetWindowLongW, SetWindowPos, GWLP_WNDPROC,
+            GWL_STYLE, SWP_FRAMECHANGED, SWP_NOMOVE, SWP_NOSIZE, SWP_NOZORDER, WS_BORDER,
+            WS_CAPTION, WS_THICKFRAME,
+        };
+
+        let ex_style = GetWindowLongW(
+            hwnd,
+            windows_sys::Win32::UI::WindowsAndMessaging::GWL_EXSTYLE,
+        );
+        SetWindowLongW(
+            hwnd,
+            windows_sys::Win32::UI::WindowsAndMessaging::GWL_EXSTYLE,
+            ex_style | windows_sys::Win32::UI::WindowsAndMessaging::WS_EX_TOOLWINDOW as i32,
+        );
+
+        let style = GetWindowLongW(hwnd, GWL_STYLE);
+        SetWindowLongW(
+            hwnd,
+            GWL_STYLE,
+            style & !((WS_THICKFRAME | WS_CAPTION | WS_BORDER) as i32),
+        );
+        SetWindowPos(
+            hwnd,
+            0,
+            0,
+            0,
+            0,
+            0,
+            SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_FRAMECHANGED,
+        );
+
+        // 注入自定义窗口过程
+        let old_proc = SetWindowLongPtrW(hwnd, GWLP_WNDPROC, plugin_wnd_proc as *const () as isize);
+        if old_proc != 0 {
+            let procs = WND_PROCS.get_or_init(|| Mutex::new(std::collections::HashMap::new()));
+            procs.lock().unwrap().insert(hwnd, old_proc);
+        }
+    }
+
+    // 恢复独立设置（置顶和鼠标穿透）
+    if let Some(cfg) = config {
+        if let Some(plugin_cfg) = cfg.plugins.get(id) {
+            unsafe {
+                use windows_sys::Win32::UI::WindowsAndMessaging::{
+                    SetWindowPos, HWND_NOTOPMOST, HWND_TOPMOST, SWP_NOMOVE, SWP_NOSIZE,
+                };
+                // 恢复始终置顶
+                let insert_after = if plugin_cfg.always_on_top {
+                    HWND_TOPMOST
+                } else {
+                    HWND_NOTOPMOST
+                };
+                SetWindowPos(hwnd, insert_after, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE);
+
+                use windows_sys::Win32::UI::WindowsAndMessaging::{
+                    GetWindowLongW, SetWindowLongW, GWL_EXSTYLE, WS_EX_LAYERED, WS_EX_TRANSPARENT,
+                };
+                let style = GetWindowLongW(
+                    hwnd,
+                    windows_sys::Win32::UI::WindowsAndMessaging::GWL_EXSTYLE,
+                );
+                SetWindowLongW(
+                    hwnd,
+                    GWL_EXSTYLE,
+                    if plugin_cfg.mouse_passthrough {
+                        style | WS_EX_TRANSPARENT as i32 | WS_EX_LAYERED as i32
+                    } else {
+                        style & !(WS_EX_TRANSPARENT as i32 | WS_EX_LAYERED as i32)
+                    },
+                );
+            }
+        }
+    }
+}
+
 fn main() {
     // 1. 初始化存储和加载配置
     let store = Arc::new(Store::new());
@@ -244,6 +325,73 @@ fn main() {
             },
         )));
 
+        cx.set_global(widget_core::TogglePluginCallback(std::sync::Arc::new(
+            move |cx: &mut App, plugin_id: &str, loaded: bool| {
+                if let Some(pm) = cx.try_global::<PluginManager>().cloned() {
+                    if let Some(plugin) = pm.get_plugins().iter().find(|p| p.id() == plugin_id) {
+                        println!("[TogglePluginCallback] plugin_id: {}, loaded: {}", plugin_id, loaded);
+                        if loaded {
+                            let handle = plugin.spawn_window(cx);
+                            println!("[TogglePluginCallback] spawn_window called!");
+                            cx.update_global::<WindowManager, _>(|wm, _| {
+                                wm.register_widget_window(plugin.id(), handle);
+                            });
+
+                            let plugin_id_string = plugin_id.to_string();
+                            cx.spawn(async move |cx| {
+                                let mut hwnd = 0;
+                                for _ in 0..50 {
+                                    cx.background_executor().timer(std::time::Duration::from_millis(100)).await;
+                                    hwnd = cx.update(|cx| {
+                                        let h = cx.try_global::<WindowManager>()
+                                            .and_then(|wm| wm.widget_windows.get(&plugin_id_string.as_str()))
+                                            .map(|(h, _)| *h);
+                                        if let Some(h) = h {
+                                            h.update(cx, |_, win, _| {
+                                                use raw_window_handle::HasWindowHandle;
+                                                if let Ok(wh) = win.window_handle() {
+                                                    if let raw_window_handle::RawWindowHandle::Win32(hw) = wh.as_raw() {
+                                                        return hw.hwnd.get();
+                                                    }
+                                                }
+                                                0isize
+                                            }).unwrap_or(0)
+                                        } else { 0 }
+                                    }).unwrap_or(0);
+                                    if hwnd != 0 { break; }
+                                }
+
+                                if hwnd != 0 {
+                                    let _ = cx.update(|cx| {
+                                        let _ = cx.update_global::<WindowManager, _>(|wm, _| {
+                                            if let Some(e) = wm.widget_windows.get_mut(plugin_id_string.as_str()) {
+                                                e.1 = hwnd;
+                                            }
+                                        });
+                                        widget_core::register_plugin_hwnd(&plugin_id_string, hwnd);
+                                        let config = cx.try_global::<widget_core::AppConfig>().cloned();
+                                        apply_plugin_window_styles(hwnd, &plugin_id_string, config.as_ref());
+                                    });
+                                }
+                            }).detach();
+                        } else {
+                            let handle_opt = cx.update_global::<WindowManager, _>(|wm, _| {
+                                let h = wm.widget_windows.get(plugin_id).map(|(handle, _)| handle.clone());
+                                wm.remove_widget_window(plugin_id);
+                                h
+                            });
+                            if let Some(handle) = handle_opt {
+                                let _ = handle.update(cx, |_, window, _| {
+                                    window.remove_window();
+                                });
+                            }
+                            plugin.on_unload(cx);
+                        }
+                    }
+                }
+            }
+        )));
+
         // 初始化窗口管理器，用于管理主窗口和所有插件窗口的生命周期和状态
         WindowManager::init(cx);
 
@@ -254,9 +402,17 @@ fn main() {
         }
 
         cx.update_global::<WindowManager, _>(|wm, cx| {
+            let config = cx.try_global::<widget_core::AppConfig>().cloned();
             for plugin in &plugins {
-                let handle = plugin.spawn_window(cx);
-                wm.register_widget_window(plugin.id(), handle);
+                let is_loaded = config
+                    .as_ref()
+                    .and_then(|c| c.plugins.get(plugin.id()))
+                    .map(|p| p.loaded)
+                    .unwrap_or(true);
+                if is_loaded {
+                    let handle = plugin.spawn_window(cx);
+                    wm.register_widget_window(plugin.id(), handle);
+                }
             }
         });
         cx.set_global(pm);
@@ -364,98 +520,18 @@ fn main() {
                     }
                     // 注册到 thread_local，供 widget-ui on_click 等跨线程操作直接使用
                     widget_core::register_plugin_hwnd(id, *hwnd);
-                    // 防止 Win + D （显示桌面）操作导致小组件被隐藏
-                    WindowManager::attach_to_desktop(*hwnd);
-                    // 移除默认的 WS_THICKFRAME 并子类化窗口以彻底禁用原生缩放
-                    unsafe {
-                        use windows_sys::Win32::UI::WindowsAndMessaging::{
-                            GetWindowLongW, SetWindowLongPtrW, SetWindowLongW, SetWindowPos,
-                            GWLP_WNDPROC, GWL_STYLE, SWP_FRAMECHANGED, SWP_NOMOVE, SWP_NOSIZE,
-                            SWP_NOZORDER, WS_BORDER, WS_CAPTION, WS_THICKFRAME,
-                        };
+                    // 应用窗口样式和独立设置
+                    apply_plugin_window_styles(*hwnd, id.as_str(), config.as_ref());
 
-                        let ex_style = GetWindowLongW(
-                            *hwnd,
-                            windows_sys::Win32::UI::WindowsAndMessaging::GWL_EXSTYLE,
-                        );
-                        SetWindowLongW(
-                            *hwnd,
-                            windows_sys::Win32::UI::WindowsAndMessaging::GWL_EXSTYLE,
-                            ex_style
-                                | windows_sys::Win32::UI::WindowsAndMessaging::WS_EX_TOOLWINDOW
-                                    as i32,
-                        );
-
-                        let style = GetWindowLongW(*hwnd, GWL_STYLE);
-                        SetWindowLongW(
-                            *hwnd,
-                            GWL_STYLE,
-                            style & !((WS_THICKFRAME | WS_CAPTION | WS_BORDER) as i32),
-                        );
-                        SetWindowPos(
-                            *hwnd,
-                            0,
-                            0,
-                            0,
-                            0,
-                            0,
-                            SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_FRAMECHANGED,
-                        );
-
-                        // 注入自定义窗口过程
-                        let old_proc = SetWindowLongPtrW(
-                            *hwnd,
-                            GWLP_WNDPROC,
-                            plugin_wnd_proc as *const () as isize,
-                        );
-                        if old_proc != 0 {
-                            let procs = WND_PROCS
-                                .get_or_init(|| Mutex::new(std::collections::HashMap::new()));
-                            procs.lock().unwrap().insert(*hwnd, old_proc);
-                        }
-                    }
-
-                    // 恢复独立设置（置顶和鼠标穿透）
                     if let Some(cfg) = &config {
-                        if let Some(plugin_cfg) = cfg.plugins.get(id.as_str()) {
-                            unsafe {
-                                use windows_sys::Win32::UI::WindowsAndMessaging::{
-                                    SetWindowPos, HWND_NOTOPMOST, HWND_TOPMOST, SWP_NOMOVE,
-                                    SWP_NOSIZE,
-                                };
-                                // 恢复始终置顶
-                                let insert_after = if plugin_cfg.always_on_top {
-                                    HWND_TOPMOST
-                                } else {
-                                    HWND_NOTOPMOST
-                                };
-                                SetWindowPos(
-                                    *hwnd,
-                                    insert_after,
-                                    0,
-                                    0,
-                                    0,
-                                    0,
-                                    SWP_NOMOVE | SWP_NOSIZE,
-                                );
-
-                                use windows_sys::Win32::UI::WindowsAndMessaging::{
-                                    GetWindowLongW, SetWindowLongW, GWL_EXSTYLE, WS_EX_LAYERED,
-                                    WS_EX_TRANSPARENT,
-                                };
-                                let style = GetWindowLongW(
-                                    *hwnd,
-                                    windows_sys::Win32::UI::WindowsAndMessaging::GWL_EXSTYLE,
-                                );
-                                SetWindowLongW(
-                                    *hwnd,
-                                    GWL_EXSTYLE,
-                                    if plugin_cfg.mouse_passthrough {
-                                        style | WS_EX_TRANSPARENT as i32 | WS_EX_LAYERED as i32
-                                    } else {
-                                        style & !(WS_EX_TRANSPARENT as i32 | WS_EX_LAYERED as i32)
-                                    },
-                                );
+                        if let Some(p_cfg) = cfg.plugins.get(id.as_str()) {
+                            if !p_cfg.enabled {
+                                unsafe {
+                                    windows_sys::Win32::UI::WindowsAndMessaging::ShowWindow(
+                                        *hwnd,
+                                        windows_sys::Win32::UI::WindowsAndMessaging::SW_HIDE,
+                                    );
+                                }
                             }
                         }
                     }
