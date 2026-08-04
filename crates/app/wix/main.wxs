@@ -90,6 +90,15 @@
             <Directory Id='ProgramMenuFolder' Name='Programs'>
                 <Directory Id='ApplicationProgramsFolder' Name='widget-rs'>
                     <Component Id='ApplicationShortcut' Guid='80FE1BBD-5E4E-4361-AAEE-C6855FF1C8B4'>
+                        <Shortcut Id='ApplicationStartMenuShortcut' 
+                                  Name='widget-rs' 
+                                  Target='[#exe0]' 
+                                  WorkingDirectory='APPLICATIONFOLDER' />
+                        <Shortcut Id='ApplicationDesktopShortcut' 
+                                  Directory='DesktopFolder' 
+                                  Name='widget-rs' 
+                                  Target='[#exe0]' 
+                                  WorkingDirectory='APPLICATIONFOLDER' />
                         <RemoveFolder Id='CleanUpShortCut' Directory='ApplicationProgramsFolder' On='uninstall'/>
                         <RegistryValue Root='HKCU' Key='Software\tierlabx\widget-rs' Name='installed' Type='integer' Value='1' KeyPath='yes'/>
                     </Component>
@@ -136,18 +145,6 @@
                                 DiskId='1'
                                 Source='$(var.CargoTargetBinDir)\widget-rs.exe'
                                 KeyPath='yes'/>
-                            <Shortcut Id='ApplicationStartMenuShortcut' 
-                                      Directory='ApplicationProgramsFolder' 
-                                      Name='widget-rs' 
-                                      WorkingDirectory='APPLICATIONFOLDER' 
-                                      Advertise='no' 
-                                      Target='[#exe0]' />
-                            <Shortcut Id='ApplicationDesktopShortcut' 
-                                      Directory='DesktopFolder' 
-                                      Name='widget-rs' 
-                                      WorkingDirectory='APPLICATIONFOLDER' 
-                                      Advertise='no' 
-                                      Target='[#exe0]' />
                         </Component>
                     </Directory>
                 </Directory>
