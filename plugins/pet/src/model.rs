@@ -56,6 +56,7 @@ pub struct Submesh {
     pub index_buffer: wgpu::Buffer,
     pub num_elements: u32,
     pub material_index: Option<usize>,
+    #[allow(dead_code)]
     pub skin_index: Option<usize>,
 }
 
@@ -63,6 +64,7 @@ pub struct Node {
     pub name: Option<String>,
     pub local_transform: Mat4,
     pub base_transform: Mat4,
+    #[allow(dead_code)]
     pub global_transform: Mat4,
     pub children: Vec<usize>,
 }

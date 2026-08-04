@@ -187,11 +187,9 @@ impl Render for PetWidget {
                         .on_click(cx.listener(|this, _, _win, cx| {
                             this.show_menu = false;
 
-                            let executor = cx.background_executor().clone();
                             let foreground = cx.foreground_executor().clone();
                             let cmd_tx = this.engine_cmd_tx.clone();
-
-                            let mut async_cx = cx.to_async();
+                            let async_cx = cx.to_async();
                             foreground
                                 .spawn(async move {
                                     let path = rfd::AsyncFileDialog::new()
@@ -206,7 +204,6 @@ impl Render for PetWidget {
                                                 path_str.to_string(),
                                             ));
                                         }
-                                        let path_string = path_str.to_string();
                                         let _ = async_cx.update(|cx| {
                                             cx.update_global::<widget_core::AppConfig, _>(
                                                 |c, _cx| {
