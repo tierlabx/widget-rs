@@ -13,6 +13,18 @@ impl Plugin for StickyWidgetPlugin {
         "sticky_widget"
     }
 
+    fn name(&self) -> &'static str {
+        "极客便签"
+    }
+
+    fn description(&self) -> &'static str {
+        "将随手记下的灵感、备忘录以极客形式贴在桌面。"
+    }
+
+    fn icon(&self) -> gpui_component::IconName {
+        gpui_component::IconName::File
+    }
+
     fn spawn_window(&self, cx: &mut App) -> AnyWindowHandle {
         let (x, y, w, h) = cx
             .try_global::<AppConfig>()

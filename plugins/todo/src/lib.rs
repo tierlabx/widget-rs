@@ -13,6 +13,18 @@ impl Plugin for TodoWidgetPlugin {
         "todo_widget"
     }
 
+    fn name(&self) -> &'static str {
+        "待办事项"
+    }
+
+    fn description(&self) -> &'static str {
+        "极简高效的任务清单，助你轻松掌控今日核心目标。"
+    }
+
+    fn icon(&self) -> gpui_component::IconName {
+        gpui_component::IconName::CircleCheck
+    }
+
     fn spawn_window(&self, cx: &mut App) -> AnyWindowHandle {
         let (x, y, w, h) = cx
             .try_global::<AppConfig>()

@@ -173,6 +173,21 @@ fn main() {
         gpui_component::init(cx);
         cx.set_global(config.clone());
 
+        // 提取并存储全局 PluginList 元数据
+        let metadata_list = pm
+            .get_plugins()
+            .iter()
+            .map(|p| widget_core::PluginMetadata {
+                id: p.id(),
+                name: p.name(),
+                description: p.description(),
+                icon: p.icon(),
+                version: p.version(),
+                author: p.author(),
+            })
+            .collect::<Vec<_>>();
+        cx.set_global(widget_core::PluginList(metadata_list));
+
         // 注册立即写盘回调，插件可调用 save_config_now(cx) 触发
         let store_for_save = Arc::clone(&store_for_app);
         cx.set_global(widget_core::SaveCallback(std::sync::Arc::new(

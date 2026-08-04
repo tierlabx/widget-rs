@@ -263,58 +263,32 @@ impl MainWindow {
     }
 
     fn render_dashboard(&self, is_edit_mode: bool, cx: &mut Context<Self>) -> impl IntoElement {
-        let sticky_loaded = cx
-            .try_global::<widget_core::UIState>()
-            .is_none_or(|s| s.is_plugin_loaded("sticky_widget"));
-        let sticky_enabled = cx
-            .try_global::<widget_core::UIState>()
-            .is_none_or(|s| s.is_plugin_enabled("sticky_widget"));
-        let sticky_top = cx
-            .try_global::<widget_core::AppConfig>()
-            .and_then(|c| c.plugins.get("sticky_widget"))
-            .is_some_and(|p| p.always_on_top);
-        let sticky_pass = cx
-            .try_global::<widget_core::AppConfig>()
-            .and_then(|c| c.plugins.get("sticky_widget"))
-            .is_some_and(|p| p.mouse_passthrough);
+        let plugin_list = cx
+            .try_global::<widget_core::PluginList>()
+            .map(|list| list.0.clone())
+            .unwrap_or_default();
 
-        let todo_loaded = cx
-            .try_global::<widget_core::UIState>()
-            .is_none_or(|s| s.is_plugin_loaded("todo_widget"));
-        let todo_enabled = cx
-            .try_global::<widget_core::UIState>()
-            .is_none_or(|s| s.is_plugin_enabled("todo_widget"));
-        let todo_top = cx
-            .try_global::<widget_core::AppConfig>()
-            .and_then(|c| c.plugins.get("todo_widget"))
-            .is_some_and(|p| p.always_on_top);
-        let todo_pass = cx
-            .try_global::<widget_core::AppConfig>()
-            .and_then(|c| c.plugins.get("todo_widget"))
-            .is_some_and(|p| p.mouse_passthrough);
+        let plugins_info: Vec<_> = plugin_list.iter().map(|meta| {
+            let loaded = cx
+                .try_global::<widget_core::UIState>()
+                .is_none_or(|s| s.is_plugin_loaded(meta.id));
+            let enabled = cx
+                .try_global::<widget_core::UIState>()
+                .is_none_or(|s| s.is_plugin_enabled(meta.id));
+            let top = cx
+                .try_global::<widget_core::AppConfig>()
+                .and_then(|c| c.plugins.get(meta.id))
+                .is_some_and(|p| p.always_on_top);
+            let pass = cx
+                .try_global::<widget_core::AppConfig>()
+                .and_then(|c| c.plugins.get(meta.id))
+                .is_some_and(|p| p.mouse_passthrough);
+            
+            (meta.clone(), loaded, enabled, top, pass)
+        }).collect();
 
-        let pet_loaded = cx
-            .try_global::<widget_core::UIState>()
-            .is_none_or(|s| s.is_plugin_loaded("pet_plugin"));
-        let pet_enabled = cx
-            .try_global::<widget_core::UIState>()
-            .is_none_or(|s| s.is_plugin_enabled("pet_plugin"));
-        let pet_top = cx
-            .try_global::<widget_core::AppConfig>()
-            .and_then(|c| c.plugins.get("pet_plugin"))
-            .is_some_and(|p| p.always_on_top);
-        let pet_pass = cx
-            .try_global::<widget_core::AppConfig>()
-            .and_then(|c| c.plugins.get("pet_plugin"))
-            .is_some_and(|p| p.mouse_passthrough);
-
-        let plugins = [
-            (sticky_loaded, sticky_enabled),
-            (todo_loaded, todo_enabled),
-            (pet_loaded, pet_enabled),
-        ];
-        let total_widgets = plugins.len();
-        let running_widgets = plugins.iter().filter(|(l, e)| *l && *e).count();
+        let total_widgets = plugins_info.len();
+        let running_widgets = plugins_info.iter().filter(|(_, l, e, _, _)| *l && *e).count();
         let stopped_widgets = total_widgets - running_widgets;
 
         div()
@@ -470,41 +444,19 @@ impl MainWindow {
                             .w_full()
                             .gap(px(16.0))
                             .flex_wrap()
-                            .children(sticky_loaded.then(|| {
-                                self.widget_card(
-                                    "便签",
-                                    "sticky_widget",
-                                    gpui_component::IconName::File,
-                                    sticky_loaded,
-                                    sticky_enabled,
-                                    sticky_top,
-                                    sticky_pass,
-                                    0,
-                                )
-                            }))
-                            .children(todo_loaded.then(|| {
-                                self.widget_card(
-                                    "待办事项",
-                                    "todo_widget",
-                                    gpui_component::IconName::CircleCheck,
-                                    todo_loaded,
-                                    todo_enabled,
-                                    todo_top,
-                                    todo_pass,
-                                    1,
-                                )
-                            }))
-                            .children(pet_loaded.then(|| {
-                                self.widget_card(
-                                    "桌面宠物",
-                                    "pet_plugin",
-                                    gpui_component::IconName::Star,
-                                    pet_loaded,
-                                    pet_enabled,
-                                    pet_top,
-                                    pet_pass,
-                                    2,
-                                )
+                            .children(plugins_info.into_iter().enumerate().filter_map(|(i, (meta, loaded, enabled, top, pass))| {
+                                loaded.then(|| {
+                                    self.widget_card(
+                                        meta.name,
+                                        meta.id,
+                                        meta.icon,
+                                        loaded,
+                                        enabled,
+                                        top,
+                                        pass,
+                                        i as u8,
+                                    )
+                                })
                             })),
                     ),
             )
@@ -846,15 +798,10 @@ impl MainWindow {
     }
 
     fn render_widgets_page(&self, cx: &mut Context<Self>) -> impl IntoElement {
-        let sticky_loaded = cx
-            .try_global::<widget_core::UIState>()
-            .is_none_or(|s| s.is_plugin_loaded("sticky_widget"));
-        let todo_loaded = cx
-            .try_global::<widget_core::UIState>()
-            .is_none_or(|s| s.is_plugin_loaded("todo_widget"));
-        let pet_loaded = cx
-            .try_global::<widget_core::UIState>()
-            .is_none_or(|s| s.is_plugin_loaded("pet_plugin"));
+        let plugin_list = cx
+            .try_global::<widget_core::PluginList>()
+            .map(|list| list.0.clone())
+            .unwrap_or_default();
 
         div()
             .flex_1()
@@ -897,33 +844,20 @@ impl MainWindow {
                     .gap(px(16.0))
                     .flex_wrap()
                     .pb(px(24.0))
-                    .child(self.market_plugin_card(
-                        "极客便签",
-                        "sticky_widget",
-                        "将随手记下的灵感、备忘录以极客形式贴在桌面。",
-                        gpui_component::IconName::File,
-                        "v1.0.0",
-                        "官方 (内置)",
-                        sticky_loaded,
-                    ))
-                    .child(self.market_plugin_card(
-                        "待办事项",
-                        "todo_widget",
-                        "极简高效的任务清单，助你轻松掌控今日核心目标。",
-                        gpui_component::IconName::CircleCheck,
-                        "v1.0.0",
-                        "官方 (内置)",
-                        todo_loaded,
-                    ))
-                    .child(self.market_plugin_card(
-                        "桌面宠物",
-                        "pet_plugin",
-                        "在桌面上养一只可爱的虚拟宠物，陪伴你每一天的工作时光。",
-                        gpui_component::IconName::Star,
-                        "v0.1.0",
-                        "官方 (内置)",
-                        pet_loaded,
-                    )),
+                    .children(plugin_list.into_iter().map(|meta| {
+                        let is_loaded = cx
+                            .try_global::<widget_core::UIState>()
+                            .is_none_or(|s| s.is_plugin_loaded(meta.id));
+                        self.market_plugin_card(
+                            meta.name,
+                            meta.id,
+                            meta.description,
+                            meta.icon,
+                            meta.version,
+                            meta.author,
+                            is_loaded,
+                        )
+                    })),
             )
     }
 

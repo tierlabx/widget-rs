@@ -116,6 +116,22 @@ pub trait Plugin: Send + Sync {
         self.id()
     }
 
+    fn description(&self) -> &'static str {
+        ""
+    }
+
+    fn icon(&self) -> gpui_component::IconName {
+        gpui_component::IconName::WindowMaximize
+    }
+
+    fn version(&self) -> &'static str {
+        "v1.0.0"
+    }
+
+    fn author(&self) -> &'static str {
+        "官方 (内置)"
+    }
+
     #[allow(unused_variables)]
     fn on_load(&self, cx: &mut App) {}
 
@@ -124,6 +140,20 @@ pub trait Plugin: Send + Sync {
     #[allow(unused_variables)]
     fn on_unload(&self, cx: &mut App) {}
 }
+
+#[derive(Clone)]
+pub struct PluginMetadata {
+    pub id: &'static str,
+    pub name: &'static str,
+    pub description: &'static str,
+    pub icon: gpui_component::IconName,
+    pub version: &'static str,
+    pub author: &'static str,
+}
+
+pub struct PluginList(pub Vec<PluginMetadata>);
+
+impl Global for PluginList {}
 
 // ─── 线程本地 HWND 存储 ───────────────────────────────────────────────────────
 // 所有操作均在主线程执行，无需跨线程同步

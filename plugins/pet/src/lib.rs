@@ -13,6 +13,22 @@ impl Plugin for PetPlugin {
         "pet_plugin"
     }
 
+    fn name(&self) -> &'static str {
+        "桌面宠物"
+    }
+
+    fn description(&self) -> &'static str {
+        "在桌面上养一只可爱的虚拟宠物，陪伴你每一天的工作时光。"
+    }
+
+    fn icon(&self) -> gpui_component::IconName {
+        gpui_component::IconName::Star
+    }
+
+    fn version(&self) -> &'static str {
+        "v0.1.0"
+    }
+
     fn spawn_window(&self, cx: &mut App) -> AnyWindowHandle {
         let (x, y, w, h) = cx
             .try_global::<AppConfig>()
