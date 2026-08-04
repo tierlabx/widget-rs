@@ -86,6 +86,15 @@
         <Property Id='DiskPrompt' Value='widget-rs Installation'/>
 
         <Directory Id='TARGETDIR' Name='SourceDir'>
+            <Directory Id='DesktopFolder' Name='Desktop' />
+            <Directory Id='ProgramMenuFolder' Name='Programs'>
+                <Directory Id='ApplicationProgramsFolder' Name='widget-rs'>
+                    <Component Id='ApplicationShortcut' Guid='80FE1BBD-5E4E-4361-AAEE-C6855FF1C8B4'>
+                        <RemoveFolder Id='CleanUpShortCut' Directory='ApplicationProgramsFolder' On='uninstall'/>
+                        <RegistryValue Root='HKCU' Key='Software\tierlabx\widget-rs' Name='installed' Type='integer' Value='1' KeyPath='yes'/>
+                    </Component>
+                </Directory>
+            </Directory>
             <Directory Id='$(var.PlatformProgramFilesFolder)' Name='PFiles'>
                 <Directory Id='APPLICATIONFOLDER' Name='widget-rs'>
                     
@@ -127,6 +136,18 @@
                                 DiskId='1'
                                 Source='$(var.CargoTargetBinDir)\widget-rs.exe'
                                 KeyPath='yes'/>
+                            <Shortcut Id='ApplicationStartMenuShortcut' 
+                                      Directory='ApplicationProgramsFolder' 
+                                      Name='widget-rs' 
+                                      WorkingDirectory='APPLICATIONFOLDER' 
+                                      Advertise='no' 
+                                      Target='[#exe0]' />
+                            <Shortcut Id='ApplicationDesktopShortcut' 
+                                      Directory='DesktopFolder' 
+                                      Name='widget-rs' 
+                                      WorkingDirectory='APPLICATIONFOLDER' 
+                                      Advertise='no' 
+                                      Target='[#exe0]' />
                         </Component>
                     </Directory>
                 </Directory>
@@ -150,6 +171,7 @@
             <!--<ComponentRef Id='License'/>-->
 
             <ComponentRef Id='binary0'/>
+            <ComponentRef Id='ApplicationShortcut'/>
 
             <Feature
                 Id='Environment'
