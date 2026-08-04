@@ -49,8 +49,7 @@ impl Plugin for PetPlugin {
         };
 
         cx.open_window(options, |window, cx| {
-            let view = cx.new(|cx| PetWidget::new(window, cx));
-            cx.new(|cx| gpui_component::Root::new(view, window, cx))
+            cx.new(|cx| PetWidget::new(window, cx))
         })
         .unwrap()
         .into()

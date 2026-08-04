@@ -332,10 +332,14 @@ fn main() {
                         use windows_sys::Win32::UI::WindowsAndMessaging::{
                             GetWindowLongW, SetWindowLongPtrW, SetWindowLongW, SetWindowPos,
                             GWLP_WNDPROC, GWL_STYLE, SWP_FRAMECHANGED, SWP_NOMOVE, SWP_NOSIZE,
-                            SWP_NOZORDER, WS_THICKFRAME,
+                            SWP_NOZORDER, WS_BORDER, WS_CAPTION, WS_THICKFRAME,
                         };
                         let style = GetWindowLongW(*hwnd, GWL_STYLE);
-                        SetWindowLongW(*hwnd, GWL_STYLE, style & !(WS_THICKFRAME as i32));
+                        SetWindowLongW(
+                            *hwnd,
+                            GWL_STYLE,
+                            style & !((WS_THICKFRAME | WS_CAPTION | WS_BORDER) as i32),
+                        );
                         SetWindowPos(
                             *hwnd,
                             0,
