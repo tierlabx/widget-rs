@@ -268,27 +268,33 @@ impl MainWindow {
             .map(|list| list.0.clone())
             .unwrap_or_default();
 
-        let plugins_info: Vec<_> = plugin_list.iter().map(|meta| {
-            let loaded = cx
-                .try_global::<widget_core::UIState>()
-                .is_none_or(|s| s.is_plugin_loaded(meta.id));
-            let enabled = cx
-                .try_global::<widget_core::UIState>()
-                .is_none_or(|s| s.is_plugin_enabled(meta.id));
-            let top = cx
-                .try_global::<widget_core::AppConfig>()
-                .and_then(|c| c.plugins.get(meta.id))
-                .is_some_and(|p| p.always_on_top);
-            let pass = cx
-                .try_global::<widget_core::AppConfig>()
-                .and_then(|c| c.plugins.get(meta.id))
-                .is_some_and(|p| p.mouse_passthrough);
-            
-            (meta.clone(), loaded, enabled, top, pass)
-        }).collect();
+        let plugins_info: Vec<_> = plugin_list
+            .iter()
+            .map(|meta| {
+                let loaded = cx
+                    .try_global::<widget_core::UIState>()
+                    .is_none_or(|s| s.is_plugin_loaded(meta.id));
+                let enabled = cx
+                    .try_global::<widget_core::UIState>()
+                    .is_none_or(|s| s.is_plugin_enabled(meta.id));
+                let top = cx
+                    .try_global::<widget_core::AppConfig>()
+                    .and_then(|c| c.plugins.get(meta.id))
+                    .is_some_and(|p| p.always_on_top);
+                let pass = cx
+                    .try_global::<widget_core::AppConfig>()
+                    .and_then(|c| c.plugins.get(meta.id))
+                    .is_some_and(|p| p.mouse_passthrough);
+
+                (meta.clone(), loaded, enabled, top, pass)
+            })
+            .collect();
 
         let total_widgets = plugins_info.len();
-        let running_widgets = plugins_info.iter().filter(|(_, l, e, _, _)| *l && *e).count();
+        let running_widgets = plugins_info
+            .iter()
+            .filter(|(_, l, e, _, _)| *l && *e)
+            .count();
         let stopped_widgets = total_widgets - running_widgets;
 
         div()
@@ -438,27 +444,18 @@ impl MainWindow {
                                     .child(format!("{} 个小部件", total_widgets)),
                             ),
                     )
-                    .child(
-                        div()
-                            .flex()
-                            .w_full()
-                            .gap(px(16.0))
-                            .flex_wrap()
-                            .children(plugins_info.into_iter().enumerate().filter_map(|(i, (meta, loaded, enabled, top, pass))| {
+                    .child(div().flex().w_full().gap(px(16.0)).flex_wrap().children(
+                        plugins_info.into_iter().enumerate().filter_map(
+                            |(i, (meta, loaded, enabled, top, pass))| {
                                 loaded.then(|| {
                                     self.widget_card(
-                                        meta.name,
-                                        meta.id,
-                                        meta.icon,
-                                        loaded,
-                                        enabled,
-                                        top,
-                                        pass,
+                                        meta.name, meta.id, meta.icon, loaded, enabled, top, pass,
                                         i as u8,
                                     )
                                 })
-                            })),
-                    ),
+                            },
+                        ),
+                    )),
             )
     }
 
