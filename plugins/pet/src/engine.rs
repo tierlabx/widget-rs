@@ -1,4 +1,4 @@
-use std::sync::mpsc::SyncSender;
+use std::sync::mpsc::{Receiver, SyncSender};
 use std::time::{Duration, Instant};
 use wgpu::util::DeviceExt;
 
@@ -27,17 +27,34 @@ impl CameraUniform {
     }
 }
 
+pub enum EngineCommand {
+    LoadModel(String),
+    SetFps(u32),
+    UpdateVelocity(f32, f32),
+    Touch(f32, f32),
+}
+
 pub struct PetEngine;
 
 impl PetEngine {
-    pub fn start(sender: SyncSender<Vec<u8>>) {
+    pub fn start(
+        sender: SyncSender<Vec<u8>>,
+        command_rx: Receiver<EngineCommand>,
+        initial_model: String,
+        initial_fps: u32,
+    ) {
         std::thread::spawn(move || {
-            pollster::block_on(run_engine(sender));
+            pollster::block_on(run_engine(sender, command_rx, initial_model, initial_fps));
         });
     }
 }
 
-async fn run_engine(sender: SyncSender<Vec<u8>>) {
+async fn run_engine(
+    sender: SyncSender<Vec<u8>>,
+    command_rx: Receiver<EngineCommand>,
+    initial_model: String,
+    initial_fps: u32,
+) {
     let instance = wgpu::Instance::default();
     let adapter = instance
         .request_adapter(&wgpu::RequestAdapterOptions {
@@ -324,28 +341,76 @@ async fn run_engine(sender: SyncSender<Vec<u8>>) {
         multiview: None,
     });
 
-    let mut model = load_model_from_path(
-        &device,
-        &queue,
-        &texture_bind_group_layout,
-        "plugins/pet/assets/nina/Nina_close.vrm",
-    );
+    let mut model =
+        load_model_from_path(&device, &queue, &texture_bind_group_layout, &initial_model);
     let program_start = Instant::now();
-    let mut angle: f32 = 0.0;
-    let target_frametime = Duration::from_secs_f32(1.0 / 30.0);
+    let mut target_frametime = if initial_fps == 0 {
+        Duration::ZERO
+    } else {
+        Duration::from_secs_f32(1.0 / initial_fps as f32)
+    };
+
+    let mut velocity_x = 0.0;
+    let mut velocity_y = 0.0;
+    let mut drag_tilt_x = 0.0;
+    let mut drag_tilt_z = 0.0;
+
+    #[derive(PartialEq)]
+    enum PetState {
+        Idle,
+        TouchHead,
+        TouchBody,
+    }
+    let mut current_state = PetState::Idle;
+    let mut state_timer = 0.0;
+
+    let mut current_nod = 0.0;
+    let mut current_shake = 0.0;
 
     loop {
+        while let Ok(cmd) = command_rx.try_recv() {
+            match cmd {
+                EngineCommand::LoadModel(path) => {
+                    model =
+                        load_model_from_path(&device, &queue, &texture_bind_group_layout, &path);
+                }
+                EngineCommand::SetFps(fps) => {
+                    target_frametime = if fps == 0 {
+                        Duration::ZERO
+                    } else {
+                        Duration::from_secs_f32(1.0 / fps as f32)
+                    };
+                }
+                EngineCommand::UpdateVelocity(dx, dy) => {
+                    velocity_x = dx;
+                    velocity_y = dy;
+                }
+                EngineCommand::Touch(_x, y) => {
+                    if y < 100.0 {
+                        current_state = PetState::TouchHead;
+                    } else {
+                        current_state = PetState::TouchBody;
+                    }
+                    state_timer = 1.5; // touch animation lasts 1.5s
+                }
+            }
+        }
+
         let start = Instant::now();
         let time = program_start.elapsed().as_secs_f32();
 
-        angle += 0.02;
-        let radius = 2.5;
+        let radius = -2.5;
         camera_uniform.update_view_proj(
-            glam::vec3(angle.sin() * radius, 0.8, angle.cos() * radius),
+            glam::vec3(0.0, 0.8, radius), // Camera directly in front
             glam::vec3(0.0, 0.8, 0.0),
             WIDTH as f32 / HEIGHT as f32,
         );
         queue.write_buffer(&camera_buffer, 0, bytemuck::cast_slice(&[camera_uniform]));
+
+        let target_tilt_z = (velocity_x * -0.015).clamp(-0.5, 0.5);
+        let target_tilt_x = (velocity_y * -0.015).clamp(-0.5, 0.5);
+        drag_tilt_z += (target_tilt_z - drag_tilt_z) * 0.15;
+        drag_tilt_x += (target_tilt_x - drag_tilt_x) * 0.15;
 
         // Skeletal animation
         if let Some(m) = model.as_mut() {
@@ -357,9 +422,9 @@ async fn run_engine(sender: SyncSender<Vec<u8>>) {
                     .contains("spine")
             }) {
                 let base = m.nodes[spine_idx].base_transform;
-                // Breathing / swaying motion
-                let rot = glam::Mat4::from_rotation_z((time * 2.0).sin() * 0.05)
-                    * glam::Mat4::from_rotation_x((time * 1.5).sin() * 0.05);
+                // Breathing / swaying motion + drag physics
+                let rot = glam::Mat4::from_rotation_z((time * 2.0).sin() * 0.05 + drag_tilt_z)
+                    * glam::Mat4::from_rotation_x((time * 1.5).sin() * 0.05 + drag_tilt_x);
                 m.nodes[spine_idx].local_transform = base * rot;
             }
 
@@ -376,10 +441,51 @@ async fn run_engine(sender: SyncSender<Vec<u8>>) {
                         .contains("neck")
             }) {
                 let base = m.nodes[head_idx].base_transform;
-                // Look around slowly
-                let rot = glam::Mat4::from_rotation_y((time * 0.8).sin() * 0.3)
+
+                let mut head_rot = glam::Mat4::from_rotation_y((time * 0.8).sin() * 0.3)
                     * glam::Mat4::from_rotation_x((time * 1.2).cos() * 0.15);
-                m.nodes[head_idx].local_transform = base * rot;
+
+                let mut target_nod = 0.0;
+                let mut target_shake = 0.0;
+
+                if current_state == PetState::TouchHead {
+                    // Nodding animation
+                    target_nod = (state_timer * 10.0_f32).sin() * 0.3;
+                } else if current_state == PetState::TouchBody {
+                    // Shake head
+                    target_shake = (state_timer * 15.0_f32).sin() * 0.4;
+                }
+
+                current_nod += (target_nod - current_nod) * 0.15;
+                current_shake += (target_shake - current_shake) * 0.15;
+
+                head_rot = glam::Mat4::from_rotation_x(current_nod)
+                    * glam::Mat4::from_rotation_y(current_shake)
+                    * head_rot;
+
+                m.nodes[head_idx].local_transform = base * head_rot;
+            }
+
+            // Fix T-pose by putting arms down
+            // Node names usually vary, we'll check common ones
+            let arms = [
+                (
+                    vec!["upper arm_l", "leftupperarm", "arm_l"],
+                    glam::Mat4::from_rotation_z(1.2),
+                ),
+                (
+                    vec!["upper arm_r", "rightupperarm", "arm_r"],
+                    glam::Mat4::from_rotation_z(-1.2),
+                ),
+            ];
+            for (names, rot) in arms {
+                if let Some(idx) = m.nodes.iter().position(|n| {
+                    let node_name = n.name.as_deref().unwrap_or("").to_lowercase();
+                    names.iter().any(|&name| node_name.contains(name))
+                }) {
+                    let base = m.nodes[idx].base_transform;
+                    m.nodes[idx].local_transform = base * rot;
+                }
             }
 
             let mut global_transforms = vec![glam::Mat4::IDENTITY; m.nodes.len()];
@@ -519,6 +625,17 @@ async fn run_engine(sender: SyncSender<Vec<u8>>) {
         }
 
         let elapsed = start.elapsed();
+        let dt = elapsed.as_secs_f32().max(0.016);
+        if state_timer > 0.0 {
+            state_timer -= dt;
+            if state_timer <= 0.0 {
+                current_state = PetState::Idle;
+            }
+        }
+
+        velocity_x *= 0.8; // friction/decay
+        velocity_y *= 0.8;
+
         if elapsed < target_frametime {
             std::thread::sleep(target_frametime - elapsed);
         }

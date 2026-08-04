@@ -3,9 +3,34 @@ mod model;
 mod view;
 
 use gpui::*;
+use serde::{Deserialize, Serialize};
 use widget_core::{AppConfig, Plugin};
 
 use view::PetWidget;
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct PetConfig {
+    #[serde(default = "default_model_path")]
+    pub model_path: String,
+    #[serde(default = "default_fps")]
+    pub fps: u32,
+}
+
+fn default_model_path() -> String {
+    "plugins/pet/assets/nina/Nina_close.vrm".to_string()
+}
+fn default_fps() -> u32 {
+    30
+}
+
+impl Default for PetConfig {
+    fn default() -> Self {
+        Self {
+            model_path: default_model_path(),
+            fps: default_fps(),
+        }
+    }
+}
 
 pub struct PetPlugin;
 
