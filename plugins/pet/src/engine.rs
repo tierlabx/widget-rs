@@ -1,4 +1,4 @@
-use std::sync::mpsc::Sender;
+use std::sync::mpsc::SyncSender;
 use std::time::{Duration, Instant};
 use wgpu::util::DeviceExt;
 
@@ -30,14 +30,14 @@ impl CameraUniform {
 pub struct PetEngine;
 
 impl PetEngine {
-    pub fn start(sender: Sender<Vec<u8>>) {
+    pub fn start(sender: SyncSender<Vec<u8>>) {
         std::thread::spawn(move || {
             pollster::block_on(run_engine(sender));
         });
     }
 }
 
-async fn run_engine(sender: Sender<Vec<u8>>) {
+async fn run_engine(sender: SyncSender<Vec<u8>>) {
     let instance = wgpu::Instance::default();
     let adapter = instance
         .request_adapter(&wgpu::RequestAdapterOptions {

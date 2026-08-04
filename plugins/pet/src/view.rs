@@ -2,7 +2,7 @@ use crate::engine::{PetEngine, HEIGHT, WIDTH};
 use gpui::*;
 use image::{Frame, RgbaImage};
 use smallvec::SmallVec;
-use std::sync::mpsc::{channel, Receiver};
+use std::sync::mpsc::{sync_channel, Receiver};
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -51,7 +51,7 @@ impl PetWidget {
                             }
                         } else {
                             if this.engine_rx.is_none() {
-                                let (tx, rx) = channel();
+                                let (tx, rx) = sync_channel(2);
                                 PetEngine::start(tx);
                                 this.engine_rx = Some(rx);
                             }
