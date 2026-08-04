@@ -13,12 +13,22 @@ pub struct Store {
 impl Store {
     /// 创建一个新的 Store 实例，并初始化配置文件路径
     pub fn new() -> Self {
-        let mut config_dir = std::env::current_exe().expect("无法获取可执行文件路径");
-        config_dir.pop();
+        let config_path = if let Some(proj_dirs) =
+            directories::ProjectDirs::from("com", "tierlabx", "widget-rs")
+        {
+            let config_dir = proj_dirs.config_dir();
+            if !config_dir.exists() {
+                let _ = fs::create_dir_all(config_dir);
+            }
+            config_dir.join("config.json")
+        } else {
+            // 后备方案：如果获取不到系统的 AppData 目录，则回退到可执行文件同级目录
+            let mut fallback = std::env::current_exe().expect("无法获取可执行文件路径");
+            fallback.pop();
+            fallback.join("config.json")
+        };
 
-        Self {
-            config_path: config_dir.join("config.json"),
-        }
+        Self { config_path }
     }
 
     /// 加载配置，如果文件不存在或读取失败，则返回默认配置

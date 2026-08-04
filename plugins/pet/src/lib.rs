@@ -17,7 +17,7 @@ pub struct PetConfig {
 }
 
 fn default_model_path() -> String {
-    "plugins/pet/assets/nina/Nina_close.vrm".to_string()
+    "default".to_string()
 }
 fn default_fps() -> u32 {
     30

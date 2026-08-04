@@ -88,11 +88,15 @@ pub fn load_model_from_path(
     layout: &wgpu::BindGroupLayout,
     path: &str,
 ) -> Option<Model> {
-    if !std::path::Path::new(path).exists() {
-        println!("Model file not found: {}", path);
-        return None;
-    }
-    let (gltf, buffers, images) = gltf::import(path).ok()?;
+    let (gltf, buffers, images) = if path == "default" {
+        gltf::import_slice(include_bytes!("../assets/nina/Nina_close.vrm")).ok()?
+    } else {
+        if !std::path::Path::new(path).exists() {
+            println!("Model file not found: {}", path);
+            return None;
+        }
+        gltf::import(path).ok()?
+    };
 
     let mut materials = Vec::new();
 
