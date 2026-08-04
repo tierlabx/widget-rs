@@ -73,6 +73,45 @@ unsafe extern "system" fn plugin_wnd_proc(
         }
     }
 
+    if msg == windows_sys::Win32::UI::WindowsAndMessaging::WM_MOUSEACTIVATE {
+        unsafe {
+            windows_sys::Win32::UI::WindowsAndMessaging::SetWindowLongPtrW(
+                hwnd,
+                windows_sys::Win32::UI::WindowsAndMessaging::GWLP_HWNDPARENT,
+                0,
+            );
+        }
+    } else if msg == windows_sys::Win32::UI::WindowsAndMessaging::WM_ACTIVATE {
+        let state = wparam & 0xFFFF;
+        if state == windows_sys::Win32::UI::WindowsAndMessaging::WA_INACTIVE as usize {
+            unsafe {
+                let class_name: [u16; 8] = [
+                    'P' as u16, 'r' as u16, 'o' as u16, 'g' as u16, 'm' as u16, 'a' as u16,
+                    'n' as u16, 0,
+                ];
+                let progman = windows_sys::Win32::UI::WindowsAndMessaging::FindWindowW(
+                    class_name.as_ptr(),
+                    std::ptr::null(),
+                );
+                if progman != 0 {
+                    windows_sys::Win32::UI::WindowsAndMessaging::SetWindowLongPtrW(
+                        hwnd,
+                        windows_sys::Win32::UI::WindowsAndMessaging::GWLP_HWNDPARENT,
+                        progman,
+                    );
+                }
+            }
+        } else {
+            unsafe {
+                windows_sys::Win32::UI::WindowsAndMessaging::SetWindowLongPtrW(
+                    hwnd,
+                    windows_sys::Win32::UI::WindowsAndMessaging::GWLP_HWNDPARENT,
+                    0,
+                );
+            }
+        }
+    }
+
     let res = windows_sys::Win32::UI::WindowsAndMessaging::CallWindowProcW(
         Some(old_proc_fn),
         hwnd,
@@ -334,6 +373,19 @@ fn main() {
                             GWLP_WNDPROC, GWL_STYLE, SWP_FRAMECHANGED, SWP_NOMOVE, SWP_NOSIZE,
                             SWP_NOZORDER, WS_BORDER, WS_CAPTION, WS_THICKFRAME,
                         };
+
+                        let ex_style = GetWindowLongW(
+                            *hwnd,
+                            windows_sys::Win32::UI::WindowsAndMessaging::GWL_EXSTYLE,
+                        );
+                        SetWindowLongW(
+                            *hwnd,
+                            windows_sys::Win32::UI::WindowsAndMessaging::GWL_EXSTYLE,
+                            ex_style
+                                | windows_sys::Win32::UI::WindowsAndMessaging::WS_EX_TOOLWINDOW
+                                    as i32,
+                        );
+
                         let style = GetWindowLongW(*hwnd, GWL_STYLE);
                         SetWindowLongW(
                             *hwnd,
@@ -391,7 +443,10 @@ fn main() {
                                     GetWindowLongW, SetWindowLongW, GWL_EXSTYLE, WS_EX_LAYERED,
                                     WS_EX_TRANSPARENT,
                                 };
-                                let style = GetWindowLongW(*hwnd, GWL_EXSTYLE);
+                                let style = GetWindowLongW(
+                                    *hwnd,
+                                    windows_sys::Win32::UI::WindowsAndMessaging::GWL_EXSTYLE,
+                                );
                                 SetWindowLongW(
                                     *hwnd,
                                     GWL_EXSTYLE,

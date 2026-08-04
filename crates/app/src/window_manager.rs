@@ -4,9 +4,7 @@ use widget_core::{AppConfig, PluginConfig};
 use widget_ui::main_window::MainWindow;
 
 use crate::store::Store;
-use windows_sys::Win32::UI::WindowsAndMessaging::{
-    FindWindowW, SetWindowLongPtrW, ShowWindow, GWLP_HWNDPARENT,
-};
+use windows_sys::Win32::UI::WindowsAndMessaging::{SetWindowLongPtrW, ShowWindow, GWLP_HWNDPARENT};
 
 /// 窗口管理器
 ///
@@ -286,18 +284,29 @@ impl WindowManager {
             return;
         }
         unsafe {
-            // "Progman" 的 UTF-16 编码
-            let class_name: [u16; 8] = [
-                'P' as u16, 'r' as u16, 'o' as u16, 'g' as u16, 'm' as u16, 'a' as u16, 'n' as u16,
-                0,
+            // Create a dummy hidden owner window for EACH widget to prevent Win+D while avoiding Z-order grouping
+            let class_name: [u16; 7] = [
+                'S' as u16, 'T' as u16, 'A' as u16, 'T' as u16, 'I' as u16, 'C' as u16, 0,
             ];
-            let progman = FindWindowW(class_name.as_ptr(), std::ptr::null());
-            if progman != 0 {
-                // 在 64 位系统上，GWLP_HWNDPARENT 用于设置 Owner
-                SetWindowLongPtrW(hwnd, GWLP_HWNDPARENT, progman);
+            let owner = windows_sys::Win32::UI::WindowsAndMessaging::CreateWindowExW(
+                windows_sys::Win32::UI::WindowsAndMessaging::WS_EX_TOOLWINDOW,
+                class_name.as_ptr(),
+                std::ptr::null(),
+                windows_sys::Win32::UI::WindowsAndMessaging::WS_POPUP,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                std::ptr::null(),
+            );
+            if owner != 0 {
+                SetWindowLongPtrW(hwnd, GWLP_HWNDPARENT, owner);
                 println!(
-                    "[WindowManager] 已将 HWND {} 附加到桌面 (Progman: {})",
-                    hwnd, progman
+                    "[WindowManager] 已将 HWND {} 附加到独立隐藏 Owner: {}",
+                    hwnd, owner
                 );
             }
         }
