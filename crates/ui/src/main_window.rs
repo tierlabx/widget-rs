@@ -535,8 +535,8 @@ impl MainWindow {
                 .show_dot(true)
         };
 
-        let preview = if kind == 0 {
-            div()
+        let preview = match plugin_id {
+            "sticky_widget" => div()
                 .flex()
                 .flex_col()
                 .w_full()
@@ -551,9 +551,8 @@ impl MainWindow {
                         .text_sm()
                         .text_color(rgb(0x78350f))
                         .child("这是一个便签示例..."),
-                )
-        } else {
-            div()
+                ),
+            "todo_widget" => div()
                 .flex()
                 .flex_col()
                 .w_full()
@@ -603,7 +602,25 @@ impl MainWindow {
                                 .text_color(rgb(0xf2f2f2))
                                 .child("完成项目设计"),
                         ),
-                )
+                ),
+            _ => div()
+                .flex()
+                .flex_col()
+                .items_center()
+                .justify_center()
+                .w_full()
+                .h_full()
+                .p(px(12.0))
+                .rounded(px(6.0))
+                .bg(rgb(0x050507))
+                .border_1()
+                .border_color(rgba(0x3d3a3940))
+                .child(
+                    div()
+                        .text_sm()
+                        .text_color(rgb(0x8b949e))
+                        .child("桌面宠物 3D 渲染中..."),
+                ),
         };
 
         Card::new()

@@ -1,4 +1,5 @@
 mod engine;
+mod model;
 mod view;
 
 use gpui::*;

@@ -22,3 +22,5 @@ futures = "0.3"
 pollster = "0.3"
 bytemuck = { version = "1.14", features = ["derive"] }
 smallvec = "1.11"
+gltf = "1.4"
+glam = "0.27"
