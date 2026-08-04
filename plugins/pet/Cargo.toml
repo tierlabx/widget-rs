@@ -1,0 +1,24 @@
+[package]
+name = "pet_plugin"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+crate-type = ["rlib"]
+
+[dependencies]
+gpui.workspace = true
+gpui-component.workspace = true
+raw-window-handle.workspace = true
+widget-core.workspace = true
+windows-sys = { workspace = true, features = ["Win32_UI_WindowsAndMessaging", "Win32_UI_Input_KeyboardAndMouse"] }
+serde = { workspace = true, features = ["derive"] }
+serde_json.workspace = true
+
+# Rendering
+wgpu = "0.19"
+image = "0.25.10"
+futures = "0.3"
+pollster = "0.3"
+bytemuck = { version = "1.14", features = ["derive"] }
+smallvec = "1.11"

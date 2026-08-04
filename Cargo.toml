@@ -11,6 +11,7 @@ gpui = "0.2.2"
 gpui-component = "0.5.1"
 sticky_plugin = { path = "plugins/sticky" }
 todo_plugin = { path = "plugins/todo" }
+pet_plugin = { path = "plugins/pet" }
 widget-core = { path = "crates/core" }
 widget-ui = { path = "crates/ui" }
 
