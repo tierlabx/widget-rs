@@ -103,13 +103,7 @@ impl Render for PetWidget {
                         .object_fit(ObjectFit::Contain),
                 )
         } else {
-            div()
-                .size_full()
-                .flex()
-                .items_center()
-                .justify_center()
-                .bg(gpui::rgb(0xff0000))
-                .child("Wait for pet...")
+            div().size_full()
         }
     }
 }
