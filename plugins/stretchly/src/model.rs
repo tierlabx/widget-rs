@@ -55,8 +55,9 @@ fn today_date_string() -> String {
     format!("{:04}-{:02}-{:02}", y, m, d)
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub enum BreakState {
+    #[default]
     Working,
     MiniBreak,
     LongBreak,

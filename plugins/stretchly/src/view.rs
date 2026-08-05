@@ -7,31 +7,25 @@ use crate::model::{BreakState, StretchlyConfig, StretchlyModel};
 use crate::tips::current_tip;
 use widget_core::AppConfig;
 
-struct OriginalBounds {
-    x: i32,
-    y: i32,
-    w: i32,
-    h: i32,
-}
-
 // ══════════════════════════════════════════════════════════════════════
-// 副屏遮罩：休息开始时在每块非主显示器上各创建一个同色覆盖层
+// BreakOverlay — 每块显示器各一个独立全屏窗口，负责完整的休息 UI
 // ══════════════════════════════════════════════════════════════════════
 
-struct SecondaryOverlay {
+struct BreakOverlay {
     /// 是否已完成首次全屏定位
     positioned: bool,
+    /// 此覆盖窗口是否是主屏（主屏显示完整休息 UI，副屏只显示背景色）
+    is_primary: bool,
 }
 
-impl Render for SecondaryOverlay {
+impl Render for BreakOverlay {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         // 首次渲染：用 SetWindowPos 覆盖本显示器全屏
         if !self.positioned {
             self.positioned = true;
             if let Ok(h) = window.window_handle() {
                 if let raw_window_handle::RawWindowHandle::Win32(h) = h.as_raw() {
-                    let hwnd = h.hwnd.get();
-                    secondary_enter_fullscreen(hwnd);
+                    fullscreen_on_own_monitor(h.hwnd.get());
                 }
             }
         }
@@ -49,12 +43,201 @@ impl Render for SecondaryOverlay {
                 }
             }
         }
-        div().size_full().bg(rgba(0x02050eb0u32))
+
+        // 副屏只显示背景色
+        if !self.is_primary {
+            return div().size_full().bg(rgba(0x02050eb0u32));
+        }
+
+        // ── 从全局快照读取渲染数据（无跨 Entity 借用风险）─────────────────────────────
+        let snap = cx
+            .try_global::<crate::StretchlyBreakSnapshot>()
+            .cloned()
+            .unwrap_or_default();
+
+        let accent_color = if snap.is_mini {
+            rgb(0x34d399u32)
+        } else {
+            rgb(0xa78bfau32)
+        };
+        let accent_bg = if snap.is_mini {
+            rgba(0x34d39920u32)
+        } else {
+            rgba(0xa78bfa20u32)
+        };
+
+        div()
+            .size_full()
+            .bg(rgba(0x02050eb0u32))
+            .flex()
+            .flex_col()
+            .items_center()
+            .justify_center()
+            .child(
+                div()
+                    .absolute()
+                    .w(px(600.0))
+                    .h(px(600.0))
+                    .rounded(px(300.0))
+                    .bg(rgba(0x0d1f3510u32))
+                    .flex_shrink_0(),
+            )
+            .child(
+                div()
+                    .w(px(560.0))
+                    .flex()
+                    .flex_col()
+                    .items_center()
+                    .gap(px(20.0))
+                    .px(px(48.0))
+                    .py(px(44.0))
+                    .bg(rgba(0xffffff09u32))
+                    .rounded(px(28.0))
+                    .border_1()
+                    .border_color(rgba(0xffffff0du32))
+                    // 标题区
+                    .child(
+                        div().flex().flex_col().items_center().gap(px(6.0)).child(
+                            div()
+                                .flex()
+                                .items_center()
+                                .gap(px(8.0))
+                                .px(px(14.0))
+                                .py(px(5.0))
+                                .bg(accent_bg)
+                                .rounded(px(20.0))
+                                .child(
+                                    div()
+                                        .text_sm()
+                                        .font_weight(FontWeight::BOLD)
+                                        .text_color(accent_color)
+                                        .child(snap.break_label),
+                                )
+                                .child(
+                                    div()
+                                        .text_sm()
+                                        .text_color(rgba(0xc8d4f070u32))
+                                        .child(format!("· {}", snap.break_duration_label)),
+                                ),
+                        ),
+                    )
+                    // 大号倒计时
+                    .child(
+                        div()
+                            .flex()
+                            .flex_col()
+                            .items_center()
+                            .gap(px(12.0))
+                            .child(
+                                div()
+                                    .text_3xl()
+                                    .font_weight(FontWeight::BOLD)
+                                    .text_color(rgb(0xf1f5f9u32))
+                                    .child(snap.time_str.clone()),
+                            )
+                            .child(
+                                div()
+                                    .w(px(280.0))
+                                    .h(px(5.0))
+                                    .rounded(px(3.0))
+                                    .bg(rgba(0xffffff10u32))
+                                    .child(
+                                        div()
+                                            .h_full()
+                                            .rounded(px(3.0))
+                                            .bg(accent_color)
+                                            .w(relative(snap.progress)),
+                                    ),
+                            ),
+                    )
+                    // 休息建议
+                    .child(
+                        div()
+                            .w_full()
+                            .px(px(16.0))
+                            .py(px(14.0))
+                            .bg(rgba(0xffffff07u32))
+                            .rounded(px(12.0))
+                            .border_1()
+                            .border_color(rgba(0xffffff0au32))
+                            .flex()
+                            .flex_col()
+                            .items_center()
+                            .gap(px(6.0))
+                            .child(
+                                div()
+                                    .text_xs()
+                                    .text_color(rgba(0x94a3b860u32))
+                                    .font_weight(FontWeight::MEDIUM)
+                                    .child("休息建议"),
+                            )
+                            .child(
+                                div()
+                                    .text_sm()
+                                    .text_color(rgba(0xcbd5e1b0u32))
+                                    .text_center()
+                                    .child(snap.tip.clone()),
+                            ),
+                    )
+                    .child(div().w_full().h(px(1.0)).bg(rgba(0xffffff0au32)))
+                    // 按钮行
+                    .child(
+                        div()
+                            .flex()
+                            .items_center()
+                            .justify_center()
+                            .gap(px(10.0))
+                            // 推迟
+                            .child(
+                                div()
+                                    .px(px(18.0))
+                                    .py(px(9.0))
+                                    .rounded(px(8.0))
+                                    .bg(rgba(0xffffff0cu32))
+                                    .hover(|s| s.bg(rgba(0xffffff18u32)))
+                                    .cursor_pointer()
+                                    .text_sm()
+                                    .text_color(rgba(0xc8d4f0a0u32))
+                                    .id("postpone-break-btn")
+                                    .on_click(cx.listener(|_, _: &ClickEvent, _, cx| {
+                                        cx.set_global(crate::StretchlyOverlayRequest(Some(
+                                            crate::StretchlyOverlayAction::Postpone,
+                                        )));
+                                    }))
+                                    .child(format!("推迟 {} 分钟", snap.postpone_mins)),
+                            )
+                            // 结束休息
+                            .child(
+                                div()
+                                    .px(px(18.0))
+                                    .py(px(9.0))
+                                    .rounded(px(8.0))
+                                    .text_sm()
+                                    .font_weight(FontWeight::MEDIUM)
+                                    .id("skip-break-btn")
+                                    .when(snap.skip_available, |d| {
+                                        d.bg(accent_bg)
+                                            .hover(|s| s.bg(rgba(0x34d39930u32)))
+                                            .cursor_pointer()
+                                            .text_color(accent_color)
+                                            .on_click(cx.listener(|_, _: &ClickEvent, _, cx| {
+                                                cx.set_global(crate::StretchlyOverlayRequest(
+                                                    Some(crate::StretchlyOverlayAction::Skip),
+                                                ));
+                                            }))
+                                    })
+                                    .when(!snap.skip_available, |d| {
+                                        d.bg(rgba(0xffffff08u32)).text_color(rgba(0xffffff35u32))
+                                    })
+                                    .child(snap.skip_label.clone()),
+                            ),
+                    ),
+            )
     }
 }
 
-/// 将副屏窗口全屏铺满其所在显示器（含 +8px 扩展消除缝隙）
-fn secondary_enter_fullscreen(hwnd: isize) {
+/// 将窗口全屏铺满其所在显示器（含 +8px 扩展消除缝隙）
+fn fullscreen_on_own_monitor(hwnd: isize) {
     unsafe {
         use windows_sys::Win32::Graphics::Gdi::{
             GetMonitorInfoW, MonitorFromWindow, MONITORINFO, MONITOR_DEFAULTTONEAREST,
@@ -80,8 +263,9 @@ fn secondary_enter_fullscreen(hwnd: isize) {
     }
 }
 
-/// 枚举除 widget_hwnd 所在显示器以外的所有显示器坐标
-fn get_secondary_monitor_rects(widget_hwnd: isize) -> Vec<(i32, i32, i32, i32)> {
+/// 枚举所有显示器的坐标，返回 (x, y, w, h, is_primary)
+/// is_primary = 该显示器是否是 widget_hwnd 所在的显示器
+fn get_all_monitor_rects(widget_hwnd: isize) -> Vec<(i32, i32, i32, i32, bool)> {
     unsafe {
         use windows_sys::Win32::Foundation::{BOOL, RECT};
         use windows_sys::Win32::Graphics::Gdi::{
@@ -93,7 +277,7 @@ fn get_secondary_monitor_rects(widget_hwnd: isize) -> Vec<(i32, i32, i32, i32)> 
 
         struct State {
             widget_mon: isize,
-            rects: Vec<(i32, i32, i32, i32)>,
+            rects: Vec<(i32, i32, i32, i32, bool)>,
         }
         let mut state = State {
             widget_mon,
@@ -107,14 +291,18 @@ fn get_secondary_monitor_rects(widget_hwnd: isize) -> Vec<(i32, i32, i32, i32)> 
             lparam: isize,
         ) -> BOOL {
             let s = &mut *(lparam as *mut State);
-            if hmon != s.widget_mon {
-                let mut info: MONITORINFO = std::mem::zeroed();
-                info.cbSize = std::mem::size_of::<MONITORINFO>() as u32;
-                GetMonitorInfoW(hmon, &mut info as *mut _);
-                let r = info.rcMonitor;
-                s.rects
-                    .push((r.left, r.top, r.right - r.left, r.bottom - r.top));
-            }
+            let mut info: MONITORINFO = std::mem::zeroed();
+            info.cbSize = std::mem::size_of::<MONITORINFO>() as u32;
+            GetMonitorInfoW(hmon, &mut info as *mut _);
+            let r = info.rcMonitor;
+            let is_primary = hmon == s.widget_mon;
+            s.rects.push((
+                r.left,
+                r.top,
+                r.right - r.left,
+                r.bottom - r.top,
+                is_primary,
+            ));
             1
         }
 
@@ -133,9 +321,10 @@ pub struct StretchlyWidget {
     /// P2: 追踪预警状态变化，用于触发一次性通知
     prev_warning: bool,
     model: StretchlyModel,
-    original_bounds: Option<OriginalBounds>,
     /// 当前休息阶段的开始时刻（用于计算跳过延迟）
     break_started_at: Option<Instant>,
+    /// 缓存最后一次从 render() 取到的 HWND，供 timer 使用
+    cached_hwnd: isize,
     _timer: gpui::Task<()>,
 }
 
@@ -157,6 +346,20 @@ impl StretchlyWidget {
                     .await;
                 let res = async_cx.update(|cx| {
                     let _ = this.update(cx, |this, cx| {
+                        // ── 处理 BreakOverlay 按钮回调请求 ────────────────────────────────
+                        if let Some(req) = cx
+                            .try_global::<crate::StretchlyOverlayRequest>()
+                            .and_then(|r| r.0.clone())
+                        {
+                            // 先清除请求，再执行，避免重入
+                            cx.set_global(crate::StretchlyOverlayRequest(None));
+                            match req {
+                                crate::StretchlyOverlayAction::Skip => this.model.skip(),
+                                crate::StretchlyOverlayAction::Postpone => {
+                                    this.model.skip_and_postpone()
+                                }
+                            }
+                        }
                         // 热更新配置：排队，在下次状态切换时才真正生效
                         if let Some(cfg) = cx.try_global::<AppConfig>() {
                             if let Some(new_cfg) =
@@ -176,6 +379,112 @@ impl StretchlyWidget {
                         this.model.tick();
                         // P3: 将最新统计同步到全局，供设置页读取
                         cx.set_global(crate::StretchlyLiveStats(this.model.stats.clone()));
+
+                        // ── 状态切换：在 tick 回调里执行，避免在 render() 里调用 cx.open_window ──
+                        let is_on_break = this.model.is_on_break();
+                        if this.was_working != !is_on_break {
+                            this.was_working = !is_on_break;
+                            let hwnd = this.cached_hwnd;
+                            if is_on_break {
+                                cx.set_global(crate::StretchlyBreakActive(true));
+                                this.break_started_at = Some(Instant::now());
+                                // 隐藏小组件窗口（避免与全屏遮罩重叠）
+                                if hwnd != 0 {
+                                    unsafe {
+                                        use windows_sys::Win32::UI::WindowsAndMessaging::{
+                                            ShowWindow, SW_HIDE,
+                                        };
+                                        ShowWindow(hwnd, SW_HIDE);
+                                    }
+                                }
+                                // 为每块显示器创建独立的 BreakOverlay 窗口
+                                for (x, y, w, h, is_primary) in get_all_monitor_rects(hwnd) {
+                                    let _ = cx.open_window(
+                                        WindowOptions {
+                                            titlebar: None,
+                                            window_background:
+                                                WindowBackgroundAppearance::Transparent,
+                                            kind: WindowKind::PopUp,
+                                            is_resizable: false,
+                                            window_bounds: Some(WindowBounds::Windowed(
+                                                Bounds::new(
+                                                    Point::new(px(x as f32), px(y as f32)),
+                                                    size(px(w as f32), px(h as f32)),
+                                                ),
+                                            )),
+                                            ..Default::default()
+                                        },
+                                        move |window, cx| {
+                                            let view = cx.new(|_| BreakOverlay {
+                                                positioned: false,
+                                                is_primary,
+                                            });
+                                            cx.new(|cx| gpui_component::Root::new(view, window, cx))
+                                        },
+                                    );
+                                }
+                            } else {
+                                cx.set_global(crate::StretchlyBreakActive(false));
+                                this.break_started_at = None;
+                                // 恢复显示小组件窗口
+                                if hwnd != 0 {
+                                    unsafe {
+                                        use windows_sys::Win32::UI::WindowsAndMessaging::{
+                                            ShowWindow, SW_SHOWNA,
+                                        };
+                                        ShowWindow(hwnd, SW_SHOWNA);
+                                    }
+                                }
+                            }
+                        }
+
+                        // ── 每次 tick 发布最新快照供 BreakOverlay 渲染 ────────────────────────────
+                        if this.model.is_on_break() {
+                            let remaining = this.model.time_remaining();
+                            let rem_mins = remaining.as_secs() / 60;
+                            let rem_secs = remaining.as_secs() % 60;
+                            let time_str = format!("{:02}:{:02}", rem_mins, rem_secs);
+                            let skip_delay = this.model.config.skip_delay_seconds;
+                            let break_elapsed_secs = this
+                                .break_started_at
+                                .map(|t| t.elapsed().as_secs())
+                                .unwrap_or(0);
+                            let skip_available = break_elapsed_secs >= skip_delay;
+                            let skip_countdown = skip_delay.saturating_sub(break_elapsed_secs);
+                            let (is_mini, break_label, break_duration_label) = match this
+                                .model
+                                .state
+                            {
+                                BreakState::MiniBreak => (
+                                    true,
+                                    "微休",
+                                    format!("{} 秒", this.model.config.mini_break_duration),
+                                ),
+                                BreakState::LongBreak => (
+                                    false,
+                                    "长休",
+                                    format!("{} 分钟", this.model.config.long_break_duration / 60),
+                                ),
+                                BreakState::Working => (true, "", String::new()),
+                            };
+                            cx.set_global(crate::StretchlyBreakSnapshot {
+                                state: this.model.state,
+                                time_str,
+                                progress: this.model.progress(),
+                                break_label,
+                                break_duration_label,
+                                is_mini,
+                                skip_available,
+                                skip_label: if skip_available {
+                                    "结束休息".to_string()
+                                } else {
+                                    format!("结束休息 ({}s)", skip_countdown)
+                                },
+                                postpone_mins: this.model.config.postpone_minutes,
+                                tip: current_tip().to_string(),
+                            });
+                        }
+
                         cx.notify();
                     });
                 });
@@ -189,90 +498,9 @@ impl StretchlyWidget {
             was_working: true,
             prev_warning: false,
             model,
-            original_bounds: None,
             break_started_at: None,
+            cached_hwnd: 0,
             _timer,
-        }
-    }
-
-    // ── Win32 窗口操作 ────────────────────────────────────────────────────────
-
-    /// 全屏覆盖小组件所在显示器（含 +8px 强制扩展，消除 DWM / GPUI 边缘缝隙）
-    fn enter_fullscreen(hwnd: isize) {
-        unsafe {
-            use windows_sys::Win32::Graphics::Gdi::{
-                GetMonitorInfoW, MonitorFromWindow, MONITORINFO, MONITOR_DEFAULTTONEAREST,
-            };
-            use windows_sys::Win32::UI::WindowsAndMessaging::{
-                SetWindowPos, HWND_TOPMOST, SWP_FRAMECHANGED, SWP_SHOWWINDOW,
-            };
-            let hmon = MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST);
-            let mut info: MONITORINFO = std::mem::zeroed();
-            info.cbSize = std::mem::size_of::<MONITORINFO>() as u32;
-            GetMonitorInfoW(hmon, &mut info as *mut _);
-            let m = info.rcMonitor;
-            // 扩展 8px 以覆盖 DWM 阴影 / GPUI 内边距导致的任何边缘空白
-            let extra = 8i32;
-            SetWindowPos(
-                hwnd,
-                HWND_TOPMOST,
-                m.left - extra,
-                m.top - extra,
-                (m.right - m.left) + extra * 2,
-                (m.bottom - m.top) + extra * 2,
-                SWP_FRAMECHANGED | SWP_SHOWWINDOW,
-            );
-        }
-    }
-
-    fn exit_fullscreen(hwnd: isize, b: &OriginalBounds) {
-        unsafe {
-            use windows_sys::Win32::UI::WindowsAndMessaging::{
-                SetWindowPos, HWND_NOTOPMOST, SWP_FRAMECHANGED, SWP_SHOWWINDOW,
-            };
-            SetWindowPos(
-                hwnd,
-                HWND_NOTOPMOST,
-                b.x,
-                b.y,
-                b.w,
-                b.h,
-                SWP_FRAMECHANGED | SWP_SHOWWINDOW,
-            );
-        }
-    }
-
-    fn get_window_bounds(hwnd: isize) -> Option<OriginalBounds> {
-        unsafe {
-            use windows_sys::Win32::Foundation::RECT;
-            use windows_sys::Win32::Graphics::Dwm::{
-                DwmGetWindowAttribute, DWMWA_EXTENDED_FRAME_BOUNDS,
-            };
-            let mut rect: RECT = std::mem::zeroed();
-            let hr = DwmGetWindowAttribute(
-                hwnd,
-                DWMWA_EXTENDED_FRAME_BOUNDS as u32,
-                &mut rect as *mut _ as *mut _,
-                std::mem::size_of::<RECT>() as u32,
-            );
-            if hr == 0 {
-                return Some(OriginalBounds {
-                    x: rect.left,
-                    y: rect.top,
-                    w: rect.right - rect.left,
-                    h: rect.bottom - rect.top,
-                });
-            }
-            use windows_sys::Win32::UI::WindowsAndMessaging::GetWindowRect;
-            if GetWindowRect(hwnd, &mut rect) != 0 {
-                return Some(OriginalBounds {
-                    x: rect.left,
-                    y: rect.top,
-                    w: rect.right - rect.left,
-                    h: rect.bottom - rect.top,
-                });
-            }
-            None
         }
     }
 
@@ -304,7 +532,7 @@ impl Render for StretchlyWidget {
             .is_some_and(|s| s.is_edit_mode);
         widget_core::update_window_edit_mode(window, is_edit_mode);
 
-        // ── 获取 HWND ────────────────────────────────────────────────────────
+        // ── 缓存 HWND 供 timer 回调使用 ─────────────────────────────────────
         let hwnd = window
             .window_handle()
             .ok()
@@ -316,51 +544,12 @@ impl Render for StretchlyWidget {
                 }
             })
             .unwrap_or(0);
-
-        // ── 状态切换：全屏 / 还原 + 副屏遮罩 ───────────────────────────────────
-        let is_on_break = self.model.is_on_break();
-        if self.was_working != !is_on_break {
-            self.was_working = !is_on_break;
-            if is_on_break {
-                if hwnd != 0 {
-                    if self.original_bounds.is_none() {
-                        self.original_bounds = Self::get_window_bounds(hwnd);
-                    }
-                    Self::enter_fullscreen(hwnd);
-                    // 多显示器：为每块副屏开启独立遮罩窗口
-                    cx.set_global(crate::StretchlyBreakActive(true));
-                    for (x, y, w, h) in get_secondary_monitor_rects(hwnd) {
-                        let _ = cx.open_window(
-                            WindowOptions {
-                                titlebar: None,
-                                window_background: WindowBackgroundAppearance::Transparent,
-                                kind: WindowKind::PopUp,
-                                is_resizable: false,
-                                window_bounds: Some(WindowBounds::Windowed(Bounds::new(
-                                    Point::new(px(x as f32), px(y as f32)),
-                                    size(px(w as f32), px(h as f32)),
-                                ))),
-                                ..Default::default()
-                            },
-                            |window, cx| {
-                                let view = cx.new(|_| SecondaryOverlay { positioned: false });
-                                cx.new(|cx| gpui_component::Root::new(view, window, cx))
-                            },
-                        );
-                    }
-                }
-                self.break_started_at = Some(Instant::now());
-            } else {
-                if hwnd != 0 {
-                    if let Some(ref b) = self.original_bounds {
-                        Self::exit_fullscreen(hwnd, b);
-                    }
-                }
-                // 通知副屏遮罩窗口关闭自身
-                cx.set_global(crate::StretchlyBreakActive(false));
-                self.break_started_at = None;
-            }
+        if hwnd != 0 {
+            self.cached_hwnd = hwnd;
         }
+
+        // ── 状态切换逻辑已移至 timer tick，render() 仅读取状态 ───────────────
+        let is_on_break = self.model.is_on_break();
 
         // ── 预计算渲染数据 ────────────────────────────────────────────────────
         let remaining = self.model.time_remaining();

@@ -19,6 +19,32 @@ impl Global for StretchlyApplyNow {}
 pub struct StretchlyBreakActive(pub bool);
 impl Global for StretchlyBreakActive {}
 
+/// 每次 timer tick 更新的休息状态快照，供 BreakOverlay 渲染用
+/// 避免 BreakOverlay 在 render() 里跨 Entity 借用 StretchlyWidget
+#[derive(Clone, Default)]
+pub struct StretchlyBreakSnapshot {
+    pub state: model::BreakState,
+    pub time_str: String,
+    pub progress: f32,
+    pub break_label: &'static str,
+    pub break_duration_label: String,
+    pub is_mini: bool,
+    pub skip_available: bool,
+    pub skip_label: String,
+    pub postpone_mins: u64,
+    pub tip: String,
+}
+impl Global for StretchlyBreakSnapshot {}
+
+/// BreakOverlay 按钮回调：通知 StretchlyWidget 执行操作
+#[derive(Clone, PartialEq, Eq)]
+pub enum StretchlyOverlayAction {
+    Skip,
+    Postpone,
+}
+pub struct StretchlyOverlayRequest(pub Option<StretchlyOverlayAction>);
+impl Global for StretchlyOverlayRequest {}
+
 pub struct StretchlyWidgetPlugin;
 
 impl Plugin for StretchlyWidgetPlugin {
