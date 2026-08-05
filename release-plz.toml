@@ -21,10 +21,6 @@ release = false
 name = "widget-cli"
 release = false
 
-[[package]]
-name = "pet_plugin"
-release = false
-
 # Configure the main app crate to hold the unified changelog
 [[package]]
 name = "widget-rs"
@@ -33,4 +29,4 @@ changelog_path = "../../CHANGELOG.md"
 # Disable publishing to crates.io (we only want GitHub releases)
 publish = false
 # Include commits from all internal crates in this unified changelog
-changelog_include = ["widget-core", "widget-ui", "sticky_plugin", "todo_plugin", "widget-cli", "pet_plugin"]
+changelog_include = ["widget-core", "widget-ui", "sticky_plugin", "todo_plugin", "widget-cli"]
