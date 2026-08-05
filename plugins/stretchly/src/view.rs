@@ -12,20 +12,41 @@ use widget_core::AppConfig;
 // ══════════════════════════════════════════════════════════════════════
 
 struct BreakOverlay {
-    /// 是否已完成首次全屏定位
-    positioned: bool,
+    /// 是否已完成首次窗口样式设置
+    styled: bool,
     /// 此覆盖窗口是否是主屏（主屏显示完整休息 UI，副屏只显示背景色）
     is_primary: bool,
 }
 
 impl Render for BreakOverlay {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        // 首次渲染：用 SetWindowPos 覆盖本显示器全屏
-        if !self.positioned {
-            self.positioned = true;
+        // 首次渲染：设置窗口置顶 + 移除可拖拽标题栏（不改变位置和大小）
+        if !self.styled {
+            self.styled = true;
             if let Ok(h) = window.window_handle() {
                 if let raw_window_handle::RawWindowHandle::Win32(h) = h.as_raw() {
-                    fullscreen_on_own_monitor(h.hwnd.get());
+                    let hwnd = h.hwnd.get();
+                    unsafe {
+                        use windows_sys::Win32::UI::WindowsAndMessaging::*;
+                        // 置顶，不改变位置和大小
+                        SetWindowPos(
+                            hwnd,
+                            HWND_TOPMOST,
+                            0,
+                            0,
+                            0,
+                            0,
+                            SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE,
+                        );
+                        // 移除标题栏和边框样式，防止拖动
+                        let style = GetWindowLongW(hwnd, GWL_STYLE);
+                        SetWindowLongW(
+                            hwnd,
+                            GWL_STYLE,
+                            (style & !(WS_CAPTION as i32) & !(WS_THICKFRAME as i32))
+                                | WS_POPUP as i32,
+                        );
+                    }
                 }
             }
         }
@@ -91,10 +112,10 @@ impl Render for BreakOverlay {
                     .gap(px(20.0))
                     .px(px(48.0))
                     .py(px(44.0))
-                    .bg(rgba(0xffffff09u32))
+                    .bg(rgba(0x0a1628ccu32))
                     .rounded(px(28.0))
                     .border_1()
-                    .border_color(rgba(0xffffff0du32))
+                    .border_color(rgba(0xffffff18u32))
                     // 标题区
                     .child(
                         div().flex().flex_col().items_center().gap(px(6.0)).child(
@@ -236,33 +257,6 @@ impl Render for BreakOverlay {
     }
 }
 
-/// 将窗口全屏铺满其所在显示器（含 +8px 扩展消除缝隙）
-fn fullscreen_on_own_monitor(hwnd: isize) {
-    unsafe {
-        use windows_sys::Win32::Graphics::Gdi::{
-            GetMonitorInfoW, MonitorFromWindow, MONITORINFO, MONITOR_DEFAULTTONEAREST,
-        };
-        use windows_sys::Win32::UI::WindowsAndMessaging::{
-            SetWindowPos, HWND_TOPMOST, SWP_FRAMECHANGED, SWP_SHOWWINDOW,
-        };
-        let hmon = MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST);
-        let mut info: MONITORINFO = std::mem::zeroed();
-        info.cbSize = std::mem::size_of::<MONITORINFO>() as u32;
-        GetMonitorInfoW(hmon, &mut info as *mut _);
-        let m = info.rcMonitor;
-        let extra = 8i32;
-        SetWindowPos(
-            hwnd,
-            HWND_TOPMOST,
-            m.left - extra,
-            m.top - extra,
-            (m.right - m.left) + extra * 2,
-            (m.bottom - m.top) + extra * 2,
-            SWP_FRAMECHANGED | SWP_SHOWWINDOW,
-        );
-    }
-}
-
 /// 枚举所有显示器的坐标，返回 (x, y, w, h, is_primary)
 /// is_primary = 该显示器是否是 widget_hwnd 所在的显示器
 fn get_all_monitor_rects(widget_hwnd: isize) -> Vec<(i32, i32, i32, i32, bool)> {
@@ -380,65 +374,7 @@ impl StretchlyWidget {
                         // P3: 将最新统计同步到全局，供设置页读取
                         cx.set_global(crate::StretchlyLiveStats(this.model.stats.clone()));
 
-                        // ── 状态切换：在 tick 回调里执行，避免在 render() 里调用 cx.open_window ──
-                        let is_on_break = this.model.is_on_break();
-                        if this.was_working != !is_on_break {
-                            this.was_working = !is_on_break;
-                            let hwnd = this.cached_hwnd;
-                            if is_on_break {
-                                cx.set_global(crate::StretchlyBreakActive(true));
-                                this.break_started_at = Some(Instant::now());
-                                // 隐藏小组件窗口（避免与全屏遮罩重叠）
-                                if hwnd != 0 {
-                                    unsafe {
-                                        use windows_sys::Win32::UI::WindowsAndMessaging::{
-                                            ShowWindow, SW_HIDE,
-                                        };
-                                        ShowWindow(hwnd, SW_HIDE);
-                                    }
-                                }
-                                // 为每块显示器创建独立的 BreakOverlay 窗口
-                                for (x, y, w, h, is_primary) in get_all_monitor_rects(hwnd) {
-                                    let _ = cx.open_window(
-                                        WindowOptions {
-                                            titlebar: None,
-                                            window_background:
-                                                WindowBackgroundAppearance::Transparent,
-                                            kind: WindowKind::PopUp,
-                                            is_resizable: false,
-                                            window_bounds: Some(WindowBounds::Windowed(
-                                                Bounds::new(
-                                                    Point::new(px(x as f32), px(y as f32)),
-                                                    size(px(w as f32), px(h as f32)),
-                                                ),
-                                            )),
-                                            ..Default::default()
-                                        },
-                                        move |window, cx| {
-                                            let view = cx.new(|_| BreakOverlay {
-                                                positioned: false,
-                                                is_primary,
-                                            });
-                                            cx.new(|cx| gpui_component::Root::new(view, window, cx))
-                                        },
-                                    );
-                                }
-                            } else {
-                                cx.set_global(crate::StretchlyBreakActive(false));
-                                this.break_started_at = None;
-                                // 恢复显示小组件窗口
-                                if hwnd != 0 {
-                                    unsafe {
-                                        use windows_sys::Win32::UI::WindowsAndMessaging::{
-                                            ShowWindow, SW_SHOWNA,
-                                        };
-                                        ShowWindow(hwnd, SW_SHOWNA);
-                                    }
-                                }
-                            }
-                        }
-
-                        // ── 每次 tick 发布最新快照供 BreakOverlay 渲染 ────────────────────────────
+                        // ── 先发布快照，确保 BreakOverlay 首次渲染即有数据 ──────────────────────
                         if this.model.is_on_break() {
                             let remaining = this.model.time_remaining();
                             let rem_mins = remaining.as_secs() / 60;
@@ -483,6 +419,72 @@ impl StretchlyWidget {
                                 postpone_mins: this.model.config.postpone_minutes,
                                 tip: current_tip().to_string(),
                             });
+                        }
+
+                        // ── 状态切换：在 tick 回调里执行，避免在 render() 里调用 cx.open_window ──
+                        let is_on_break = this.model.is_on_break();
+                        if this.was_working != !is_on_break {
+                            this.was_working = !is_on_break;
+                            let hwnd = this.cached_hwnd;
+                            if is_on_break {
+                                cx.set_global(crate::StretchlyBreakActive(true));
+                                this.break_started_at = Some(Instant::now());
+                                // 隐藏小组件窗口（避免与全屏遮罩重叠）
+                                if hwnd != 0 {
+                                    unsafe {
+                                        use windows_sys::Win32::UI::WindowsAndMessaging::{
+                                            ShowWindow, SW_HIDE,
+                                        };
+                                        ShowWindow(hwnd, SW_HIDE);
+                                    }
+                                }
+                                // 为每块显示器创建独立的 BreakOverlay 窗口
+                                for (x, y, w, h, is_primary) in get_all_monitor_rects(hwnd) {
+                                    let _ = cx.open_window(
+                                        WindowOptions {
+                                            titlebar: None,
+                                            window_background:
+                                                WindowBackgroundAppearance::Transparent,
+                                            kind: WindowKind::PopUp,
+                                            is_resizable: false,
+                                            window_bounds: Some(WindowBounds::Windowed(
+                                                Bounds::new(
+                                                    Point::new(px(x as f32), px(y as f32)),
+                                                    size(px(w as f32), px(h as f32)),
+                                                ),
+                                            )),
+                                            ..Default::default()
+                                        },
+                                        move |_window, cx| {
+                                            cx.new(|cx| {
+                                                cx.observe_global::<crate::StretchlyBreakSnapshot>(
+                                                    |_, cx| cx.notify(),
+                                                )
+                                                .detach();
+                                                cx.observe_global::<crate::StretchlyBreakActive>(
+                                                    |_, cx| cx.notify(),
+                                                )
+                                                .detach();
+                                                BreakOverlay {
+                                                    styled: false,
+                                                    is_primary,
+                                                }
+                                            })
+                                        },
+                                    );
+                                }
+                            } else {
+                                cx.set_global(crate::StretchlyBreakActive(false));
+                                this.break_started_at = None;
+                                if hwnd != 0 {
+                                    unsafe {
+                                        use windows_sys::Win32::UI::WindowsAndMessaging::{
+                                            ShowWindow, SW_SHOWNA,
+                                        };
+                                        ShowWindow(hwnd, SW_SHOWNA);
+                                    }
+                                }
+                            }
                         }
 
                         cx.notify();
