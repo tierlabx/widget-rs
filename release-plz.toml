@@ -30,3 +30,6 @@ changelog_path = "../../CHANGELOG.md"
 publish = false
 # Include commits from all internal crates in this unified changelog
 changelog_include = ["widget-core", "widget-ui", "sticky_plugin", "todo_plugin", "widget-cli"]
+# Set custom tag and release name format to match existing tags (v0.1.2)
+git_tag_name = "v{{ version }}"
+git_release_name = "v{{ version }}"
