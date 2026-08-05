@@ -37,3 +37,13 @@ winreg = "0.56.0"
 
 [build-dependencies]
 winres.workspace = true
+
+[package.metadata.packager]
+identifier = "com.tierlabx.widget-rs"
+publisher = "tierlabx"
+before-packaging-command = "cargo build --release"
+formats = ["nsis", "msi", "dmg", "app", "deb", "appimage"]
+
+[package.metadata.packager.windows]
+# Add shortcuts for windows installer
+nsis = { create-desktop-shortcut = true, create-start-menu-shortcut = true }
