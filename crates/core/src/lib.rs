@@ -145,6 +145,10 @@ pub trait Plugin: Send + Sync {
         "官方 (内置)"
     }
 
+    fn estimated_memory(&self) -> usize {
+        0
+    }
+
     #[allow(unused_variables)]
     fn on_load(&self, cx: &mut App) {}
 
@@ -162,6 +166,7 @@ pub struct PluginMetadata {
     pub icon: gpui_component::IconName,
     pub version: &'static str,
     pub author: &'static str,
+    pub estimated_memory: usize,
 }
 
 pub struct PluginList(pub Vec<PluginMetadata>);

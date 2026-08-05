@@ -1,3 +1,5 @@
+mod db;
+mod markdown;
 mod model;
 mod view;
 
@@ -23,6 +25,11 @@ impl Plugin for StickyWidgetPlugin {
 
     fn icon(&self) -> gpui_component::IconName {
         gpui_component::IconName::File
+    }
+
+    fn estimated_memory(&self) -> usize {
+        // 便签预估内存：基础 2MB + 图片缓存预估
+        2 * 1024 * 1024
     }
 
     fn spawn_window(&self, cx: &mut App) -> AnyWindowHandle {

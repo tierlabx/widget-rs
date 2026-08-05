@@ -1,6 +1,6 @@
 use gpui::*;
 use gpui_component::input::{Input, InputEvent, InputState};
-use gpui_component::{Icon, IconName};
+use gpui_component::{Icon, IconName, InteractiveElementExt};
 use raw_window_handle::HasWindowHandle;
 
 use crate::model::StickyModel;
@@ -8,6 +8,7 @@ use crate::model::StickyModel;
 pub struct StickyWidget {
     hwnd_reported: bool,
     input: Entity<InputState>,
+    is_preview: bool,
 }
 
 impl StickyWidget {
@@ -38,6 +39,7 @@ impl StickyWidget {
         Self {
             hwnd_reported: false,
             input,
+            is_preview: true,
         }
     }
 }
@@ -135,19 +137,42 @@ impl Render for StickyWidget {
                     .w_full()
                     .bg(rgb(0xfef3c7))
                     .p(px(8.0))
+                    .id("sticky-container")
+                    .on_double_click(|_, _, cx| {
+                        cx.update_global::<widget_core::UIState, _>(|s, _| {
+                            // 仅在非排版模式下，双击切换预览/编辑
+                            if !s.is_edit_mode {
+                                // 略
+                            }
+                        });
+                    })
+                    .on_mouse_down(MouseButton::Left, move |_, _, _| {
+                        // 拦截双击事件
+                    })
                     .child(
                         div()
+                            .id("sticky-content")
                             .flex_1()
                             .w_full()
                             .h_full()
-                            .bg(rgba(0xffffffa0)) // 让便签输入框底色更白一些以示输入区
+                            .bg(if self.is_preview { rgba(0xfef3c700) } else { rgba(0xffffffa0) })
                             .border_1()
-                            .border_color(rgba(0xf59e0b20))
+                            .border_color(if self.is_preview { rgba(0x00000000) } else { rgba(0xf59e0b20) })
                             .rounded(px(4.0))
                             .p(px(8.0))
                             .text_color(rgb(0x3d2000))
-                            .hover(|s| s.border_color(rgba(0xf59e0b60))) // hover时有略深边框
-                            .child(Input::new(input).h_full().appearance(false).bordered(false)),
+                            .hover(|s| if !self.is_preview { s.border_color(rgba(0xf59e0b60)) } else { s })
+                            .on_double_click(cx.listener(|this, _, _, cx| {
+                                this.is_preview = !this.is_preview;
+                                cx.notify();
+                            }))
+                            .child(
+                                if self.is_preview {
+                                    crate::markdown::render_markdown(&input.read(cx).value().to_string()).into_any_element()
+                                } else {
+                                    Input::new(input).h_full().appearance(false).bordered(false).into_any_element()
+                                }
+                            ),
                     ),
             )
     }

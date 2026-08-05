@@ -6,7 +6,8 @@ edition = "2021"
 [dependencies]
 gpui.workspace = true
 gpui-component.workspace = true
+memory-stats = "1.2.0"
 raw-window-handle.workspace = true
 widget-core.workspace = true
-windows-sys = { workspace = true, features = ["Win32_UI_WindowsAndMessaging"] }
+windows-sys = { workspace = true, features = ["Win32_System_ProcessStatus", "Win32_System_Threading", "Win32_UI_WindowsAndMessaging"] }
 winreg = "0.56.0"

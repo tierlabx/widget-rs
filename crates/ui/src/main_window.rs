@@ -6,6 +6,48 @@ use windows_sys::Win32::UI::WindowsAndMessaging::{
     IsZoomed, SetForegroundWindow, ShowWindow, SW_HIDE,
 };
 
+fn get_private_memory_usage() -> usize {
+    #[cfg(target_os = "windows")]
+    {
+        use windows_sys::Win32::System::ProcessStatus::K32GetProcessMemoryInfo;
+        use windows_sys::Win32::System::Threading::GetCurrentProcess;
+        
+        #[allow(non_snake_case)]
+        #[repr(C)]
+        struct PROCESS_MEMORY_COUNTERS_EX2 {
+            pub cb: u32,
+            pub PageFaultCount: u32,
+            pub PeakWorkingSetSize: usize,
+            pub WorkingSetSize: usize,
+            pub QuotaPeakPagedPoolUsage: usize,
+            pub QuotaPagedPoolUsage: usize,
+            pub QuotaPeakNonPagedPoolUsage: usize,
+            pub QuotaNonPagedPoolUsage: usize,
+            pub PagefileUsage: usize,
+            pub PeakPagefileUsage: usize,
+            pub PrivateUsage: usize,
+            pub PrivateWorkingSetSize: usize,
+            pub SharedCommitUsage: u64,
+        }
+
+        unsafe {
+            let mut mem_counters: PROCESS_MEMORY_COUNTERS_EX2 = std::mem::zeroed();
+            mem_counters.cb = std::mem::size_of::<PROCESS_MEMORY_COUNTERS_EX2>() as u32;
+            if K32GetProcessMemoryInfo(
+                GetCurrentProcess(),
+                &mut mem_counters as *mut _ as *mut _,
+                mem_counters.cb,
+            ) != 0
+            {
+                return mem_counters.PrivateWorkingSetSize;
+            }
+        }
+    }
+    
+    // Fallback to memory_stats for non-Windows
+    memory_stats::memory_stats().map(|s| s.physical_mem).unwrap_or(0)
+}
+
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub enum NavPage {
     Dashboard,
@@ -285,17 +327,22 @@ impl MainWindow {
                     .try_global::<widget_core::AppConfig>()
                     .and_then(|c| c.plugins.get(meta.id))
                     .is_some_and(|p| p.mouse_passthrough);
+                
+                let estimated_memory = meta.estimated_memory;
 
-                (meta.clone(), loaded, enabled, top, pass)
+                (meta.clone(), loaded, enabled, top, pass, estimated_memory)
             })
             .collect();
 
         let total_widgets = plugins_info.len();
         let running_widgets = plugins_info
             .iter()
-            .filter(|(_, l, e, _, _)| *l && *e)
+            .filter(|(_, l, e, _, _, _)| *l && *e)
             .count();
         let stopped_widgets = total_widgets - running_widgets;
+
+        let total_mem = get_private_memory_usage();
+        let mem_str = format!("{:.1} MB", total_mem as f64 / 1024.0 / 1024.0);
 
         div()
             .id("main-scroll")
@@ -416,6 +463,14 @@ impl MainWindow {
                         rgb(0xb8b3b0),
                         rgba(0xffffff06),
                         rgba(0x3d3a3960),
+                    ))
+                    .child(self.stat_card(
+                        gpui_component::IconName::LayoutDashboard,
+                        mem_str.clone(),
+                        "主进程物理内存",
+                        rgb(0x00d992), // matching green theme
+                        rgba(0x00d9920d),
+                        rgba(0x00d99225),
                     )),
             )
             .child(
@@ -446,11 +501,12 @@ impl MainWindow {
                     )
                     .child(div().flex().w_full().gap(px(16.0)).flex_wrap().children(
                         plugins_info.into_iter().enumerate().filter_map(
-                            |(i, (meta, loaded, enabled, top, pass))| {
+                            |(i, (meta, loaded, enabled, top, pass, mem))| {
                                 loaded.then(|| {
                                     self.widget_card(
                                         meta.name, meta.id, meta.icon, loaded, enabled, top, pass,
                                         i as u8,
+                                        mem,
                                     )
                                 })
                             },
@@ -513,6 +569,7 @@ impl MainWindow {
         always_on_top: bool,
         mouse_passthrough: bool,
         kind: u8,
+        estimated_memory: usize,
     ) -> impl IntoElement {
         use crate::components::badge::{Badge, BadgeVariant};
         use crate::components::button::{Button, ButtonVariant};
@@ -659,6 +716,13 @@ impl MainWindow {
                                     .font_weight(FontWeight::SEMIBOLD)
                                     .text_color(rgb(0xf2f2f2))
                                     .child(title),
+                            )
+                            .child(
+                                div()
+                                    .text_xs()
+                                    .font_weight(FontWeight::MEDIUM)
+                                    .text_color(rgb(0x8b949e))
+                                    .child(format!("~{:.1} MB", estimated_memory as f64 / 1024.0 / 1024.0)),
                             ),
                     )
                     .child(status_badge),

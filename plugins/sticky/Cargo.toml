@@ -9,6 +9,9 @@ crate-type = ["rlib"]
 [dependencies]
 gpui.workspace = true
 gpui-component.workspace = true
+heed = "0.22.1"
+pulldown-cmark = "0.13.4"
 raw-window-handle.workspace = true
+uuid = { version = "1.24.0", features = ["v4"] }
 widget-core.workspace = true
 windows-sys = { workspace = true, features = ["Win32_UI_WindowsAndMessaging", "Win32_UI_Input_KeyboardAndMouse"] }

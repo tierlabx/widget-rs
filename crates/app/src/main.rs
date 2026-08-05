@@ -304,6 +304,7 @@ fn main() {
                 icon: p.icon(),
                 version: p.version(),
                 author: p.author(),
+                estimated_memory: p.estimated_memory(),
             })
             .collect::<Vec<_>>();
         cx.set_global(widget_core::PluginList(metadata_list));

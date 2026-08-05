@@ -25,6 +25,11 @@ impl Plugin for TodoWidgetPlugin {
         gpui_component::IconName::CircleCheck
     }
 
+    fn estimated_memory(&self) -> usize {
+        // 待办事项预估内存：基础 1.5MB
+        1536 * 1024
+    }
+
     fn spawn_window(&self, cx: &mut App) -> AnyWindowHandle {
         let (x, y, w, h) = cx
             .try_global::<AppConfig>()

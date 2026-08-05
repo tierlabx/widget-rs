@@ -132,21 +132,38 @@ impl WindowManager {
                     .update(cx, |_, window, _| window.scale_factor())
                     .unwrap_or(1.0);
 
-                // 优先使用物理 client rect 来修正由于 WS_THICKFRAME 引起的 GPUI 偏差
+                // 优先使用物理扩展帧边界来修正由于 WS_THICKFRAME 及阴影引起的 GPUI 偏差
                 if *hwnd != 0 {
                     unsafe {
-                        use windows_sys::Win32::Foundation::{POINT, RECT};
-                        use windows_sys::Win32::Graphics::Gdi::ClientToScreen;
-                        use windows_sys::Win32::UI::WindowsAndMessaging::GetClientRect;
-                        let mut rect: RECT = std::mem::zeroed();
-                        if GetClientRect(*hwnd, &mut rect) != 0 {
-                            let mut pt = POINT { x: 0, y: 0 };
-                            ClientToScreen(*hwnd, &mut pt);
+                        use windows_sys::Win32::Foundation::RECT;
+                        use windows_sys::Win32::Graphics::Dwm::{DwmGetWindowAttribute, DWMWA_EXTENDED_FRAME_BOUNDS};
+                        use windows_sys::Win32::UI::HiDpi::GetDpiForWindow;
+                        
+                        let dpi = GetDpiForWindow(*hwnd);
+                        let actual_scale = if dpi == 0 { scale } else { dpi as f32 / 96.0 };
 
-                            x = pt.x as f32 / scale;
-                            y = pt.y as f32 / scale;
-                            width = (rect.right - rect.left) as f32 / scale;
-                            height = (rect.bottom - rect.top) as f32 / scale;
+                        let mut rect: RECT = std::mem::zeroed();
+                        let hr = DwmGetWindowAttribute(
+                            *hwnd,
+                            DWMWA_EXTENDED_FRAME_BOUNDS as u32,
+                            &mut rect as *mut _ as *mut _,
+                            std::mem::size_of::<RECT>() as u32,
+                        );
+                        
+                        if hr == 0 {
+                            x = rect.left as f32 / actual_scale;
+                            y = rect.top as f32 / actual_scale;
+                            width = (rect.right - rect.left) as f32 / actual_scale;
+                            height = (rect.bottom - rect.top) as f32 / actual_scale;
+                        } else {
+                            // 降级使用 GetWindowRect
+                            use windows_sys::Win32::UI::WindowsAndMessaging::GetWindowRect;
+                            if GetWindowRect(*hwnd, &mut rect) != 0 {
+                                x = rect.left as f32 / actual_scale;
+                                y = rect.top as f32 / actual_scale;
+                                width = (rect.right - rect.left) as f32 / actual_scale;
+                                height = (rect.bottom - rect.top) as f32 / actual_scale;
+                            }
                         }
                     }
                 }
