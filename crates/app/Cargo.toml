@@ -13,6 +13,12 @@ path-guid = "86135684-15A6-4DF1-862E-FB93B28A682D"
 license = false
 eula = false
 
+[package.metadata.packager]
+identifier = "com.tierlabx.widget-rs"
+publisher = "tierlabx"
+before-packaging-command = "cargo build --release"
+formats = ["nsis", "wix", "dmg", "app", "deb", "appimage"]
+
 [dependencies]
 gpui.workspace = true
 gpui-component.workspace = true
@@ -37,13 +43,3 @@ winreg = "0.56.0"
 
 [build-dependencies]
 winres.workspace = true
-
-[package.metadata.packager]
-identifier = "com.tierlabx.widget-rs"
-publisher = "tierlabx"
-before-packaging-command = "cargo build --release"
-formats = ["nsis", "msi", "dmg", "app", "deb", "appimage"]
-
-[package.metadata.packager.windows]
-# Add shortcuts for windows installer
-nsis = { create-desktop-shortcut = true, create-start-menu-shortcut = true }
