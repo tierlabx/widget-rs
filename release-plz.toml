@@ -1,35 +1,29 @@
 [workspace]
+publish = false
 git_release_enable = false
-# Disable all release actions (tagging, publishing, changelogs) for internal crates
+git_tag_enable = false
+
 [[package]]
 name = "widget-core"
-release = false
 
 [[package]]
 name = "widget-ui"
-release = false
 
 [[package]]
 name = "sticky_plugin"
-release = false
 
 [[package]]
 name = "todo_plugin"
-release = false
 
 [[package]]
 name = "widget-cli"
-release = false
 
-# Configure the main app crate to hold the unified changelog
+# Configure the main app crate to hold the unified changelog and handle the actual release
 [[package]]
 name = "widget-rs"
-# Place the changelog in the root of the workspace
+git_release_enable = true
+git_tag_enable = true
 changelog_path = "../../CHANGELOG.md"
-# Disable publishing to crates.io (we only want GitHub releases)
-publish = false
-# Include commits from all internal crates in this unified changelog
 changelog_include = ["widget-core", "widget-ui", "sticky_plugin", "todo_plugin", "widget-cli"]
-# Set custom tag and release name format to match existing tags (v0.1.2)
 git_tag_name = "v{{ version }}"
 git_release_name = "v{{ version }}"
