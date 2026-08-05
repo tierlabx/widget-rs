@@ -27,6 +27,10 @@ git_release_enable = false
 [[package]]
 name = "todo_plugin"
 changelog_update = false
+
+[[package]]
+name = "stretchly_plugin"
+changelog_update = false
 git_tag_enable = false
 git_release_enable = false
 

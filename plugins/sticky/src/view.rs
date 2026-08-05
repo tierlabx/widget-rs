@@ -101,7 +101,6 @@ impl Render for StickyWidget {
             } else {
                 rgb(0x3d3a39)
             })
-            .rounded(px(8.0))
             .children(drag_handle)
             // 标题栏
             .child(

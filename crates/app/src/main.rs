@@ -393,6 +393,16 @@ fn main() {
             }
         )));
 
+        cx.set_global(widget_core::OpenPluginSettingsCallback(std::sync::Arc::new(
+            move |cx: &mut App, plugin_id: &str| {
+                if let Some(pm) = cx.try_global::<PluginManager>().cloned() {
+                    if let Some(plugin) = pm.get_plugins().iter().find(|p| p.id() == plugin_id) {
+                        plugin.build_settings_window(cx);
+                    }
+                }
+            }
+        )));
+
         // 初始化窗口管理器，用于管理主窗口和所有插件窗口的生命周期和状态
         WindowManager::init(cx);
 

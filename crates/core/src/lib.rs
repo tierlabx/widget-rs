@@ -69,6 +69,11 @@ impl Global for SaveBoundsCallback {}
 pub struct TogglePluginCallback(pub std::sync::Arc<dyn Fn(&mut App, &str, bool)>);
 impl Global for TogglePluginCallback {}
 
+/// 打开插件设置窗口的回调
+#[derive(Clone)]
+pub struct OpenPluginSettingsCallback(pub std::sync::Arc<dyn Fn(&mut App, &str)>);
+impl Global for OpenPluginSettingsCallback {}
+
 /// 立即落盘：克隆数据后交给后台执行器执行 IO，不阻塞 GPUI 主线程
 /// 在任何 GPUI 事件处理器（subscribe/listener）内都可安全调用
 pub fn save_config_now(cx: &mut App) {
@@ -156,6 +161,9 @@ pub trait Plugin: Send + Sync {
 
     #[allow(unused_variables)]
     fn on_unload(&self, cx: &mut App) {}
+
+    #[allow(unused_variables)]
+    fn build_settings_window(&self, cx: &mut App) {}
 }
 
 #[derive(Clone)]

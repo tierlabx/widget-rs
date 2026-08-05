@@ -661,6 +661,37 @@ impl MainWindow {
                                 .child("完成项目设计"),
                         ),
                 ),
+            "stretchly_widget" => div()
+                .flex()
+                .flex_col()
+                .items_center()
+                .justify_center()
+                .w_full()
+                .h_full()
+                .p(px(12.0))
+                .rounded(px(6.0))
+                .bg(rgb(0x050507))
+                .border_1()
+                .border_color(rgba(0x3d3a3940))
+                .child(
+                    div()
+                        .flex()
+                        .items_center()
+                        .justify_center()
+                        .w_full()
+                        .h_full()
+                        .bg(rgba(0x00d99210))
+                        .rounded(px(4.0))
+                        .border_1()
+                        .border_color(rgba(0x00d99240))
+                        .child(
+                            div()
+                                .text_sm()
+                                .text_color(rgb(0x00d992))
+                                .font_weight(FontWeight::BOLD)
+                                .child("休息提醒 - 专注中..."),
+                        ),
+                ),
             _ => div()
                 .flex()
                 .flex_col()
@@ -820,6 +851,17 @@ impl MainWindow {
                         div()
                             .flex()
                             .gap(px(8.0))
+                            .child(
+                                Button::new(("btn-settings", kind as usize), "")
+                                    .variant(ButtonVariant::Ghost)
+                                    .icon(gpui_component::IconName::Settings)
+                                    .on_click(move |_, _, cx| {
+                                        let cb = cx.try_global::<widget_core::OpenPluginSettingsCallback>().cloned();
+                                        if let Some(cb) = cb {
+                                            cb.0(cx, plugin_id);
+                                        }
+                                    }),
+                            )
                             .child(
                                 Button::new(("btn-load", kind as usize), load_label)
                                     .variant(ButtonVariant::Outline)

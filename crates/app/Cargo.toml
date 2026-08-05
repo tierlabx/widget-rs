@@ -24,6 +24,7 @@ gpui-component.workspace = true
 mimalloc = { version = "0.1", default-features = false }
 sticky_plugin.workspace = true
 todo_plugin.workspace = true
+stretchly_plugin.workspace = true
 widget-core.workspace = true
 widget-ui.workspace = true
 

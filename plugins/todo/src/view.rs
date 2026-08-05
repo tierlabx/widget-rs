@@ -395,7 +395,6 @@ impl Render for TodoWidget {
             } else {
                 rgb(0x3d3a39) // VoltAgent Warm Charcoal
             })
-            .rounded(px(8.0))
             .children(drag_handle)
             // 标题栏
             .child(
@@ -405,6 +404,7 @@ impl Render for TodoWidget {
                     .justify_between()
                     .w_full()
                     .px(px(16.0))
+                    .py(px(10.0))
                     .bg(rgb(0x050507)) // VoltAgent Abyss Black
                     .border_b_1()
                     .border_color(rgb(0x3d3a39)) // VoltAgent Warm Charcoal

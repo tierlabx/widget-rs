@@ -6382,6 +6382,19 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2b2231b7c3057d5e4ad0156fb3dc807d900806020c5ffa3ee6ff2c8c76fb8520"
 
 [[package]]
+name = "stretchly_plugin"
+version = "0.1.5"
+dependencies = [
+ "gpui",
+ "gpui-component",
+ "raw-window-handle 0.6.2",
+ "serde",
+ "serde_json",
+ "widget-core",
+ "windows-sys 0.52.0",
+]
+
+[[package]]
 name = "strict-num"
 version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -7807,6 +7820,7 @@ dependencies = [
  "serde",
  "serde_json",
  "sticky_plugin",
+ "stretchly_plugin",
  "tao",
  "todo_plugin",
  "tray-icon",
