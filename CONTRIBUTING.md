@@ -58,4 +58,14 @@
 
 如果你在开发中遇到任何架构设计上的疑问，请参考 `docs/PRD.md` 和 `README.md` 中的架构图。
 
+## 📦 打包与构建
+
+本项目使用 [cargo-packager](https://github.com/tauri-apps/cargo-packager) 进行应用程序的打包和分发。
+
+如果你需要在本地构建安装包进行测试，请运行以下命令：
+```bash
+cargo packager --release
+```
+*(注意：首次使用需要先安装该工具，运行 `cargo install cargo-packager --locked`)*
+
 期待你的第一个 PR！🚀
