@@ -5,33 +5,41 @@ git_tag_enable = true
 git_tag_name = "v{{ version }}"
 git_release_name = "v{{ version }}"
 
-[package]
-git_tag_enable = false
-git_release_enable = false
-
 # Disable individual changelogs for sub-crates so they don't clutter the repo
 [[package]]
 name = "widget-core"
 changelog_update = false
+git_tag_enable = false
+git_release_enable = false
 
 [[package]]
 name = "widget-ui"
 changelog_update = false
+git_tag_enable = false
+git_release_enable = false
 
 [[package]]
 name = "sticky_plugin"
 changelog_update = false
+git_tag_enable = false
+git_release_enable = false
 
 [[package]]
 name = "todo_plugin"
 changelog_update = false
+git_tag_enable = false
+git_release_enable = false
 
 [[package]]
 name = "widget-cli"
 changelog_update = false
+git_tag_enable = false
+git_release_enable = false
 
 # Main app manages the unified changelog
 [[package]]
 name = "widget-rs"
 changelog_path = "../../CHANGELOG.md"
 changelog_include = ["widget-core", "widget-ui", "sticky_plugin", "todo_plugin", "widget-cli"]
+git_tag_enable = false
+git_release_enable = false
