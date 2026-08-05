@@ -1,5 +1,5 @@
 [workspace]
-
+git_release_enable = false
 # Disable all release actions (tagging, publishing, changelogs) for internal crates
 [[package]]
 name = "widget-core"
