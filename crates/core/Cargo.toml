@@ -1,7 +1,7 @@
 [package]
 name = "widget-core"
-version = "0.1.2"
-edition = "2021"
+version.workspace = true
+edition.workspace = true
 
 [dependencies]
 gpui.workspace = true

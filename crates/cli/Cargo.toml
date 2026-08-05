@@ -1,11 +1,11 @@
 [package]
 name = "widget-cli"
-version = "0.1.2"
-edition = "2021"
-description = "CLI tool for managing widget-rs plugins."
-repository = "https://github.com/tierlabx/widget-rs.git"
-authors = ["tierlabx"]
-license = "MIT"
+version.workspace = true
+edition.workspace = true
+description = "Widget plugin/core"
+repository.workspace = true
+authors.workspace = true
+license.workspace = true
 
 [package.metadata.wix]
 upgrade-guid = "4920E300-33BB-4F15-B5E3-A5B2EE2D50E9"

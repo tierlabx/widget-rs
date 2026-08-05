@@ -6,6 +6,13 @@ members = [
 ]
 default-members = ["crates/app"]
 
+[workspace.package]
+version = "0.1.4"
+edition = "2021"
+authors = ["tierlabx"]
+license = "MIT"
+repository = "https://github.com/tierlabx/widget-rs.git"
+
 [workspace.dependencies]
 gpui = "0.2.2"
 gpui-component = "0.5.1"
