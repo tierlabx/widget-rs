@@ -5,6 +5,10 @@ git_tag_enable = true
 git_tag_name = "v{{ version }}"
 git_release_name = "v{{ version }}"
 
+[package]
+git_tag_enable = false
+git_release_enable = false
+
 # Disable individual changelogs for sub-crates so they don't clutter the repo
 [[package]]
 name = "widget-core"
