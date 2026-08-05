@@ -155,24 +155,43 @@ impl Render for StickyWidget {
                             .flex_1()
                             .w_full()
                             .h_full()
-                            .bg(if self.is_preview { rgba(0xfef3c700) } else { rgba(0xffffffa0) })
+                            .bg(if self.is_preview {
+                                rgba(0xfef3c700)
+                            } else {
+                                rgba(0xffffffa0)
+                            })
                             .border_1()
-                            .border_color(if self.is_preview { rgba(0x00000000) } else { rgba(0xf59e0b20) })
+                            .border_color(if self.is_preview {
+                                rgba(0x00000000)
+                            } else {
+                                rgba(0xf59e0b20)
+                            })
                             .rounded(px(4.0))
                             .p(px(8.0))
                             .text_color(rgb(0x3d2000))
-                            .hover(|s| if !self.is_preview { s.border_color(rgba(0xf59e0b60)) } else { s })
+                            .hover(|s| {
+                                if !self.is_preview {
+                                    s.border_color(rgba(0xf59e0b60))
+                                } else {
+                                    s
+                                }
+                            })
                             .on_double_click(cx.listener(|this, _, _, cx| {
                                 this.is_preview = !this.is_preview;
                                 cx.notify();
                             }))
-                            .child(
-                                if self.is_preview {
-                                    crate::markdown::render_markdown(&input.read(cx).value().to_string()).into_any_element()
-                                } else {
-                                    Input::new(input).h_full().appearance(false).bordered(false).into_any_element()
-                                }
-                            ),
+                            .child(if self.is_preview {
+                                crate::markdown::render_markdown(
+                                    &input.read(cx).value().to_string(),
+                                )
+                                .into_any_element()
+                            } else {
+                                Input::new(input)
+                                    .h_full()
+                                    .appearance(false)
+                                    .bordered(false)
+                                    .into_any_element()
+                            }),
                     ),
             )
     }

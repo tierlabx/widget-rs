@@ -11,7 +11,7 @@ fn get_private_memory_usage() -> usize {
     {
         use windows_sys::Win32::System::ProcessStatus::K32GetProcessMemoryInfo;
         use windows_sys::Win32::System::Threading::GetCurrentProcess;
-        
+
         #[allow(non_snake_case)]
         #[repr(C)]
         struct PROCESS_MEMORY_COUNTERS_EX2 {
@@ -43,9 +43,11 @@ fn get_private_memory_usage() -> usize {
             }
         }
     }
-    
+
     // Fallback to memory_stats for non-Windows
-    memory_stats::memory_stats().map(|s| s.physical_mem).unwrap_or(0)
+    memory_stats::memory_stats()
+        .map(|s| s.physical_mem)
+        .unwrap_or(0)
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -327,7 +329,7 @@ impl MainWindow {
                     .try_global::<widget_core::AppConfig>()
                     .and_then(|c| c.plugins.get(meta.id))
                     .is_some_and(|p| p.mouse_passthrough);
-                
+
                 let estimated_memory = meta.estimated_memory;
 
                 (meta.clone(), loaded, enabled, top, pass, estimated_memory)
@@ -505,8 +507,7 @@ impl MainWindow {
                                 loaded.then(|| {
                                     self.widget_card(
                                         meta.name, meta.id, meta.icon, loaded, enabled, top, pass,
-                                        i as u8,
-                                        mem,
+                                        i as u8, mem,
                                     )
                                 })
                             },

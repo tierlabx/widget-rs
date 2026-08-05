@@ -1,5 +1,5 @@
+use heed::types::{Bytes, Str};
 use heed::{Database, Env, EnvOpenOptions};
-use heed::types::{Str, Bytes};
 use std::sync::{Arc, OnceLock};
 
 pub struct ImageDb {
@@ -18,13 +18,14 @@ impl ImageDb {
             EnvOpenOptions::new()
                 .map_size(100 * 1024 * 1024) // 100MB
                 .max_dbs(1)
-                .open(path).ok()?
+                .open(path)
+                .ok()?
         };
-        
+
         let mut wtxn = env.write_txn().ok()?;
         let db = env.create_database(&mut wtxn, Some("images")).ok()?;
         wtxn.commit().ok()?;
-        
+
         Some(Self { env, db })
     }
 

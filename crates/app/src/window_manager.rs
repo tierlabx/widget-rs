@@ -136,9 +136,11 @@ impl WindowManager {
                 if *hwnd != 0 {
                     unsafe {
                         use windows_sys::Win32::Foundation::RECT;
-                        use windows_sys::Win32::Graphics::Dwm::{DwmGetWindowAttribute, DWMWA_EXTENDED_FRAME_BOUNDS};
+                        use windows_sys::Win32::Graphics::Dwm::{
+                            DwmGetWindowAttribute, DWMWA_EXTENDED_FRAME_BOUNDS,
+                        };
                         use windows_sys::Win32::UI::HiDpi::GetDpiForWindow;
-                        
+
                         let dpi = GetDpiForWindow(*hwnd);
                         let actual_scale = if dpi == 0 { scale } else { dpi as f32 / 96.0 };
 
@@ -149,7 +151,7 @@ impl WindowManager {
                             &mut rect as *mut _ as *mut _,
                             std::mem::size_of::<RECT>() as u32,
                         );
-                        
+
                         if hr == 0 {
                             x = rect.left as f32 / actual_scale;
                             y = rect.top as f32 / actual_scale;
