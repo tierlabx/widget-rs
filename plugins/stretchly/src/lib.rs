@@ -1,4 +1,5 @@
 mod model;
+pub mod overlay;
 mod tips;
 mod view;
 
