@@ -4,6 +4,7 @@ use gpui_component::{Icon, IconName, InteractiveElementExt};
 use raw_window_handle::HasWindowHandle;
 
 use crate::model::StickyModel;
+use gpui_component::ActiveTheme;
 
 pub struct StickyWidget {
     hwnd_reported: bool,
@@ -155,9 +156,9 @@ impl Render for StickyWidget {
                             .w_full()
                             .h_full()
                             .bg(if self.is_preview {
-                                rgba(0xfef3c700)
+                                gpui::Hsla::transparent_black()
                             } else {
-                                rgba(0xffffffa0)
+                                cx.theme().background
                             })
                             .border_1()
                             .border_color(if self.is_preview {
