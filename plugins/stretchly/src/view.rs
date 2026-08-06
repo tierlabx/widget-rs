@@ -55,14 +55,7 @@ impl Render for BreakOverlay {
             .try_global::<crate::StretchlyBreakActive>()
             .is_some_and(|g| g.0);
         if !break_active {
-            if let Ok(h) = window.window_handle() {
-                if let raw_window_handle::RawWindowHandle::Win32(h) = h.as_raw() {
-                    unsafe {
-                        use windows_sys::Win32::UI::WindowsAndMessaging::{PostMessageW, WM_CLOSE};
-                        PostMessageW(h.hwnd.get(), WM_CLOSE, 0, 0);
-                    }
-                }
-            }
+            window.remove_window();
         }
 
         // 副屏只显示背景色

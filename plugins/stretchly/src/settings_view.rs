@@ -248,17 +248,8 @@ impl Render for StretchlySettingsView {
                             .cursor_pointer()
                             .id("close-btn")
                             .on_click(|_, win, _| {
-                                if let Ok(h) = win.window_handle() {
-                                    if let RawWindowHandle::Win32(h) = h.as_raw() {
-                                        unsafe {
-                                            windows_sys::Win32::UI::WindowsAndMessaging::PostMessageW(
-                                                h.hwnd.get(),
-                                                windows_sys::Win32::UI::WindowsAndMessaging::WM_CLOSE,
-                                                0,
-                                                0,
-                                            );
-                                        }
-                                    }
+                                if let Ok(_h) = win.window_handle() {
+                                    win.remove_window();
                                 }
                             })
                             .child(gpui_component::Icon::new(gpui_component::IconName::Close)),
@@ -477,16 +468,8 @@ impl Render for StretchlySettingsView {
                                             .cursor_pointer()
                                             .on_click(cx.listener(|this, _, win, cx| {
                                                 this.save(cx);
-                                                if let Ok(h) = win.window_handle() {
-                                                    if let RawWindowHandle::Win32(h) = h.as_raw() {
-                                                        unsafe {
-                                                            windows_sys::Win32::UI::WindowsAndMessaging::PostMessageW(
-                                                                h.hwnd.get(),
-                                                                windows_sys::Win32::UI::WindowsAndMessaging::WM_CLOSE,
-                                                                0, 0,
-                                                            );
-                                                        }
-                                                    }
+                                                if let Ok(_h) = win.window_handle() {
+                                                    win.remove_window();
                                                 }
                                             }))
                                             .child(
@@ -513,16 +496,8 @@ impl Render for StretchlySettingsView {
                                             .on_click(cx.listener(|this, _, win, cx| {
                                                 this.save(cx);
                                                 cx.set_global(crate::StretchlyApplyNow(true));
-                                                if let Ok(h) = win.window_handle() {
-                                                    if let RawWindowHandle::Win32(h) = h.as_raw() {
-                                                        unsafe {
-                                                            windows_sys::Win32::UI::WindowsAndMessaging::PostMessageW(
-                                                                h.hwnd.get(),
-                                                                windows_sys::Win32::UI::WindowsAndMessaging::WM_CLOSE,
-                                                                0, 0,
-                                                            );
-                                                        }
-                                                    }
+                                                if let Ok(_h) = win.window_handle() {
+                                                    win.remove_window();
                                                 }
                                             }))
                                             .child(
