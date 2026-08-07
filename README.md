@@ -83,6 +83,23 @@ pub fn create_plugin() -> std::sync::Arc<dyn widget_core::Plugin> {
 
 ---
 
+## 🔖 版本发布 (Release)
+
+Widget-RS 内置了基于 [Conventional Commits](https://www.conventionalcommits.org/) 的版本发布工具，自动计算版本号、更新 `Cargo.toml`、生成 `CHANGELOG.md`、提交并推送 tag。
+
+```bash
+# 自动根据 commit 历史计算版本号并发布
+cargo run -p widget-cli -- release
+
+# 预览下一个版本（不做任何修改）
+cargo run -p widget-cli -- release --dry-run
+
+# 手动指定版本号
+cargo run -p widget-cli -- release --version 0.2.0
+```
+
+推送 tag 后，GitHub Actions 会自动触发打包并创建 GitHub Release。
+
 ## 🛠 技术栈
 
 | 领域 | 核心技术 | 说明 |
@@ -91,7 +108,7 @@ pub fn create_plugin() -> std::sync::Arc<dyn widget_core::Plugin> {
 | **UI 组件库**| gpui-component | 构建标准 UI 控件 |
 | **底层交互** | windows-sys 0.52 | 原生窗口消息拦截、边缘吸附处理 |
 | **系统托盘** | tray-icon | 跨平台系统托盘支持 |
-| **工程构建** | release-plz, GitHub Actions | 自动化版本发布与 CI/CD 测试 |
+| **工程构建** | widget-cli, GitHub Actions | 内置版本发布工具与 CI/CD 自动打包 |
 
 ---
 
