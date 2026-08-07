@@ -4,7 +4,7 @@ mod tips;
 mod view;
 
 use gpui::*;
-use widget_core::{AppConfig, Plugin};
+use widget_core::Plugin;
 
 use view::StretchlyWidget;
 
@@ -70,12 +70,12 @@ impl Plugin for StretchlyWidgetPlugin {
     }
 
     fn spawn_window(&self, cx: &mut App) -> AnyWindowHandle {
-        let (x, y, w, h) = cx
-            .try_global::<AppConfig>()
-            .and_then(|cfg| cfg.plugins.get("stretchly_widget").cloned())
-            .map(|p| (p.x, p.y, p.width, p.height))
-            // 默认：右上角紧凑小组件，280×100
-            .unwrap_or((1250.0, 100.0, 280.0, 100.0));
+        let (x, y, w, h) = widget_core::resolve_plugin_bounds(
+            cx,
+            "stretchly_widget",
+            // 默认：右上角紧凑小组件，280x100
+            (1250.0, 100.0, 280.0, 100.0),
+        );
 
         let options = WindowOptions {
             titlebar: None,
@@ -95,6 +95,16 @@ impl Plugin for StretchlyWidgetPlugin {
         })
         .unwrap()
         .into()
+    }
+
+    fn on_unload(&self, cx: &mut App) {
+        // 清理 stretchly 注册的所有全局状态，释放关联的堆内存
+        cx.set_global(StretchlyApplyNow(false));
+        cx.set_global(StretchlyBreakActive(false));
+        cx.set_global(StretchlyBreakSnapshot::default());
+        cx.set_global(StretchlyOverlayRequest(None));
+        cx.set_global(StretchlyLiveStats(Default::default()));
+        println!("[stretchly] on_unload: 已清理所有全局状态");
     }
 
     fn build_settings_window(&self, cx: &mut App) {

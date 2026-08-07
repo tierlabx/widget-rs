@@ -4,7 +4,7 @@ mod model;
 mod view;
 
 use gpui::*;
-use widget_core::{AppConfig, Plugin};
+use widget_core::Plugin;
 
 use view::StickyWidget;
 
@@ -33,11 +33,8 @@ impl Plugin for StickyWidgetPlugin {
     }
 
     fn spawn_window(&self, cx: &mut App) -> AnyWindowHandle {
-        let (x, y, w, h) = cx
-            .try_global::<AppConfig>()
-            .and_then(|cfg| cfg.plugins.get("sticky_widget").cloned())
-            .map(|p| (p.x, p.y, p.width, p.height))
-            .unwrap_or((1250.0, 50.0, 320.0, 360.0));
+        let (x, y, w, h) =
+            widget_core::resolve_plugin_bounds(cx, "sticky_widget", (1250.0, 50.0, 320.0, 360.0));
 
         let options = WindowOptions {
             titlebar: None,

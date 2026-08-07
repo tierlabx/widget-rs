@@ -2,7 +2,7 @@ mod model;
 mod view;
 
 use gpui::*;
-use widget_core::{AppConfig, Plugin};
+use widget_core::Plugin;
 
 use view::TodoWidget;
 
@@ -31,11 +31,8 @@ impl Plugin for TodoWidgetPlugin {
     }
 
     fn spawn_window(&self, cx: &mut App) -> AnyWindowHandle {
-        let (x, y, w, h) = cx
-            .try_global::<AppConfig>()
-            .and_then(|cfg| cfg.plugins.get("todo_widget").cloned())
-            .map(|p| (p.x, p.y, p.width, p.height))
-            .unwrap_or((1250.0, 450.0, 360.0, 460.0));
+        let (x, y, w, h) =
+            widget_core::resolve_plugin_bounds(cx, "todo_widget", (1250.0, 450.0, 360.0, 460.0));
 
         println!("[TodoPlugin] 初始位置: ({}, {}) {}x{}", x, y, w, h);
 

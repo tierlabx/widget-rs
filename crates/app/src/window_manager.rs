@@ -14,8 +14,8 @@ pub struct WindowManager {
     pub main_window: Option<WindowHandle<gpui_component::Root>>,
     /// 主窗口的 Win32 HWND（提取后单独存储，避免后续操作时产生不必要的生命周期或借用嵌套）
     pub main_hwnd: isize,
-    /// 注册的所有插件窗口：插件 ID 映射到 (窗口泛型句柄, Win32 HWND)
-    pub widget_windows: HashMap<&'static str, (AnyWindowHandle, isize)>,
+    /// 注册的所有插件窗口：插件 ID 映射到 (窗口泛型句柄, Win32 HWND, Owner HWND)
+    pub widget_windows: HashMap<&'static str, (AnyWindowHandle, isize, isize)>,
     /// 全局应用是否可见的状态标志
     pub is_visible: bool,
 }
@@ -85,12 +85,22 @@ impl WindowManager {
     pub fn register_widget_window(&mut self, id: &'static str, handle: AnyWindowHandle) {
         // 尝试从窗口句柄中提取 HWND，默认先给 0
         let hwnd = Self::extract_hwnd(&handle);
-        self.widget_windows.insert(id, (handle, hwnd));
+        self.widget_windows.insert(id, (handle, hwnd, 0));
     }
 
-    /// 移除插件窗口记录
+    /// 移除插件窗口记录，同时销毁关联的隐藏 Owner 窗口
     pub fn remove_widget_window(&mut self, id: &str) {
-        self.widget_windows.remove(id);
+        if let Some((_, _, owner_hwnd)) = self.widget_windows.remove(id) {
+            if owner_hwnd != 0 {
+                unsafe {
+                    windows_sys::Win32::UI::WindowsAndMessaging::DestroyWindow(owner_hwnd);
+                }
+                println!(
+                    "[WindowManager] 已销毁插件 {} 的隐藏 Owner HWND: {}",
+                    id, owner_hwnd
+                );
+            }
+        }
     }
 
     /// 从 `AnyWindowHandle` 中尝试提取 Win32 HWND
@@ -119,7 +129,7 @@ impl WindowManager {
     pub fn save_all_plugin_bounds(&self, cx: &mut App, store: &Store) {
         let mut config = cx.try_global::<AppConfig>().cloned().unwrap_or_default();
 
-        for (id, (handle, hwnd)) in &self.widget_windows {
+        for (id, (handle, hwnd, _owner)) in &self.widget_windows {
             // 使用 GPUI 内部方法获取逻辑位置（DIPs），确保与 spawn_window 时的 px(x) 保持一致
             // 这会自动处理 DPI 缩放问题
             if let Ok(bounds) = handle.update(cx, |_, window, _| window.bounds()) {
@@ -133,6 +143,7 @@ impl WindowManager {
                     .unwrap_or(1.0);
 
                 // 优先使用物理扩展帧边界来修正由于 WS_THICKFRAME 及阴影引起的 GPUI 偏差
+                let mut actual_scale = scale;
                 if *hwnd != 0 {
                     unsafe {
                         use windows_sys::Win32::Foundation::RECT;
@@ -142,7 +153,7 @@ impl WindowManager {
                         use windows_sys::Win32::UI::HiDpi::GetDpiForWindow;
 
                         let dpi = GetDpiForWindow(*hwnd);
-                        let actual_scale = if dpi == 0 { scale } else { dpi as f32 / 96.0 };
+                        actual_scale = if dpi == 0 { scale } else { dpi as f32 / 96.0 };
 
                         let mut rect: RECT = std::mem::zeroed();
                         let hr = DwmGetWindowAttribute(
@@ -171,11 +182,16 @@ impl WindowManager {
                 }
 
                 let config_for_id = config.plugins.get(*id).cloned();
-                let plugin_cfg = config_for_id.unwrap_or_else(|| widget_core::PluginConfig {
+                let plugin_cfg = config_for_id.unwrap_or(widget_core::PluginConfig {
                     x: 0.0,
                     y: 0.0,
                     width: 0.0,
                     height: 0.0,
+                    scale: 1.0,
+                    phys_x: 0,
+                    phys_y: 0,
+                    phys_w: 0,
+                    phys_h: 0,
                     always_on_top: false,
                     mouse_passthrough: false,
                     loaded: true,
@@ -186,9 +202,43 @@ impl WindowManager {
                 entry.y = y;
                 entry.width = width;
                 entry.height = height;
+                entry.scale = actual_scale;
+
+                // 同时保存物理像素坐标（用于 SetWindowPos 精确恢复）
+                if *hwnd != 0 {
+                    unsafe {
+                        use windows_sys::Win32::Foundation::RECT;
+                        use windows_sys::Win32::Graphics::Dwm::{
+                            DwmGetWindowAttribute, DWMWA_EXTENDED_FRAME_BOUNDS,
+                        };
+                        let mut rect: RECT = std::mem::zeroed();
+                        let hr = DwmGetWindowAttribute(
+                            *hwnd,
+                            DWMWA_EXTENDED_FRAME_BOUNDS as u32,
+                            &mut rect as *mut _ as *mut _,
+                            std::mem::size_of::<RECT>() as u32,
+                        );
+                        if hr == 0 {
+                            entry.phys_x = rect.left;
+                            entry.phys_y = rect.top;
+                            entry.phys_w = rect.right - rect.left;
+                            entry.phys_h = rect.bottom - rect.top;
+                        } else {
+                            use windows_sys::Win32::UI::WindowsAndMessaging::GetWindowRect;
+                            if GetWindowRect(*hwnd, &mut rect) != 0 {
+                                entry.phys_x = rect.left;
+                                entry.phys_y = rect.top;
+                                entry.phys_w = rect.right - rect.left;
+                                entry.phys_h = rect.bottom - rect.top;
+                            }
+                        }
+                    }
+                }
+
                 println!(
-                    "[WindowManager] 保存插件 {} 逻辑位置: ({}, {}) {}x{}",
-                    id, x, y, width, height
+                    "[WindowManager] 保存插件 {} 逻辑: ({}, {}) {}x{} scale={} 物理: ({}, {}) {}x{}",
+                    id, x, y, width, height, actual_scale,
+                    entry.phys_x, entry.phys_y, entry.phys_w, entry.phys_h
                 );
             }
         }
@@ -207,7 +257,7 @@ impl WindowManager {
         self.widget_windows
             .iter()
             .find(|(k, _)| **k == plugin_id)
-            .map(|(_, (_, hwnd))| *hwnd)
+            .map(|(_, (_, hwnd, _))| *hwnd)
             .unwrap_or(0)
     }
 
@@ -236,7 +286,7 @@ impl WindowManager {
         use windows_sys::Win32::UI::WindowsAndMessaging::{
             SetWindowPos, HWND_NOTOPMOST, HWND_TOPMOST, SWP_NOMOVE, SWP_NOSIZE,
         };
-        for (id, (_, hwnd)) in &self.widget_windows {
+        for (id, (_, hwnd, _)) in &self.widget_windows {
             if *hwnd == 0 {
                 continue;
             }
@@ -314,9 +364,10 @@ impl WindowManager {
     }
 
     /// 将窗口附加到桌面（Progman），防止 Win + D 时被最小化
-    pub fn attach_to_desktop(hwnd: isize) {
+    /// 返回创建的隐藏 Owner 窗口 HWND（0 表示失败）
+    pub fn attach_to_desktop(hwnd: isize) -> isize {
         if hwnd == 0 {
-            return;
+            return 0;
         }
         unsafe {
             // Create a dummy hidden owner window for EACH widget to prevent Win+D while avoiding Z-order grouping
@@ -344,6 +395,7 @@ impl WindowManager {
                     hwnd, owner
                 );
             }
+            owner
         }
     }
 }

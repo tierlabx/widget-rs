@@ -156,9 +156,13 @@ impl gpui::AssetSource for AppAssets {
     }
 }
 
-pub fn apply_plugin_window_styles(hwnd: isize, id: &str, config: Option<&widget_core::AppConfig>) {
-    // 防止 Win + D （显示桌面）操作导致小组件被隐藏
-    WindowManager::attach_to_desktop(hwnd);
+pub fn apply_plugin_window_styles(
+    hwnd: isize,
+    id: &str,
+    config: Option<&widget_core::AppConfig>,
+) -> isize {
+    // 防止 Win + D （显示桌面）操作导致小组件被隐藏，返回 Owner HWND
+    let owner_hwnd = WindowManager::attach_to_desktop(hwnd);
     // 移除默认的 WS_THICKFRAME 并子类化窗口以彻底禁用原生缩放
     unsafe {
         use windows_sys::Win32::UI::WindowsAndMessaging::{
@@ -234,6 +238,28 @@ pub fn apply_plugin_window_styles(hwnd: isize, id: &str, config: Option<&widget_
                 );
             }
         }
+    }
+    owner_hwnd
+}
+
+/// 清理插件窗口样式：还原 WndProc 子类化并从 HashMap 中移除
+pub fn cleanup_plugin_window_styles(hwnd: isize) {
+    if hwnd == 0 {
+        return;
+    }
+    let procs = WND_PROCS.get_or_init(|| Mutex::new(std::collections::HashMap::new()));
+    if let Some(old_proc) = procs.lock().unwrap().remove(&hwnd) {
+        unsafe {
+            windows_sys::Win32::UI::WindowsAndMessaging::SetWindowLongPtrW(
+                hwnd,
+                windows_sys::Win32::UI::WindowsAndMessaging::GWLP_WNDPROC,
+                old_proc,
+            );
+        }
+        println!(
+            "[cleanup_plugin_window_styles] 已还原 HWND {} 的 WndProc",
+            hwnd
+        );
     }
 }
 
@@ -346,7 +372,7 @@ fn main() {
                                     hwnd = cx.update(|cx| {
                                         let h = cx.try_global::<WindowManager>()
                                             .and_then(|wm| wm.widget_windows.get(&plugin_id_string.as_str()))
-                                            .map(|(h, _)| *h);
+                                            .map(|(h, _, _)| *h);
                                         if let Some(h) = h {
                                             h.update(cx, |_, win, _| {
                                                 use raw_window_handle::HasWindowHandle;
@@ -364,23 +390,57 @@ fn main() {
 
                                 if hwnd != 0 {
                                     let _ = cx.update(|cx| {
-                                        let _ = cx.update_global::<WindowManager, _>(|wm, _| {
+                                        cx.update_global::<WindowManager, _>(|wm, _| {
                                             if let Some(e) = wm.widget_windows.get_mut(plugin_id_string.as_str()) {
                                                 e.1 = hwnd;
                                             }
                                         });
                                         widget_core::register_plugin_hwnd(&plugin_id_string, hwnd);
                                         let config = cx.try_global::<widget_core::AppConfig>().cloned();
-                                        apply_plugin_window_styles(hwnd, &plugin_id_string, config.as_ref());
+                                        let owner_hwnd = apply_plugin_window_styles(hwnd, &plugin_id_string, config.as_ref());
+                                        // 将 Owner HWND 存入 widget_windows
+                                        cx.update_global::<WindowManager, _>(|wm, _| {
+                                            if let Some(e) = wm.widget_windows.get_mut(plugin_id_string.as_str()) {
+                                                e.2 = owner_hwnd;
+                                            }
+                                        });
+                                        // 用保存的物理坐标精确修正窗口位置
+                                        if let Some((px, py, pw, ph)) = widget_core::get_saved_physical_bounds(cx, &plugin_id_string) {
+                                            unsafe {
+                                                windows_sys::Win32::UI::WindowsAndMessaging::SetWindowPos(
+                                                    hwnd,
+                                                    0,
+                                                    px, py, pw, ph,
+                                                    windows_sys::Win32::UI::WindowsAndMessaging::SWP_NOZORDER
+                                                    | windows_sys::Win32::UI::WindowsAndMessaging::SWP_NOACTIVATE,
+                                                );
+                                            }
+                                            println!("[TogglePluginCallback] SetWindowPos 精确修正 {} -> ({}, {}) {}x{}", plugin_id_string, px, py, pw, ph);
+                                        }
                                     });
                                 }
                             }).detach();
                         } else {
-                            let handle_opt = cx.update_global::<WindowManager, _>(|wm, _| {
-                                let h = wm.widget_windows.get(plugin_id).map(|(handle, _)| handle.clone());
-                                wm.remove_widget_window(plugin_id);
-                                h
+                            // 卸载插件：先保存位置，再清理资源
+                            // 通过 SaveBoundsCallback 保存所有插件位置（包含 store 引用）
+                            let save_cb = cx
+                                .try_global::<widget_core::SaveBoundsCallback>()
+                                .map(|cb| cb.0.clone());
+                            if let Some(cb) = save_cb {
+                                cb(cx);
+                            }
+                            let (handle_opt, hwnd) = cx.update_global::<WindowManager, _>(|wm, _| {
+                                let entry = wm.widget_windows.get(plugin_id);
+                                let h = entry.map(|(handle, _, _)| *handle);
+                                let hwnd = entry.map(|(_, hwnd, _)| *hwnd).unwrap_or(0);
+                                wm.remove_widget_window(plugin_id); // 同时销毁 Owner
+                                (h, hwnd)
                             });
+                            // 清理 WndProc 子类化
+                            cleanup_plugin_window_styles(hwnd);
+                            // 注销 HWND
+                            widget_core::unregister_plugin_hwnd(plugin_id);
+                            // 销毁窗口
                             if let Some(handle) = handle_opt {
                                 let _ = handle.update(cx, |_, window, _| {
                                     window.remove_window();
@@ -448,7 +508,7 @@ fn main() {
                     let ph = wm
                         .widget_windows
                         .iter()
-                        .map(|(id, (h, _))| (id.to_string(), *h))
+                        .map(|(id, (h, _, _))| (id.to_string(), *h))
                         .collect();
                     let mh = wm.main_window.as_ref().map(|h| (*h).into());
                     (ph, mh)
@@ -531,8 +591,25 @@ fn main() {
                     }
                     // 注册到 thread_local，供 widget-ui on_click 等跨线程操作直接使用
                     widget_core::register_plugin_hwnd(id, *hwnd);
-                    // 应用窗口样式和独立设置
-                    apply_plugin_window_styles(*hwnd, id.as_str(), config.as_ref());
+                    // 应用窗口样式和独立设置，并存储 Owner HWND
+                    let owner_hwnd = apply_plugin_window_styles(*hwnd, id.as_str(), config.as_ref());
+                    if let Some(e) = wm.widget_windows.get_mut(id.as_str()) {
+                        e.2 = owner_hwnd;
+                    }
+
+                    // 用保存的物理坐标精确修正窗口位置（完全绕过 GPUI 坐标转换）
+                    if let Some((px, py, pw, ph)) = widget_core::get_saved_physical_bounds(cx, id.as_str()) {
+                        unsafe {
+                            windows_sys::Win32::UI::WindowsAndMessaging::SetWindowPos(
+                                *hwnd,
+                                0,
+                                px, py, pw, ph,
+                                windows_sys::Win32::UI::WindowsAndMessaging::SWP_NOZORDER
+                                | windows_sys::Win32::UI::WindowsAndMessaging::SWP_NOACTIVATE,
+                            );
+                        }
+                        println!("[main] SetWindowPos 精确修正 {} -> ({}, {}) {}x{}", id, px, py, pw, ph);
+                    }
 
                     if let Some(cfg) = &config {
                         if let Some(p_cfg) = cfg.plugins.get(id.as_str()) {

@@ -785,7 +785,7 @@ impl MainWindow {
                                     .on_click(move |_, _, cx| {
                                         cx.update_global::<widget_core::AppConfig, _>(|c, _| {
                                             let p = c.plugins.entry(plugin_id.to_string()).or_insert_with(|| widget_core::PluginConfig {
-                                                x: 0.0, y: 0.0, width: 300.0, height: 300.0, always_on_top: false, mouse_passthrough: false, loaded: true, enabled: true
+                                                x: 0.0, y: 0.0, width: 300.0, height: 300.0, scale: 1.0, phys_x: 0, phys_y: 0, phys_w: 0, phys_h: 0, always_on_top: false, mouse_passthrough: false, loaded: true, enabled: true
                                             });
                                             p.always_on_top = !always_on_top;
                                         });
@@ -819,7 +819,7 @@ impl MainWindow {
                                     .on_click(move |_, _, cx| {
                                         cx.update_global::<widget_core::AppConfig, _>(|c, _| {
                                             let p = c.plugins.entry(plugin_id.to_string()).or_insert_with(|| widget_core::PluginConfig {
-                                                x: 0.0, y: 0.0, width: 300.0, height: 300.0, always_on_top: false, mouse_passthrough: false, loaded: true, enabled: true
+                                                x: 0.0, y: 0.0, width: 300.0, height: 300.0, scale: 1.0, phys_x: 0, phys_y: 0, phys_w: 0, phys_h: 0, always_on_top: false, mouse_passthrough: false, loaded: true, enabled: true
                                             });
                                             p.mouse_passthrough = !mouse_passthrough;
                                         });
@@ -884,6 +884,11 @@ impl MainWindow {
                                                 y: 0.0,
                                                 width: 0.0,
                                                 height: 0.0,
+                                                scale: 1.0,
+                                                phys_x: 0,
+                                                phys_y: 0,
+                                                phys_w: 0,
+                                                phys_h: 0,
                                                 always_on_top: false,
                                                 mouse_passthrough: false,
                                                 loaded: next_loaded,
@@ -1124,6 +1129,11 @@ impl MainWindow {
                                                 y: 0.0,
                                                 width: 300.0,
                                                 height: 300.0,
+                                                scale: 1.0,
+                                                phys_x: 0,
+                                                phys_y: 0,
+                                                phys_w: 0,
+                                                phys_h: 0,
                                                 always_on_top: false,
                                                 mouse_passthrough: false,
                                                 loaded: next_loaded,
