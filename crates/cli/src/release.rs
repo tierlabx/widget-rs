@@ -2,7 +2,6 @@ use std::fmt;
 use std::fs;
 use std::path::Path;
 use std::process::Command;
-use toml_edit::{value, DocumentMut};
 
 /// 版本号 bump 类型，按优先级从高到低排列
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
@@ -230,31 +229,58 @@ fn get_commits_since(tag: Option<&str>, workspace_root: &Path) -> Vec<String> {
 }
 
 /// 更新根 Cargo.toml 中的所有版本号
-fn update_cargo_toml(workspace_root: &Path, new_version: &str) -> Result<(), String> {
+///
+/// 使用逐行字符串替换，避免 toml_edit 解析多行内联表的兼容性问题。
+/// 更新策略：
+/// - `[workspace.package]` 区段中的 `version = "x.y.z"` → 直接替换
+/// - `[workspace.dependencies]` 区段中同时包含 `path =` 和 `version =` 的行 → 替换 version
+fn update_cargo_toml(
+    workspace_root: &Path,
+    new_version: &str,
+    old_version: &str,
+) -> Result<(), String> {
     let cargo_path = workspace_root.join("Cargo.toml");
     let content =
         fs::read_to_string(&cargo_path).map_err(|e| format!("无法读取 Cargo.toml: {}", e))?;
 
-    let mut doc: DocumentMut = content
-        .parse()
-        .map_err(|e| format!("无法解析 Cargo.toml: {}", e))?;
+    let old_ver_quoted = format!("\"{}\"", old_version);
+    let new_ver_quoted = format!("\"{}\"", new_version);
 
-    // 更新 workspace.package.version
-    doc["workspace"]["package"]["version"] = value(new_version);
+    let mut result = Vec::new();
+    let mut in_workspace_package = false;
+    let mut in_workspace_deps = false;
 
-    // 更新 workspace.dependencies 中所有带 path 的内部依赖的 version
-    if let Some(deps) = doc["workspace"]["dependencies"].as_table_mut() {
-        for (_key, dep_value) in deps.iter_mut() {
-            if let Some(table) = dep_value.as_inline_table_mut() {
-                // 只更新带 path 字段的内部依赖
-                if table.contains_key("path") && table.contains_key("version") {
-                    table.insert("version", new_version.into());
-                }
-            }
+    for line in content.lines() {
+        let trimmed = line.trim();
+
+        // 追踪当前所在的 TOML 区段
+        if trimmed.starts_with('[') {
+            in_workspace_package = trimmed == "[workspace.package]";
+            in_workspace_deps = trimmed == "[workspace.dependencies]";
+        }
+
+        if in_workspace_package
+            && trimmed.starts_with("version")
+            && trimmed.contains(&old_ver_quoted)
+        {
+            // [workspace.package] 中的 version 行
+            result.push(line.replace(&old_ver_quoted, &new_ver_quoted));
+        } else if in_workspace_deps && trimmed.contains("path") && trimmed.contains(&old_ver_quoted)
+        {
+            // [workspace.dependencies] 中带 path 的内部依赖行
+            result.push(line.replace(&old_ver_quoted, &new_ver_quoted));
+        } else {
+            result.push(line.to_string());
         }
     }
 
-    fs::write(&cargo_path, doc.to_string()).map_err(|e| format!("无法写入 Cargo.toml: {}", e))?;
+    // 保持原文件的换行风格
+    let mut output = result.join("\n");
+    if content.ends_with('\n') {
+        output.push('\n');
+    }
+
+    fs::write(&cargo_path, output).map_err(|e| format!("无法写入 Cargo.toml: {}", e))?;
 
     Ok(())
 }
@@ -398,13 +424,21 @@ fn fallback_date() -> String {
 fn get_repo_url(workspace_root: &Path) -> String {
     let cargo_path = workspace_root.join("Cargo.toml");
     let content = fs::read_to_string(&cargo_path).unwrap_or_default();
-    let doc: DocumentMut = content.parse().unwrap_or_default();
 
-    doc["workspace"]["package"]["repository"]
-        .as_str()
-        .unwrap_or("https://github.com/tierlabx/widget-rs")
-        .trim_end_matches(".git")
-        .to_string()
+    // 简单字符串搜索提取 repository 值，避免 TOML 解析
+    for line in content.lines() {
+        let trimmed = line.trim();
+        if trimmed.starts_with("repository") && trimmed.contains('=') {
+            if let Some(val) = trimmed.split('=').nth(1) {
+                let url = val.trim().trim_matches('"').trim_end_matches(".git");
+                if url.starts_with("http") {
+                    return url.to_string();
+                }
+            }
+        }
+    }
+
+    "https://github.com/tierlabx/widget-rs".to_string()
 }
 
 /// 执行版本发布流程
@@ -492,7 +526,7 @@ pub fn run_release(workspace_root: &Path, manual_version: Option<&str>, dry_run:
 
     // 6. 更新 Cargo.toml
     println!("\n正在更新 Cargo.toml...");
-    if let Err(e) = update_cargo_toml(workspace_root, &version_str) {
+    if let Err(e) = update_cargo_toml(workspace_root, &version_str, &current_version.to_string()) {
         eprintln!("更新 Cargo.toml 失败: {}", e);
         std::process::exit(1);
     }
