@@ -6,6 +6,26 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+## [0.2.0](https://github.com/tierlabx/widget-rs/releases/tag/v0.2.0) - 2026-08-07
+
+### Added
+
+- implement automated release management tools for version bumping, CHANGELOG generation, and Cargo.toml updates
+- 修复窗口漂移
+- add stretchly plugin with full-screen break overlay and native window hook support
+
+### Fixed
+
+- ci 发布工具
+- 修复多屏，及内存优化
+- 修复内存泄漏问题
+- 修复stretchly 遮罩问题
+- 修复便签主题
+
+### Changed
+
+- remove dist-workspace.toml and update contribution guidelines
+
 
 ## [0.1.0](https://github.com/tierlabx/widget-rs/releases/tag/v0.1.0) - 2026-07-31
 
