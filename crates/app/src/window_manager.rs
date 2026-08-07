@@ -205,32 +205,18 @@ impl WindowManager {
                 entry.scale = actual_scale;
 
                 // 同时保存物理像素坐标（用于 SetWindowPos 精确恢复）
+                // 必须用 GetWindowRect（与 SetWindowPos 同一坐标系），
+                // 不能用 DwmGetWindowAttribute 因为它排除了 DWM 阴影区域，导致每次保存都缩水
                 if *hwnd != 0 {
                     unsafe {
                         use windows_sys::Win32::Foundation::RECT;
-                        use windows_sys::Win32::Graphics::Dwm::{
-                            DwmGetWindowAttribute, DWMWA_EXTENDED_FRAME_BOUNDS,
-                        };
+                        use windows_sys::Win32::UI::WindowsAndMessaging::GetWindowRect;
                         let mut rect: RECT = std::mem::zeroed();
-                        let hr = DwmGetWindowAttribute(
-                            *hwnd,
-                            DWMWA_EXTENDED_FRAME_BOUNDS as u32,
-                            &mut rect as *mut _ as *mut _,
-                            std::mem::size_of::<RECT>() as u32,
-                        );
-                        if hr == 0 {
+                        if GetWindowRect(*hwnd, &mut rect) != 0 {
                             entry.phys_x = rect.left;
                             entry.phys_y = rect.top;
                             entry.phys_w = rect.right - rect.left;
                             entry.phys_h = rect.bottom - rect.top;
-                        } else {
-                            use windows_sys::Win32::UI::WindowsAndMessaging::GetWindowRect;
-                            if GetWindowRect(*hwnd, &mut rect) != 0 {
-                                entry.phys_x = rect.left;
-                                entry.phys_y = rect.top;
-                                entry.phys_w = rect.right - rect.left;
-                                entry.phys_h = rect.bottom - rect.top;
-                            }
                         }
                     }
                 }

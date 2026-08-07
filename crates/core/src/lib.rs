@@ -334,6 +334,18 @@ pub fn resolve_plugin_bounds(
 
     // 枚举所有活跃显示器，检查窗口中心点是否在某个显示器上
     let monitors = enumerate_monitors();
+    for (i, m) in monitors.iter().enumerate() {
+        println!(
+            "[resolve_plugin_bounds] 显示器{}: ({},{})~({},{}) DPI={} 缩放={}%",
+            i,
+            m.left,
+            m.top,
+            m.right,
+            m.bottom,
+            m.dpi,
+            (m.dpi as f32 / 96.0 * 100.0) as u32
+        );
+    }
     let on_monitor = monitors.iter().any(|m| {
         check_cx >= m.left as f32
             && check_cx < m.right as f32
