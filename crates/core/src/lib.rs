@@ -53,6 +53,9 @@ pub struct PluginConfig {
 pub struct AppConfig {
     #[serde(default)]
     pub auto_start: bool,
+    /// 应用启动时自动检查新版本
+    #[serde(default = "default_true")]
+    pub auto_check_update: bool,
     /// 各插件位置，键为插件 ID，例如 "sticky_widget"
     pub plugins: HashMap<String, PluginConfig>,
     /// 插件自定义数据

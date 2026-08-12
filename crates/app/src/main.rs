@@ -335,6 +335,11 @@ fn main() {
             .collect::<Vec<_>>();
         cx.set_global(widget_core::PluginList(metadata_list));
 
+        // 注册更新状态桥接（异步任务通过此全局变量回传更新检查/下载状态）
+        cx.set_global(widget_ui::MainWindowUpdateBridge {
+            status: widget_ui::UpdateStatus::Idle,
+        });
+
         // 注册立即写盘回调，插件可调用 save_config_now(cx) 触发
         let store_for_save = Arc::clone(&store_for_app);
         cx.set_global(widget_core::SaveCallback(std::sync::Arc::new(

@@ -15,13 +15,40 @@ trigger: always_on
 - **模块化与注释**：
   - 遵循项目的 `app`、`core`、`ui` 及 `plugins` 隔离架构。
   - 重要的业务逻辑、开放的 API（public structs/traits/functions）必须添加标准的 Rust 文档注释（`///`）。
+  - **单文件行数限制**：任何 `.rs` 文件不应超过 **400 行**。超出时必须按职责拆分为子模块。
 - **插件开发规范**：
   - 所有小部件插件**必须**使用 `WidgetWindow<T>` 容器包装，**禁止**在插件的 `view.rs` 中手动实现编辑模式检测、拖拽条渲染、窗口边框切换、`update_window_edit_mode` 等窗口级逻辑。
   - 插件的 UI 结构体必须实现 `widget_core::WidgetContent` trait（提供 `plugin_id()` 和 `drag_label()`）。
   - `spawn_window` 必须使用 `widget_core::default_widget_window_options()` 创建窗口选项，并通过 `WidgetWindow::new(content)` 包装内容。
   - 如有特殊需求（如条件隐藏拖拽条），通过覆盖 `show_drag_handle()` 方法实现，不要自行渲染拖拽条。
 
-## 3. 工作流与自动化规范
+## 3. 控制面板 UI 开发规范
+- **模块化文件结构**（`crates/ui/src/`）：
+  - `main_window.rs` — 仅包含 `MainWindow` 结构体和 `Render` impl，负责组装 Layout。
+  - `layout.rs` — 通用布局函数：`page_header()`、`section_title()`、`settings_card()`、`settings_row()` 等。
+  - `titlebar.rs` — 标题栏渲染逻辑。
+  - `sidebar.rs` — 侧边导航渲染逻辑。
+  - `update.rs` — 更新检查/下载逻辑及 `UpdateStatus` 枚举。
+  - `pages/*.rs` — 每个页面一个文件（`dashboard.rs`、`widgets.rs`、`settings.rs`）。
+  - `components/*.rs` — 可复用 UI 组件（`badge`、`button`、`card`、`toggle` 等）。
+- **统一 Layout 滚动**：
+  - 滚动由 `main_window.rs` 的 Layout 层统一处理（`overflow_hidden + min_h_0 + overflow_y_scroll`）。
+  - **禁止**在页面文件（`pages/*.rs`）中自行添加 `overflow_y_scroll` 或 `min_h_0`。
+  - 页面函数只返回内容元素，不关心滚动和外层容器。
+- **复用通用组件**：
+  - 页面标题**必须**使用 `layout::page_header(title, subtitle)`，禁止手写 `text_3xl + font_weight(BOLD)` 样板。
+  - 区块标题**必须**使用 `layout::section_title(title)`。
+  - 设置卡片**必须**使用 `layout::settings_card()` + `layout::settings_row()`。
+  - Toggle 开关**必须**使用 `components::toggle::toggle_switch()`。
+- **新增页面流程**：
+  1. 在 `pages/` 下新建文件，实现页面内容函数。
+  2. 在 `pages/mod.rs` 中声明模块。
+  3. 在 `NavPage` 枚举中添加变体。
+  4. 在 `sidebar.rs` 中添加导航项。
+  5. 在 `main_window.rs` 的 `Render` match 中添加路由。
+  6. **不需要**处理滚动、页面容器或 padding — Layout 已统一处理。
+
+## 4. 工作流与自动化规范
 - **约定式提交 (Conventional Commits)**：
   - 帮你生成或执行 Git 提交时，提交信息**必须**采用 Conventional Commits 格式（如 `feat: xxx`, `fix: xxx`, `docs: xxx`, `chore: xxx`）。
   - 严格的提交格式是 `widget-cli release` 自动化版本发布和更新日志生成的基础。

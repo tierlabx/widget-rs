@@ -50,6 +50,27 @@ fn get_private_memory_usage() -> usize {
         .unwrap_or(0)
 }
 
+/// 更新检查状态
+pub enum UpdateStatus {
+    /// 初始状态
+    Idle,
+    /// 正在检查中
+    Checking,
+    /// 发现新版本
+    Available {
+        version: String,
+        download_url: String,
+    },
+    /// 正在下载 (0-100%)
+    Downloading(u8),
+    /// 下载完成，待安装
+    ReadyToInstall(std::path::PathBuf),
+    /// 已是最新版本
+    UpToDate,
+    /// 错误
+    Error(String),
+}
+
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub enum NavPage {
     Dashboard,
@@ -60,6 +81,7 @@ pub enum NavPage {
 pub struct MainWindow {
     is_maximized: bool,
     nav_page: NavPage,
+    update_status: UpdateStatus,
 }
 
 impl Default for MainWindow {
@@ -73,6 +95,7 @@ impl MainWindow {
         Self {
             is_maximized: false,
             nav_page: NavPage::Dashboard,
+            update_status: UpdateStatus::Idle,
         }
     }
 }
@@ -118,6 +141,8 @@ impl Render for MainWindow {
                     .flex()
                     .flex_1()
                     .w_full()
+                    .overflow_hidden()
+                    .min_h_0()
                     .child(self.render_sidebar(nav_page, cx))
                     .child(match nav_page {
                         NavPage::Dashboard => {
@@ -1165,18 +1190,288 @@ impl MainWindow {
             )
     }
 
-    fn render_settings_page(&self, cx: &mut Context<Self>) -> impl IntoElement {
+    fn render_settings_page(&mut self, cx: &mut Context<Self>) -> impl IntoElement {
         let auto_start = cx
             .try_global::<widget_core::AppConfig>()
             .is_some_and(|c| c.auto_start);
+        let auto_check_update = cx
+            .try_global::<widget_core::AppConfig>()
+            .is_some_and(|c| c.auto_check_update);
+
+        // 从全局桥接同步状态
+        if let Some(bridge) = cx.try_global::<MainWindowUpdateBridge>() {
+            match &bridge.status {
+                UpdateStatus::Idle => {}
+                other => {
+                    // 需要用 unsafe 来绕过借用检查，因为 bridge 借用了 cx
+                    let status_clone = match other {
+                        UpdateStatus::Idle => UpdateStatus::Idle,
+                        UpdateStatus::Checking => UpdateStatus::Checking,
+                        UpdateStatus::Available {
+                            version,
+                            download_url,
+                        } => UpdateStatus::Available {
+                            version: version.clone(),
+                            download_url: download_url.clone(),
+                        },
+                        UpdateStatus::Downloading(p) => UpdateStatus::Downloading(*p),
+                        UpdateStatus::ReadyToInstall(p) => UpdateStatus::ReadyToInstall(p.clone()),
+                        UpdateStatus::UpToDate => UpdateStatus::UpToDate,
+                        UpdateStatus::Error(e) => UpdateStatus::Error(e.clone()),
+                    };
+                    self.update_status = status_clone;
+                }
+            }
+        }
+
+        // 根据更新状态构建右侧按钮区域
+        let update_right = match &self.update_status {
+            UpdateStatus::Idle => {
+                let handler = cx.listener(|this, _: &ClickEvent, _, cx| {
+                    this.check_for_update(cx);
+                });
+                div()
+                    .child(
+                        div()
+                            .id("check-update-btn")
+                            .cursor_pointer()
+                            .flex()
+                            .items_center()
+                            .gap(px(6.0))
+                            .px(px(16.0))
+                            .py(px(8.0))
+                            .rounded(px(6.0))
+                            .bg(rgb(0x101010))
+                            .border_1()
+                            .border_color(rgb(0x3d3a39))
+                            .hover(|s| s.border_color(rgba(0x00d99280)))
+                            .on_click(handler)
+                            .child(div().text_color(rgb(0x8b949e)).child(
+                                gpui_component::Icon::new(gpui_component::IconName::LoaderCircle),
+                            ))
+                            .child(
+                                div()
+                                    .text_sm()
+                                    .font_weight(FontWeight::MEDIUM)
+                                    .text_color(rgb(0xf2f2f2))
+                                    .child("检查更新"),
+                            ),
+                    )
+                    .into_any_element()
+            }
+            UpdateStatus::Checking => {
+                div()
+                    .child(
+                        div()
+                            .flex()
+                            .items_center()
+                            .gap(px(6.0))
+                            .px(px(16.0))
+                            .py(px(8.0))
+                            .rounded(px(6.0))
+                            .bg(rgb(0x101010))
+                            .border_1()
+                            .border_color(rgb(0x3d3a39))
+                            .child(div().text_color(rgb(0x00d992)).child(
+                                gpui_component::Icon::new(gpui_component::IconName::LoaderCircle),
+                            ))
+                            .child(div().text_sm().text_color(rgb(0x8b949e)).child("检查中...")),
+                    )
+                    .into_any_element()
+            }
+            UpdateStatus::Available {
+                version,
+                download_url,
+            } => {
+                let ver = version.clone();
+                let url = download_url.clone();
+                let handler = cx.listener(move |this, _: &ClickEvent, _, cx| {
+                    this.download_update(url.clone(), cx);
+                });
+                div()
+                    .flex()
+                    .items_center()
+                    .gap(px(12.0))
+                    .child(
+                        div()
+                            .text_sm()
+                            .text_color(rgb(0x00d992))
+                            .font_weight(FontWeight::MEDIUM)
+                            .child(format!("发现新版本 {}", ver)),
+                    )
+                    .child(
+                        div()
+                            .id("download-update-btn")
+                            .cursor_pointer()
+                            .flex()
+                            .items_center()
+                            .gap(px(6.0))
+                            .px(px(16.0))
+                            .py(px(8.0))
+                            .rounded(px(6.0))
+                            .bg(rgba(0x00d99218))
+                            .border_1()
+                            .border_color(rgb(0x00d992))
+                            .hover(|s| s.bg(rgba(0x00d99230)))
+                            .on_click(handler)
+                            .child(div().text_color(rgb(0x00d992)).child(
+                                gpui_component::Icon::new(gpui_component::IconName::ArrowDown),
+                            ))
+                            .child(
+                                div()
+                                    .text_sm()
+                                    .font_weight(FontWeight::MEDIUM)
+                                    .text_color(rgb(0x2fd6a1))
+                                    .child("立即更新"),
+                            ),
+                    )
+                    .into_any_element()
+            }
+            UpdateStatus::Downloading(progress) => {
+                let pct = *progress;
+                div()
+                    .child(
+                        div()
+                            .flex()
+                            .items_center()
+                            .gap(px(6.0))
+                            .px(px(16.0))
+                            .py(px(8.0))
+                            .rounded(px(6.0))
+                            .bg(rgb(0x101010))
+                            .border_1()
+                            .border_color(rgb(0x3d3a39))
+                            .child(div().text_color(rgb(0x00d992)).child(
+                                gpui_component::Icon::new(gpui_component::IconName::ArrowDown),
+                            ))
+                            .child(
+                                div()
+                                    .text_sm()
+                                    .text_color(rgb(0x8b949e))
+                                    .child(format!("下载中 {}%...", pct)),
+                            ),
+                    )
+                    .into_any_element()
+            }
+            UpdateStatus::ReadyToInstall(path) => {
+                let install_path = path.clone();
+                let handler = cx.listener(move |_this, _: &ClickEvent, _, _cx| {
+                    let _ = std::process::Command::new(&install_path).spawn();
+                    std::process::exit(0);
+                });
+                div()
+                    .child(
+                        div()
+                            .id("install-update-btn")
+                            .cursor_pointer()
+                            .flex()
+                            .items_center()
+                            .gap(px(6.0))
+                            .px(px(16.0))
+                            .py(px(8.0))
+                            .rounded(px(6.0))
+                            .bg(rgba(0x00d99218))
+                            .border_1()
+                            .border_color(rgb(0x00d992))
+                            .hover(|s| s.bg(rgba(0x00d99230)))
+                            .on_click(handler)
+                            .child(div().text_color(rgb(0x00d992)).child(
+                                gpui_component::Icon::new(gpui_component::IconName::ArrowRight),
+                            ))
+                            .child(
+                                div()
+                                    .text_sm()
+                                    .font_weight(FontWeight::MEDIUM)
+                                    .text_color(rgb(0x2fd6a1))
+                                    .child("安装并重启"),
+                            ),
+                    )
+                    .into_any_element()
+            }
+            UpdateStatus::UpToDate => div()
+                .child(
+                    div()
+                        .flex()
+                        .items_center()
+                        .gap(px(6.0))
+                        .px(px(16.0))
+                        .py(px(8.0))
+                        .rounded(px(6.0))
+                        .bg(rgb(0x101010))
+                        .border_1()
+                        .border_color(rgb(0x3d3a39))
+                        .child(
+                            div()
+                                .text_color(rgb(0x00d992))
+                                .child(gpui_component::Icon::new(gpui_component::IconName::Check)),
+                        )
+                        .child(
+                            div()
+                                .text_sm()
+                                .text_color(rgb(0x8b949e))
+                                .child("已是最新版本"),
+                        ),
+                )
+                .into_any_element(),
+            UpdateStatus::Error(msg) => {
+                let err_msg = msg.clone();
+                let handler = cx.listener(|this, _: &ClickEvent, _, cx| {
+                    this.check_for_update(cx);
+                });
+                div()
+                    .flex()
+                    .items_center()
+                    .gap(px(12.0))
+                    .child(div().text_sm().text_color(rgb(0xfb565b)).child(err_msg))
+                    .child(
+                        div()
+                            .id("retry-update-btn")
+                            .cursor_pointer()
+                            .flex()
+                            .items_center()
+                            .gap(px(6.0))
+                            .px(px(16.0))
+                            .py(px(8.0))
+                            .rounded(px(6.0))
+                            .bg(rgb(0x101010))
+                            .border_1()
+                            .border_color(rgb(0x3d3a39))
+                            .hover(|s| s.border_color(rgba(0x00d99280)))
+                            .on_click(handler)
+                            .child(
+                                div()
+                                    .text_sm()
+                                    .font_weight(FontWeight::MEDIUM)
+                                    .text_color(rgb(0xf2f2f2))
+                                    .child("重试"),
+                            ),
+                    )
+                    .into_any_element()
+            }
+        };
+
+        let update_desc: &str = match &self.update_status {
+            UpdateStatus::Idle => "立即手动检查",
+            UpdateStatus::Checking => "正在连接服务器...",
+            UpdateStatus::Available { .. } => "有新版本可用",
+            UpdateStatus::Downloading(_) => "正在下载安装包...",
+            UpdateStatus::ReadyToInstall(_) => "下载完成，点击安装",
+            UpdateStatus::UpToDate => "当前已是最新版本",
+            UpdateStatus::Error(_) => "检查失败",
+        };
+
+        let current_version = env!("CARGO_PKG_VERSION");
 
         div()
+            .id("settings-scroll")
             .flex_1()
             .h_full()
+            .overflow_y_scroll()
             .flex()
             .flex_col()
             .p(px(24.0))
             .gap(px(20.0))
+            // 标题
             .child(
                 div()
                     .flex()
@@ -1196,6 +1491,7 @@ impl MainWindow {
                             .child("配置小部件全局行为"),
                     ),
             )
+            // 开机自启动
             .child(self.setting_toggle(
                 "开机自启动",
                 "系统启动时自动运行应用",
@@ -1225,8 +1521,219 @@ impl MainWindow {
                     widget_core::save_config_now(cx);
                 },
             ))
+            // ── 更新 ─────────────────────────────────────────────────────
+            .child(
+                div()
+                    .text_base()
+                    .font_weight(FontWeight::SEMIBOLD)
+                    .text_color(rgb(0x8b949e))
+                    .child("更新"),
+            )
+            .child(
+                div()
+                    .flex()
+                    .flex_col()
+                    .w_full()
+                    .rounded(px(10.0))
+                    .bg(rgb(0x101010))
+                    .border_1()
+                    .border_color(rgb(0x3d3a39))
+                    .child(
+                        div()
+                            .flex()
+                            .justify_between()
+                            .items_center()
+                            .w_full()
+                            .p(px(20.0))
+                            .border_b_1()
+                            .border_color(rgb(0x3d3a39))
+                            .child(
+                                div()
+                                    .flex()
+                                    .flex_col()
+                                    .gap(px(4.0))
+                                    .child(
+                                        div()
+                                            .text_base()
+                                            .font_weight(FontWeight::SEMIBOLD)
+                                            .text_color(rgb(0xf2f2f2))
+                                            .child("自动检查更新"),
+                                    )
+                                    .child(
+                                        div()
+                                            .text_sm()
+                                            .text_color(rgb(0x8b949e))
+                                            .child("应用启动时自动检查新版本"),
+                                    ),
+                            )
+                            .child(self.toggle_switch(
+                                "auto-check-update",
+                                auto_check_update,
+                                |val, cx| {
+                                    cx.update_global::<widget_core::AppConfig, _>(|c, _| {
+                                        c.auto_check_update = val;
+                                    });
+                                    widget_core::save_config_now(cx);
+                                },
+                            )),
+                    )
+                    .child(
+                        div()
+                            .flex()
+                            .justify_between()
+                            .items_center()
+                            .w_full()
+                            .p(px(20.0))
+                            .child(
+                                div()
+                                    .flex()
+                                    .flex_col()
+                                    .gap(px(4.0))
+                                    .child(
+                                        div()
+                                            .text_base()
+                                            .font_weight(FontWeight::SEMIBOLD)
+                                            .text_color(rgb(0xf2f2f2))
+                                            .child("检查更新"),
+                                    )
+                                    .child(
+                                        div()
+                                            .text_sm()
+                                            .text_color(rgb(0x8b949e))
+                                            .child(update_desc),
+                                    ),
+                            )
+                            .child(update_right),
+                    ),
+            )
+            // ── 关于 ─────────────────────────────────────────────────────
+            .child(
+                div()
+                    .text_base()
+                    .font_weight(FontWeight::SEMIBOLD)
+                    .text_color(rgb(0x8b949e))
+                    .child("关于"),
+            )
+            .child(
+                div()
+                    .flex()
+                    .flex_col()
+                    .w_full()
+                    .rounded(px(10.0))
+                    .bg(rgb(0x101010))
+                    .border_1()
+                    .border_color(rgb(0x3d3a39))
+                    .child(
+                        div()
+                            .flex()
+                            .justify_between()
+                            .items_center()
+                            .w_full()
+                            .p(px(20.0))
+                            .border_b_1()
+                            .border_color(rgb(0x3d3a39))
+                            .child(
+                                div()
+                                    .text_base()
+                                    .font_weight(FontWeight::SEMIBOLD)
+                                    .text_color(rgb(0xf2f2f2))
+                                    .child("Widget-RS"),
+                            )
+                            .child(
+                                div()
+                                    .text_sm()
+                                    .text_color(rgb(0x8b949e))
+                                    .child(format!("v{}", current_version)),
+                            ),
+                    )
+                    .child(
+                        div()
+                            .flex()
+                            .justify_between()
+                            .items_center()
+                            .w_full()
+                            .p(px(20.0))
+                            .border_b_1()
+                            .border_color(rgb(0x3d3a39))
+                            .child(
+                                div()
+                                    .text_base()
+                                    .font_weight(FontWeight::SEMIBOLD)
+                                    .text_color(rgb(0xf2f2f2))
+                                    .child("开源地址"),
+                            )
+                            .child(
+                                div()
+                                    .id("open-github-link")
+                                    .cursor_pointer()
+                                    .text_sm()
+                                    .text_color(rgb(0x00d992))
+                                    .hover(|s| s.text_color(rgb(0x2fd6a1)))
+                                    .on_click(|_, _, _| {
+                                        let _ = open::that("https://github.com/tierlabx/widget-rs");
+                                    })
+                                    .child("github.com/tierlabx/widget-rs"),
+                            ),
+                    )
+                    .child(
+                        div()
+                            .flex()
+                            .justify_between()
+                            .items_center()
+                            .w_full()
+                            .p(px(20.0))
+                            .child(
+                                div()
+                                    .text_base()
+                                    .font_weight(FontWeight::SEMIBOLD)
+                                    .text_color(rgb(0xf2f2f2))
+                                    .child("许可证"),
+                            )
+                            .child(
+                                div()
+                                    .text_sm()
+                                    .text_color(rgb(0x8b949e))
+                                    .child("MIT License"),
+                            ),
+                    ),
+            )
     }
 
+    /// Toggle 开关组件
+    fn toggle_switch(
+        &self,
+        id: &'static str,
+        enabled: bool,
+        on_toggle: impl Fn(bool, &mut App) + 'static,
+    ) -> impl IntoElement {
+        div()
+            .id(ElementId::Name(id.into()))
+            .cursor_pointer()
+            .w(px(48.0))
+            .h(px(26.0))
+            .rounded_full()
+            .bg(if enabled {
+                rgb(0x00d992)
+            } else {
+                rgb(0x3d3a39)
+            })
+            .flex()
+            .items_center()
+            .px(px(3.0))
+            .on_click(move |_, _, cx| {
+                on_toggle(!enabled, cx);
+            })
+            .child(
+                div()
+                    .w(px(20.0))
+                    .h(px(20.0))
+                    .rounded_full()
+                    .bg(rgb(0xffffff))
+                    .when(enabled, |d: gpui::Div| d.ml(px(22.0))),
+            )
+    }
+
+    /// 带标签的 toggle 行组件
     fn setting_toggle(
         &self,
         title: &'static str,
@@ -1259,32 +1766,142 @@ impl MainWindow {
                     )
                     .child(div().text_sm().text_color(rgb(0x8b949e)).child(desc)),
             )
-            .child(
-                div()
-                    .id(ElementId::Name(id.into()))
-                    .cursor_pointer()
-                    .w(px(48.0))
-                    .h(px(26.0))
-                    .rounded_full()
-                    .bg(if enabled {
-                        rgb(0x00d992)
-                    } else {
-                        rgb(0x3d3a39)
+            .child(self.toggle_switch(id, enabled, on_toggle))
+    }
+
+    /// 异步检查 GitHub Releases 最新版本
+    fn check_for_update(&mut self, cx: &mut Context<Self>) {
+        self.update_status = UpdateStatus::Checking;
+        cx.notify();
+
+        let app_cx: &mut gpui::App = cx;
+        app_cx
+            .spawn(async move |async_cx| {
+                let result = async_cx
+                    .background_executor()
+                    .spawn(async {
+                        let resp = ureq::get(
+                            "https://api.github.com/repos/tierlabx/widget-rs/releases/latest",
+                        )
+                        .header("User-Agent", "widget-rs-updater")
+                        .header("Accept", "application/vnd.github.v3+json")
+                        .call()
+                        .map_err(|e| format!("网络请求失败: {}", e))?;
+
+                        let body: serde_json::Value = resp
+                            .into_body()
+                            .read_json()
+                            .map_err(|e| format!("解析响应失败: {}", e))?;
+
+                        let tag = body["tag_name"]
+                            .as_str()
+                            .ok_or_else(|| "无法获取版本号".to_string())?
+                            .to_string();
+
+                        // 查找 *-setup.exe 或 *_setup.exe 资产
+                        let download_url = body["assets"]
+                            .as_array()
+                            .and_then(|assets| {
+                                assets.iter().find_map(|a| {
+                                    let name = a["name"].as_str().unwrap_or("");
+                                    if name.ends_with("-setup.exe") || name.ends_with("_setup.exe")
+                                    {
+                                        a["browser_download_url"].as_str().map(|s| s.to_string())
+                                    } else {
+                                        None
+                                    }
+                                })
+                            })
+                            .unwrap_or_else(|| {
+                                body["html_url"]
+                                    .as_str()
+                                    .unwrap_or(
+                                        "https://github.com/tierlabx/widget-rs/releases/latest",
+                                    )
+                                    .to_string()
+                            });
+
+                        Ok::<(String, String), String>((tag, download_url))
                     })
-                    .flex()
-                    .items_center()
-                    .px(px(3.0))
-                    .on_click(move |_, _, cx| {
-                        on_toggle(!enabled, cx);
+                    .await;
+
+                let _ = async_cx.update(move |cx| {
+                    cx.update_global::<MainWindowUpdateBridge, _>(|bridge, cx| match result {
+                        Ok((tag, url)) => {
+                            let remote_ver = tag.trim_start_matches('v');
+                            let current_ver = env!("CARGO_PKG_VERSION");
+                            if remote_ver > current_ver {
+                                bridge.status = UpdateStatus::Available {
+                                    version: tag,
+                                    download_url: url,
+                                };
+                            } else {
+                                bridge.status = UpdateStatus::UpToDate;
+                            }
+                            cx.refresh_windows();
+                        }
+                        Err(e) => {
+                            bridge.status = UpdateStatus::Error(e);
+                            cx.refresh_windows();
+                        }
+                    });
+                });
+            })
+            .detach();
+    }
+
+    /// 异步下载更新安装包
+    fn download_update(&mut self, url: String, cx: &mut Context<Self>) {
+        self.update_status = UpdateStatus::Downloading(0);
+        cx.notify();
+
+        let app_cx: &mut gpui::App = cx;
+        app_cx
+            .spawn(async move |async_cx| {
+                let result = async_cx
+                    .background_executor()
+                    .spawn(async move {
+                        let resp = ureq::get(&url)
+                            .header("User-Agent", "widget-rs-updater")
+                            .call()
+                            .map_err(|e| format!("下载失败: {}", e))?;
+
+                        let temp_dir = std::env::temp_dir();
+                        let file_name = url
+                            .split('/')
+                            .last()
+                            .unwrap_or("widget-rs-setup.exe")
+                            .to_string();
+                        let dest = temp_dir.join(&file_name);
+
+                        let mut file = std::fs::File::create(&dest)
+                            .map_err(|e| format!("创建文件失败: {}", e))?;
+                        std::io::copy(&mut resp.into_body().into_reader(), &mut file)
+                            .map_err(|e| format!("写入文件失败: {}", e))?;
+
+                        Ok::<std::path::PathBuf, String>(dest)
                     })
-                    .child(
-                        div()
-                            .w(px(20.0))
-                            .h(px(20.0))
-                            .rounded_full()
-                            .bg(rgb(0xffffff))
-                            .when(enabled, |d: gpui::Div| d.ml(px(22.0))),
-                    ),
-            )
+                    .await;
+
+                let _ = async_cx.update(move |cx| {
+                    cx.update_global::<MainWindowUpdateBridge, _>(|bridge, cx| match result {
+                        Ok(path) => {
+                            bridge.status = UpdateStatus::ReadyToInstall(path);
+                            cx.refresh_windows();
+                        }
+                        Err(e) => {
+                            bridge.status = UpdateStatus::Error(e);
+                            cx.refresh_windows();
+                        }
+                    });
+                });
+            })
+            .detach();
     }
 }
+
+/// 全局桥接：用于异步任务回传更新状态到 MainWindow
+pub struct MainWindowUpdateBridge {
+    pub status: UpdateStatus,
+}
+impl Global for MainWindowUpdateBridge {}
