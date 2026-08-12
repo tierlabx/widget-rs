@@ -123,5 +123,12 @@ pub fn render_markdown(text: &str) -> impl IntoElement {
         );
     }
 
-    div().w_full().flex().flex_col().children(elements)
+    div()
+        .id("sticky-md-scroll")
+        .w_full()
+        .h_full()
+        .overflow_y_scroll()
+        .flex()
+        .flex_col()
+        .children(elements)
 }

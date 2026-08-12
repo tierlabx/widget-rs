@@ -96,6 +96,8 @@ impl Render for StickyWidget {
                     .bg(rgb(0xfef3c7))
                     .p(px(8.0))
                     .id("sticky-container")
+                    .overflow_hidden()
+                    .min_h_0()
                     .on_double_click(|_, _, cx| {
                         cx.update_global::<widget_core::UIState, _>(|s, _| {
                             // 仅在非排版模式下，双击切换预览/编辑
@@ -113,6 +115,8 @@ impl Render for StickyWidget {
                             .flex_1()
                             .w_full()
                             .h_full()
+                            .overflow_hidden()
+                            .min_h_0()
                             .bg(if self.is_preview {
                                 gpui::Hsla::transparent_black()
                             } else {
