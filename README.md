@@ -42,7 +42,7 @@ cd widget-rs
 cargo run
 
 # 构建发布版本
-cargo build --release
+cargo packager --release
 ```
 
 ### 3. 操作指南
