@@ -1,6 +1,6 @@
 # Widget-RS 🎨
 
-[![CI](https://github.com/your-username/widget-rs/actions/workflows/ci.yml/badge.svg)](https://github.com/your-username/widget-rs/actions/workflows/ci.yml)
+[![CI](https://github.com/tierlabx/widget-rs/actions/workflows/ci.yml/badge.svg)](https://github.com/tierlabx/widget-rs/actions/workflows/ci.yml)
 [![Rust](https://img.shields.io/badge/rust-1.75%2B-blue.svg)](https://www.rust-lang.org)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
