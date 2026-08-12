@@ -16,8 +16,9 @@
 
 ### 2.2 多窗口支持与无边框特性
 * 小部件（便签、待办）要求是无边框独立悬浮窗。
-* **实现方案**：在 GPUI 的 WindowOptions 中设置 `titlebar: None` 以及 `window_background: WindowBackgroundAppearance::Transparent`。
-* 拖拽实现：由于去除了原生标题栏，可以在 GPUI 中捕获鼠标拖拽事件，并调用平台原生 API 或 GPUI 的拖拽扩展执行窗口拖拽。
+* **实现方案**：在 GPUI 的 WindowOptions 中设置 `titlebar: None` 以及 `window_background: WindowBackgroundAppearance::Transparent`。通过 `widget_core::default_widget_window_options()` 辅助函数统一创建标准窗口选项。
+* **窗口容器 (WidgetWindow)**：所有插件窗口通过 `WidgetWindow<T: WidgetContent>` 容器统一包装。该容器在 `Render` 实现中自动处理：编辑模式检测（`UIState::is_edit_mode`）、拖拽条渲染（`#00d992` + `start_window_drag`）、窗口边框切换、`update_window_edit_mode`（`WS_THICKFRAME` 切换）。插件只需实现 `WidgetContent` trait 提供 `plugin_id()`、`drag_label()` 和可选的 `show_drag_handle()`。
+* 拖拽实现：由 `WidgetWindow` 容器在编辑模式下渲染拖拽条，调用 GPUI 的 `start_window_drag` 执行原生窗口拖拽。
 
 ### 2.3 高级窗口交互
 * **始终置顶 (Always on Top)**：在创建小部件窗口时，将对应平台窗口属性（`always_on_top`）设置为 true。
@@ -27,8 +28,9 @@
 * **鼠标穿透 (Mouse Passthrough)**：为实现小部件不干扰日常操作，需在 Rust 控制层通过获取底层原生窗口句柄（如 `winit` 的 `set_cursor_hittest(false)`）动态开启/关闭窗口的鼠标事件拦截。开启穿透后，拖拽区将暂时失效，因此须通过系统托盘菜单等外部控制流提供关闭穿透的入口。
 
 ### 2.4 插件市场与动态扩展
-* **组件化插件**：为了支持第三方插件，通过暴露标准的 GPUI Plugin 接口，并探索使用动态链接库或 WASM 将 UI 与逻辑下发到本地执行。
-* **逻辑运行沙箱**：考虑到第三方插件的安全性，插件的业务代码不能直接编译为原生库。初期可以提供基于 REST/Local Socket 的跨进程通讯接口；中后期推荐集成 WebAssembly 沙箱 (`wasmtime`) 或嵌入式脚本引擎（如 `rhai`），插件开发者可使用 JS/TS/Rust 编译为 Wasm 并在沙箱内安全调用宿主（Host）提供的公开 API（如弹窗、发起网络请求等）。
+* **源码级插件 (当前)**：通过 `widget-cli` 自动化工具实现源码级插件注入。插件实现 `WidgetContent` trait + `Plugin` trait，由 `WidgetWindow` 容器统一提供窗口能力。新插件只需约 20 行样板代码即可接入。
+* **组件化插件 (规划)**：为了支持第三方插件，通过暴露标准的 GPUI Plugin 接口，并探索使用动态链接库或 WASM 将 UI 与逻辑下发到本地执行。
+* **逻辑运行沙箱 (规划)**：考虑到第三方插件的安全性，未来推荐集成 WebAssembly 沙箱 (`wasmtime`)，WASM 插件通过声明式 UI 协议 (`WidgetNode`) 与 Host 端的 `WasmBridge: WidgetContent` 桥接组件交互，由 `WidgetWindow` 容器统一管理窗口行为。
 
 ### 2.5 本地存储系统
 * 使用系统标准的应用数据目录 (`std::env` 获取，如 `%APPDATA%/WidgetRS/` 或 `~/.config/WidgetRS/`) 存放数据。
@@ -52,29 +54,43 @@ directories = "5.0"
 
 ## 4. 项目结构设计 (Project Structure Design)
 
-项目将采用标准的 Cargo 目录结构，同时将 UI 资源（Slint）、核心逻辑和插件沙箱进行清晰的物理隔离：
+项目采用 Cargo Workspace 的 monorepo 结构，将核心框架、UI 层和业务插件进行清晰的物理隔离：
 
 ```text
 widget-rs/
-├── Cargo.toml                # 项目全局依赖与工作区配置
-├── build.rs                  # 构建脚本（负责在编译期间处理静态 .slint 文件）
-├── ui/                       # UI 组件层 (UI Layer)
-│   ├── theme.rs              # 全局样式规范（颜色、间距、字体等，对应 VoltAgent 规范）
-│   ├── main_window.rs        # 主管理面板界面
-│   ├── sticky_widget.rs      # 便签小部件界面
-│   ├── todo_widget.rs        # 待办小部件界面
-│   └── components/           # 复用的 UI 组件库（如自定义按钮、输入框、状态卡片）
-├── src/                      # 核心控制与数据层 (Controller & Data Layer)
-│   ├── main.rs               # 程序入口与主事件循环挂载
-│   ├── app.rs                # App Core Manager (核心状态与生命周期调度)
-│   ├── window_manager.rs     # 窗口控制器（多窗口句柄管理、边缘吸附、鼠标穿透拦截）
-│   ├── tray.rs               # 系统托盘图标与右键事件处理
-│   ├── store.rs              # 本地数据持久化（读写 JSON 配置和数据）
-│   ├── plugin_manager.rs     # 插件市场交互、下载与动态 UI 加载管理器
-│   └── sandbox.rs            # 插件安全运行沙箱（Wasm / 脚本解释器交互层）
-└── plugins/                  # [运行期自动生成] 本地安装的插件资源目录
-    └── example_plugin/       # 示例插件目录
-        ├── ui.rs             # 插件的 UI 组件代码
-        ├── logic.wasm        # 插件的编译后沙箱逻辑
-        └── manifest.json     # 插件元数据（名称、版本、所需系统权限声明）
+├── Cargo.toml                # Workspace 全局配置
+├── crates/                   # 核心框架层
+│   ├── core/                 # widget-core：Plugin trait, WidgetContent trait,
+│   │   └── src/              #   WidgetWindow 容器, AppConfig, UIState 等
+│   │       ├── lib.rs
+│   │       └── widget_window.rs  # WidgetWindow<T> 通用容器
+│   ├── app/                  # widget-rs (主程序入口)
+│   │   └── src/
+│   │       ├── main.rs               # 程序入口、Win32 子类化
+│   │       ├── window_manager.rs     # 多窗口句柄管理、边缘吸附
+│   │       └── plugin_registry.rs    # 插件注册表（CLI 自动维护）
+│   ├── ui/                   # widget-ui：主窗口 UI 与通用组件
+│   │   └── src/
+│   │       ├── main_window.rs        # 管理面板界面
+│   │       └── components/           # 复用 UI 组件（Badge, Button, Card）
+│   └── cli/                  # widget-cli：插件管理命令行工具
+├── plugins/                  # 业务插件层
+│   ├── sticky/               # 便签插件
+│   │   └── src/
+│   │       ├── lib.rs        # Plugin trait 实现 + spawn_window
+│   │       ├── view.rs       # WidgetContent + Render 实现
+│   │       ├── model.rs      # 数据持久化逻辑
+│   │       └── markdown.rs   # Markdown 渲染
+│   ├── todo/                 # 待办事项插件
+│   │   └── src/
+│   │       ├── lib.rs
+│   │       ├── view.rs       # WidgetContent + Render 实现
+│   │       └── model.rs
+│   └── stretchly/            # 健康提醒插件
+│       └── src/
+│           ├── lib.rs
+│           ├── view.rs       # WidgetContent + Render (含 show_drag_handle 条件)
+│           ├── model.rs
+│           └── overlay.rs    # 休息遮罩层
+└── docs/                     # 设计文档
 ```

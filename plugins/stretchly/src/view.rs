@@ -295,13 +295,23 @@ impl StretchlyWidget {
     }
 }
 
+impl widget_core::WidgetContent for StretchlyWidget {
+    fn plugin_id(&self) -> &'static str {
+        "stretchly_widget"
+    }
+
+    fn drag_label(&self) -> &'static str {
+        "拖拽移动"
+    }
+
+    /// 休息中不显示拖拽条
+    fn show_drag_handle(&self) -> bool {
+        !self.model.is_on_break()
+    }
+}
+
 impl Render for StretchlyWidget {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        let is_edit_mode = cx
-            .try_global::<widget_core::UIState>()
-            .is_some_and(|s| s.is_edit_mode);
-        widget_core::update_window_edit_mode(window, is_edit_mode);
-
         // ── 缓存 HWND 供 timer 回调使用 ─────────────────────────────────────
         let hwnd = window
             .window_handle()
@@ -350,33 +360,6 @@ impl Render for StretchlyWidget {
             format!("{} 秒", rem_secs)
         };
 
-        // ── 编辑模式拖拽条 ────────────────────────────────────────────────────
-        let drag_handle = if is_edit_mode && !is_on_break {
-            Some(
-                div()
-                    .w_full()
-                    .h(px(24.0))
-                    .bg(rgb(0x00d992))
-                    .flex()
-                    .justify_center()
-                    .items_center()
-                    .flex_shrink_0()
-                    .id("stretchly-drag")
-                    .on_mouse_down(MouseButton::Left, |_, win, _| {
-                        widget_core::start_window_drag(win);
-                    })
-                    .child(
-                        div()
-                            .text_xs()
-                            .font_weight(FontWeight::BOLD)
-                            .text_color(rgb(0x050507))
-                            .child(":: 拖拽移动 ::"),
-                    ),
-            )
-        } else {
-            None
-        };
-
         // ══════════════════════════════════════════════════════════════════════
         // 工作中/休息中：紧凑小组件（休息时作为底层显示）
         // ══════════════════════════════════════════════════════════════════════
@@ -386,11 +369,7 @@ impl Render for StretchlyWidget {
         } else {
             rgba(0x0d111aefu32)
         };
-        let border_color = if is_warning {
-            rgba(0xf59e0b50u32)
-        } else {
-            rgba(0xffffff18u32)
-        };
+
         let progress_color = if is_warning {
             rgb(0xf59e0bu32)
         } else {
@@ -416,11 +395,9 @@ impl Render for StretchlyWidget {
         div()
             .flex()
             .flex_col()
+            .flex_1()
             .size_full()
             .bg(bg_color)
-            .border_1()
-            .border_color(border_color)
-            .children(drag_handle)
             .child(
                 div()
                     .flex()

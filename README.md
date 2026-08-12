@@ -73,13 +73,21 @@ cargo run -p widget-cli -- plugin remove sticky_plugin
 1. 创建一个新的 Rust 库 (`cargo new --lib plugins/my_plugin`)
 2. 引入 `widget-core` 依赖
 3. 遵循 **UI与逻辑分离规范**，建立 `model.rs` 存放数据逻辑，`view.rs` 存放渲染代码。
-4. 在 `lib.rs` 中实现 `widget_core::Plugin` Trait 并提供标准的 `create_plugin` 函数，例如：
+4. 在 `view.rs` 中实现 `widget_core::WidgetContent` Trait（只需提供 `plugin_id` 和 `drag_label`），窗口级能力（编辑模式、拖拽、边框）由 `WidgetWindow` 容器自动提供。
+5. 在 `lib.rs` 中实现 `widget_core::Plugin` Trait，使用 `WidgetWindow` 包装你的内容：
 ```rust
-pub fn create_plugin() -> std::sync::Arc<dyn widget_core::Plugin> {
-    std::sync::Arc::new(MyPlugin)
+fn spawn_window(&self, cx: &mut App) -> AnyWindowHandle {
+    let options = widget_core::default_widget_window_options(cx, "my_plugin", (100.0, 100.0, 300.0, 300.0));
+    cx.open_window(options, |window, cx| {
+        let content = cx.new(|cx| MyWidget::new(window, cx));
+        let widget_window = cx.new(|_cx| widget_core::WidgetWindow::new(content));
+        cx.new(|cx| gpui_component::Root::new(widget_window, window, cx))
+    }).unwrap().into()
 }
 ```
-4. 使用 CLI 将其添加到主程序中编译运行！
+6. 使用 CLI 将其添加到主程序中编译运行！
+
+> 详细的 API 说明和完整示例请参考 [插件开发指南](docs/PLUGIN_DEVELOPMENT.md)。
 
 ---
 

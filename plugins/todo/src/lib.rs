@@ -31,26 +31,16 @@ impl Plugin for TodoWidgetPlugin {
     }
 
     fn spawn_window(&self, cx: &mut App) -> AnyWindowHandle {
-        let (x, y, w, h) =
-            widget_core::resolve_plugin_bounds(cx, "todo_widget", (1250.0, 450.0, 360.0, 460.0));
-
-        println!("[TodoPlugin] 初始位置: ({}, {}) {}x{}", x, y, w, h);
-
-        let options = WindowOptions {
-            titlebar: None,
-            window_background: WindowBackgroundAppearance::Transparent,
-            kind: WindowKind::PopUp,
-            is_resizable: false,
-            window_bounds: Some(WindowBounds::Windowed(Bounds::new(
-                Point::new(px(x), px(y)),
-                size(px(w), px(h)),
-            ))),
-            ..Default::default()
-        };
+        let options = widget_core::default_widget_window_options(
+            cx,
+            "todo_widget",
+            (1250.0, 450.0, 360.0, 460.0),
+        );
 
         cx.open_window(options, |window, cx| {
-            let view = cx.new(|cx| TodoWidget::new(window, cx));
-            cx.new(|cx| gpui_component::Root::new(view, window, cx))
+            let content = cx.new(|cx| TodoWidget::new(window, cx));
+            let widget_window = cx.new(|_cx| widget_core::WidgetWindow::new(content));
+            cx.new(|cx| gpui_component::Root::new(widget_window, window, cx))
         })
         .unwrap()
         .into()

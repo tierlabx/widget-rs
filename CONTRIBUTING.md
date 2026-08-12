@@ -13,7 +13,7 @@
 
 ## 🛠 提交流程与规范 (约定式提交)
 
-为了配合 GitHub Actions 以及 `release-plz` 自动化发布工具，本项目**强制要求使用 Conventional Commits (约定式提交)**。
+为了配合 GitHub Actions 以及 `widget-cli release` 自动化发布工具，本项目**强制要求使用 Conventional Commits (约定式提交)**。
 
 提交信息格式要求如下：
 ```text
@@ -42,21 +42,34 @@
 1. 在 `plugins/` 目录下新建一个 Cargo 包：`cargo new --lib plugins/my_plugin`
 2. 按照分离规范组织代码结构：
    - `src/model.rs`: 纯数据结构定义、状态管理与持久化逻辑。
-   - `src/view.rs`: 具体的 `GPUI` 渲染树实现 (实现 `Render` Trait)。
+   - `src/view.rs`: 具体的 `GPUI` 渲染树实现 (实现 `Render` 和 `WidgetContent` Trait)。
    - `src/lib.rs`: 作为模块入口，暴露插件和统一装配。
-3. 让你的插件入口实现 `widget_core::Plugin` Trait (提供 `spawn_window`, `on_load` 等方法)。
-4. 在插件代码根目录（通常是 `lib.rs`）暴露统一入口点：
+3. 你的小部件 UI 结构体必须实现 `widget_core::WidgetContent` Trait，提供 `plugin_id()` 和 `drag_label()`，窗口级能力（编辑模式、拖拽、边框切换）由 `WidgetWindow` 统一管理，**禁止在插件内手动实现**。
+4. 在 `lib.rs` 中实现 `widget_core::Plugin` Trait，`spawn_window` 使用 `WidgetWindow` 包装你的内容：
+   ```rust
+   fn spawn_window(&self, cx: &mut App) -> AnyWindowHandle {
+       let options = widget_core::default_widget_window_options(cx, "my_plugin", (100.0, 100.0, 300.0, 300.0));
+       cx.open_window(options, |window, cx| {
+           let content = cx.new(|cx| MyWidget::new(window, cx));
+           let widget_window = cx.new(|_cx| widget_core::WidgetWindow::new(content));
+           cx.new(|cx| gpui_component::Root::new(widget_window, window, cx))
+       }).unwrap().into()
+   }
+   ```
+5. 暴露统一入口点：
    ```rust
    pub fn create_plugin() -> std::sync::Arc<dyn widget_core::Plugin> {
        std::sync::Arc::new(MyPlugin)
    }
    ```
-4. 使用提供的命令行工具自动化注册插件：
+6. 使用提供的命令行工具自动化注册插件：
    ```bash
    cargo run -p widget-cli -- plugin add my_plugin --path plugins/my_plugin
    ```
 
-如果你在开发中遇到任何架构设计上的疑问，请参考 `docs/PRD.md` 和 `README.md` 中的架构图。
+> **注意**: 编辑模式检测、拖拽条、窗口边框、`update_window_edit_mode` 等窗口级逻辑已由 `WidgetWindow` 容器统一封装，**不要**在插件中重复实现。
+
+详细的 API 说明请参考 `docs/PLUGIN_DEVELOPMENT.md`。
 
 ## 📦 打包与构建
 

@@ -3,7 +3,6 @@ use gpui::*;
 use gpui_component::input::{Input, InputEvent, InputState};
 
 use gpui_component::{Icon, IconName};
-use raw_window_handle::HasWindowHandle;
 
 use crate::model::{TodoItem, TodoModel};
 
@@ -29,7 +28,6 @@ impl Render for DragTodoView {
 }
 
 pub struct TodoWidget {
-    hwnd_reported: bool,
     items: Vec<TodoItem>,
     /// 新增输入框
     new_input: Entity<InputState>,
@@ -74,7 +72,6 @@ impl TodoWidget {
         let edit_input = cx.new(|cx| InputState::new(window, cx).placeholder("编辑待办内容..."));
 
         Self {
-            hwnd_reported: false,
             items: saved_items,
             new_input,
             show_input: false,
@@ -86,50 +83,18 @@ impl TodoWidget {
     }
 }
 
+impl widget_core::WidgetContent for TodoWidget {
+    fn plugin_id(&self) -> &'static str {
+        "todo_widget"
+    }
+
+    fn drag_label(&self) -> &'static str {
+        "拖拽移动待办"
+    }
+}
+
 impl Render for TodoWidget {
     fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        let is_edit_mode = cx
-            .try_global::<widget_core::UIState>()
-            .is_some_and(|s| s.is_edit_mode);
-
-        // ── Win32 HWND / 边框逻辑 ─────────────────────────────────
-        if let Ok(handle) = _window.window_handle() {
-            if let raw_window_handle::RawWindowHandle::Win32(h) = handle.as_raw() {
-                let hwnd = h.hwnd.get();
-                if !self.hwnd_reported {
-                    self.hwnd_reported = true;
-                    let _ = hwnd;
-                }
-            }
-        }
-        widget_core::update_window_edit_mode(_window, is_edit_mode);
-
-        // ── 编辑模式拖拽条 ────────────────────────────────────────
-        let drag_handle = if is_edit_mode {
-            Some(
-                div()
-                    .w_full()
-                    .h(px(28.0))
-                    .bg(rgb(0x00d992))
-                    .flex()
-                    .justify_center()
-                    .items_center()
-                    .id("todo-drag")
-                    .on_mouse_down(MouseButton::Left, |_, window, _| {
-                        widget_core::start_window_drag(window);
-                    })
-                    .child(
-                        div()
-                            .text_xs()
-                            .font_weight(FontWeight::BOLD)
-                            .text_color(rgb(0x050507))
-                            .child(":: 拖拽移动待办 ::"),
-                    ),
-            )
-        } else {
-            None
-        };
-
         let done_count = self.items.iter().filter(|i| i.done).count();
         let total = self.items.len();
         let editing_idx = self.editing_idx;
@@ -387,15 +352,9 @@ impl Render for TodoWidget {
         div()
             .flex()
             .flex_col()
+            .flex_1()
             .size_full()
             .bg(rgba(0x050507f2)) // VoltAgent Abyss Black with slight transparency
-            .border_1()
-            .border_color(if is_edit_mode {
-                rgb(0x00d992)
-            } else {
-                rgb(0x3d3a39) // VoltAgent Warm Charcoal
-            })
-            .children(drag_handle)
             // 标题栏
             .child(
                 div()

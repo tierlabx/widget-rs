@@ -70,28 +70,17 @@ impl Plugin for StretchlyWidgetPlugin {
     }
 
     fn spawn_window(&self, cx: &mut App) -> AnyWindowHandle {
-        let (x, y, w, h) = widget_core::resolve_plugin_bounds(
+        let options = widget_core::default_widget_window_options(
             cx,
             "stretchly_widget",
             // 默认：右上角紧凑小组件，280x100
             (1250.0, 100.0, 280.0, 100.0),
         );
 
-        let options = WindowOptions {
-            titlebar: None,
-            window_background: WindowBackgroundAppearance::Transparent,
-            kind: WindowKind::PopUp,
-            is_resizable: false,
-            window_bounds: Some(WindowBounds::Windowed(Bounds::new(
-                Point::new(px(x), px(y)),
-                size(px(w), px(h)),
-            ))),
-            ..Default::default()
-        };
-
         cx.open_window(options, |window, cx| {
-            let view = cx.new(|cx| StretchlyWidget::new(window, cx));
-            cx.new(|cx| gpui_component::Root::new(view, window, cx))
+            let content = cx.new(|cx| StretchlyWidget::new(window, cx));
+            let widget_window = cx.new(|_cx| widget_core::WidgetWindow::new(content));
+            cx.new(|cx| gpui_component::Root::new(widget_window, window, cx))
         })
         .unwrap()
         .into()

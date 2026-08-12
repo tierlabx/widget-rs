@@ -1,3 +1,6 @@
+mod widget_window;
+pub use widget_window::{default_widget_window_options, WidgetContent, WidgetWindow};
+
 use gpui::*;
 use serde::{Deserialize, Serialize};
 use std::cell::RefCell;

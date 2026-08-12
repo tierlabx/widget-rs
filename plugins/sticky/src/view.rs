@@ -1,13 +1,10 @@
 use gpui::*;
 use gpui_component::input::{Input, InputEvent, InputState};
-use gpui_component::{Icon, IconName, InteractiveElementExt};
-use raw_window_handle::HasWindowHandle;
+use gpui_component::{ActiveTheme, Icon, IconName, InteractiveElementExt};
 
 use crate::model::StickyModel;
-use gpui_component::ActiveTheme;
 
 pub struct StickyWidget {
-    hwnd_reported: bool,
     input: Entity<InputState>,
     is_preview: bool,
 }
@@ -38,71 +35,32 @@ impl StickyWidget {
         .detach();
 
         Self {
-            hwnd_reported: false,
             input,
             is_preview: true,
         }
     }
 }
 
+impl widget_core::WidgetContent for StickyWidget {
+    fn plugin_id(&self) -> &'static str {
+        "sticky_widget"
+    }
+
+    fn drag_label(&self) -> &'static str {
+        "拖拽移动便签"
+    }
+}
+
 impl Render for StickyWidget {
     fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        let is_edit_mode = cx
-            .try_global::<widget_core::UIState>()
-            .is_some_and(|s| s.is_edit_mode);
-
-        if let Ok(handle) = _window.window_handle() {
-            if let raw_window_handle::RawWindowHandle::Win32(h) = handle.as_raw() {
-                let hwnd = h.hwnd.get();
-                if !self.hwnd_reported {
-                    self.hwnd_reported = true;
-                    let _ = hwnd;
-                }
-            }
-        }
-        widget_core::update_window_edit_mode(_window, is_edit_mode);
-
-        let drag_handle = if is_edit_mode {
-            Some(
-                div()
-                    .w_full()
-                    .h(px(28.0))
-                    .bg(rgb(0x00d992)) // Emerald Signal Green
-                    .flex()
-                    .justify_center()
-                    .items_center()
-                    .id("sticky-drag")
-                    .cursor_pointer()
-                    .hover(|s| s.bg(rgba(0x00d992cc)))
-                    .on_mouse_down(MouseButton::Left, |_, window, _| {
-                        widget_core::start_window_drag(window);
-                    })
-                    .child(
-                        div()
-                            .text_xs()
-                            .font_weight(FontWeight::BOLD)
-                            .text_color(rgb(0x050507))
-                            .child(":: 拖拽移动便签 ::"),
-                    ),
-            )
-        } else {
-            None
-        };
-
         let input = &self.input;
 
         div()
             .flex()
             .flex_col()
+            .flex_1()
             .size_full()
             .bg(rgba(0x050507d9))
-            .border_1()
-            .border_color(if is_edit_mode {
-                rgb(0x00d992)
-            } else {
-                rgb(0x3d3a39)
-            })
-            .children(drag_handle)
             // 标题栏
             .child(
                 div()
