@@ -1,4 +1,3 @@
-use gpui::prelude::FluentBuilder;
 use gpui::*;
 
 use raw_window_handle::{HasWindowHandle, RawWindowHandle};

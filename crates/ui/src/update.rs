@@ -35,7 +35,7 @@ pub fn check_for_update(cx: &mut App) {
     });
     cx.refresh_windows();
 
-    let mut async_cx = cx.to_async();
+    let async_cx = cx.to_async();
     cx.foreground_executor()
         .spawn(async move {
             let status = async_cx
@@ -112,7 +112,7 @@ pub fn download_update(url: String, cx: &mut App) {
     });
     cx.refresh_windows();
 
-    let mut async_cx = cx.to_async();
+    let async_cx = cx.to_async();
     cx.foreground_executor()
         .spawn(async move {
             let status = async_cx
