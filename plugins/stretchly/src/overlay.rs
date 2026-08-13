@@ -63,14 +63,20 @@ pub struct BreakOverlay {
     styled: bool,
     is_primary: bool,
     bounds: (i32, i32, i32, i32),
+    _subs: Vec<gpui::Subscription>,
 }
 
 impl BreakOverlay {
-    pub fn new(is_primary: bool, bounds: (i32, i32, i32, i32)) -> Self {
+    pub fn new(
+        is_primary: bool,
+        bounds: (i32, i32, i32, i32),
+        subs: Vec<gpui::Subscription>,
+    ) -> Self {
         Self {
             styled: false,
             is_primary,
             bounds,
+            _subs: subs,
         }
     }
 }

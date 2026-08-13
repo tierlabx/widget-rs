@@ -216,15 +216,13 @@ impl StretchlyWidget {
                                         },
                                         move |_window, cx| {
                                             cx.new(|cx| {
-                                                cx.observe_global::<crate::StretchlyBreakSnapshot>(
+                                                let sub1 = cx.observe_global::<crate::StretchlyBreakSnapshot>(
                                                     |_, cx| cx.notify(),
-                                                )
-                                                .detach();
-                                                cx.observe_global::<crate::StretchlyBreakActive>(
+                                                );
+                                                let sub2 = cx.observe_global::<crate::StretchlyBreakActive>(
                                                     |_, cx| cx.notify(),
-                                                )
-                                                .detach();
-                                                BreakOverlay::new(is_primary, (x, y, w, h))
+                                                );
+                                                BreakOverlay::new(is_primary, (x, y, w, h), vec![sub1, sub2])
                                             })
                                         },
                                     );
