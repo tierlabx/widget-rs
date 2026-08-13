@@ -1,4 +1,4 @@
-use crate::plugin_manager::PluginManager;
+use crate::plugin::manager::PluginManager;
 
 pub fn register_all_plugins(pm: &mut PluginManager) {
     // [WIDGET_CLI_INJECT_PLUGINS_START]

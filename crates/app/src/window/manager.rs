@@ -3,8 +3,7 @@ use std::collections::HashMap;
 use widget_core::AppConfig;
 use widget_ui::main_window::MainWindow;
 
-use crate::store::Store;
-use windows_sys::Win32::UI::WindowsAndMessaging::{SetWindowLongPtrW, ShowWindow, GWLP_HWNDPARENT};
+use crate::config::store::Store;
 
 /// 窗口管理器
 ///
@@ -91,15 +90,11 @@ impl WindowManager {
     /// 移除插件窗口记录，同时销毁关联的隐藏 Owner 窗口
     pub fn remove_widget_window(&mut self, id: &str) {
         if let Some((_, _, owner_hwnd)) = self.widget_windows.remove(id) {
-            if owner_hwnd != 0 {
-                unsafe {
-                    windows_sys::Win32::UI::WindowsAndMessaging::DestroyWindow(owner_hwnd);
-                }
-                println!(
-                    "[WindowManager] 已销毁插件 {} 的隐藏 Owner HWND: {}",
-                    id, owner_hwnd
-                );
-            }
+            crate::window::platform::windows::destroy_window(owner_hwnd);
+            println!(
+                "[WindowManager] 已销毁插件 {} 的隐藏 Owner HWND: {}",
+                id, owner_hwnd
+            );
         }
     }
 
@@ -145,40 +140,13 @@ impl WindowManager {
                 // 优先使用物理扩展帧边界来修正由于 WS_THICKFRAME 及阴影引起的 GPUI 偏差
                 let mut actual_scale = scale;
                 if *hwnd != 0 {
-                    unsafe {
-                        use windows_sys::Win32::Foundation::RECT;
-                        use windows_sys::Win32::Graphics::Dwm::{
-                            DwmGetWindowAttribute, DWMWA_EXTENDED_FRAME_BOUNDS,
-                        };
-                        use windows_sys::Win32::UI::HiDpi::GetDpiForWindow;
-
-                        let dpi = GetDpiForWindow(*hwnd);
-                        actual_scale = if dpi == 0 { scale } else { dpi as f32 / 96.0 };
-
-                        let mut rect: RECT = std::mem::zeroed();
-                        let hr = DwmGetWindowAttribute(
-                            *hwnd,
-                            DWMWA_EXTENDED_FRAME_BOUNDS as u32,
-                            &mut rect as *mut _ as *mut _,
-                            std::mem::size_of::<RECT>() as u32,
-                        );
-
-                        if hr == 0 {
-                            x = rect.left as f32 / actual_scale;
-                            y = rect.top as f32 / actual_scale;
-                            width = (rect.right - rect.left) as f32 / actual_scale;
-                            height = (rect.bottom - rect.top) as f32 / actual_scale;
-                        } else {
-                            // 降级使用 GetWindowRect
-                            use windows_sys::Win32::UI::WindowsAndMessaging::GetWindowRect;
-                            if GetWindowRect(*hwnd, &mut rect) != 0 {
-                                x = rect.left as f32 / actual_scale;
-                                y = rect.top as f32 / actual_scale;
-                                width = (rect.right - rect.left) as f32 / actual_scale;
-                                height = (rect.bottom - rect.top) as f32 / actual_scale;
-                            }
-                        }
-                    }
+                    let (log_x, log_y, log_w, log_h, ascl, _px, _py, _pw, _ph) =
+                        crate::window::platform::windows::get_window_bounds(*hwnd, scale);
+                    x = log_x;
+                    y = log_y;
+                    width = log_w;
+                    height = log_h;
+                    actual_scale = ascl;
                 }
 
                 let config_for_id = config.plugins.get(*id).cloned();
@@ -205,20 +173,13 @@ impl WindowManager {
                 entry.scale = actual_scale;
 
                 // 同时保存物理像素坐标（用于 SetWindowPos 精确恢复）
-                // 必须用 GetWindowRect（与 SetWindowPos 同一坐标系），
-                // 不能用 DwmGetWindowAttribute 因为它排除了 DWM 阴影区域，导致每次保存都缩水
                 if *hwnd != 0 {
-                    unsafe {
-                        use windows_sys::Win32::Foundation::RECT;
-                        use windows_sys::Win32::UI::WindowsAndMessaging::GetWindowRect;
-                        let mut rect: RECT = std::mem::zeroed();
-                        if GetWindowRect(*hwnd, &mut rect) != 0 {
-                            entry.phys_x = rect.left;
-                            entry.phys_y = rect.top;
-                            entry.phys_w = rect.right - rect.left;
-                            entry.phys_h = rect.bottom - rect.top;
-                        }
-                    }
+                    let (_, _, _, _, _, px, py, pw, ph) =
+                        crate::window::platform::windows::get_window_bounds(*hwnd, scale);
+                    entry.phys_x = px;
+                    entry.phys_y = py;
+                    entry.phys_w = pw;
+                    entry.phys_h = ph;
                 }
 
                 println!(
@@ -252,40 +213,13 @@ impl WindowManager {
     /// 此方法纯通过底层 Win32 API 操作，不依赖应用生命周期机制。
     #[allow(dead_code)]
     pub fn show_plugin_window(hwnd: isize, visible: bool) {
-        if hwnd == 0 {
-            return;
-        }
-        unsafe {
-            use windows_sys::Win32::UI::WindowsAndMessaging::{SW_HIDE, SW_SHOW};
-            if visible {
-                ShowWindow(hwnd, SW_SHOW);
-            } else {
-                ShowWindow(hwnd, SW_HIDE);
-            }
-        }
-        println!("[WindowManager] HWND {} 可见性: {}", hwnd, visible);
+        crate::window::platform::windows::show_plugin_window(hwnd, visible);
     }
 
     /// 应用"始终置顶"设置到所有插件窗口
     #[allow(dead_code)]
     pub fn apply_always_on_top(&self, always_on_top: bool) {
-        use windows_sys::Win32::UI::WindowsAndMessaging::{
-            SetWindowPos, HWND_BOTTOM, HWND_TOPMOST, SWP_NOMOVE, SWP_NOSIZE,
-        };
-        for (id, (_, hwnd, _)) in &self.widget_windows {
-            if *hwnd == 0 {
-                continue;
-            }
-            unsafe {
-                let insert_after = if always_on_top {
-                    HWND_TOPMOST
-                } else {
-                    HWND_BOTTOM
-                };
-                SetWindowPos(*hwnd, insert_after, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE);
-            }
-            println!("[WindowManager] 插件 {} 置顶: {}", id, always_on_top);
-        }
+        crate::window::platform::windows::apply_always_on_top(&self.widget_windows, always_on_top);
     }
 
     /// 获取主窗口的 HWND（避免在 update_global 闭包内嵌套调用）
@@ -315,73 +249,17 @@ impl WindowManager {
     /// 能有效规避在部分操作闭包中获取框架级别 Window 可变引用造成的借用冲突。
     /// （前提：必须已通过某种方式正确设置了 `self.main_hwnd`）
     pub fn toggle_main_window_win32(&mut self) -> bool {
-        let hwnd = self.main_hwnd;
-        if hwnd == 0 {
-            return self.is_visible;
-        }
-        unsafe {
-            use windows_sys::Win32::UI::WindowsAndMessaging::{
-                IsIconic, IsWindowVisible, SetForegroundWindow, ShowWindow, SW_HIDE, SW_RESTORE,
-                SW_SHOW,
-            };
-            let is_win_visible = IsWindowVisible(hwnd) != 0;
-            let is_minimized = IsIconic(hwnd) != 0;
-            let next_visible = !is_win_visible || is_minimized;
-            self.is_visible = next_visible;
-            if next_visible {
-                if IsIconic(hwnd) != 0 {
-                    ShowWindow(hwnd, SW_RESTORE);
-                } else {
-                    ShowWindow(hwnd, SW_SHOW);
-                }
-                SetForegroundWindow(hwnd);
-            } else {
-                ShowWindow(hwnd, SW_HIDE);
-            }
-            println!("[WindowManager] 主窗口切换: is_visible = {}", next_visible);
-            next_visible
-        }
+        let next_visible = crate::window::platform::windows::toggle_main_window_win32(
+            self.main_hwnd,
+            self.is_visible,
+        );
+        self.is_visible = next_visible;
+        next_visible
     }
 
     /// 兼容旧接口（托盘事件中使用），已迁移为 toggle_main_window_win32
     #[allow(dead_code)]
     pub fn toggle_main_window(&mut self, _cx: &mut App) {
         self.toggle_main_window_win32();
-    }
-
-    /// 将窗口附加到桌面（Progman），防止 Win + D 时被最小化
-    /// 返回创建的隐藏 Owner 窗口 HWND（0 表示失败）
-    pub fn attach_to_desktop(hwnd: isize) -> isize {
-        if hwnd == 0 {
-            return 0;
-        }
-        unsafe {
-            // Create a dummy hidden owner window for EACH widget to prevent Win+D while avoiding Z-order grouping
-            let class_name: [u16; 7] = [
-                'S' as u16, 'T' as u16, 'A' as u16, 'T' as u16, 'I' as u16, 'C' as u16, 0,
-            ];
-            let owner = windows_sys::Win32::UI::WindowsAndMessaging::CreateWindowExW(
-                windows_sys::Win32::UI::WindowsAndMessaging::WS_EX_TOOLWINDOW,
-                class_name.as_ptr(),
-                std::ptr::null(),
-                windows_sys::Win32::UI::WindowsAndMessaging::WS_POPUP,
-                0,
-                0,
-                0,
-                0,
-                0,
-                0,
-                0,
-                std::ptr::null(),
-            );
-            if owner != 0 {
-                SetWindowLongPtrW(hwnd, GWLP_HWNDPARENT, owner);
-                println!(
-                    "[WindowManager] 已将 HWND {} 附加到独立隐藏 Owner: {}",
-                    hwnd, owner
-                );
-            }
-            owner
-        }
     }
 }

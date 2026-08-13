@@ -7,7 +7,7 @@ use tray_icon::{
 ///
 /// 将图片文件解码为 RGBA 格式，并创建 `Icon` 实例用于系统托盘。
 fn build_icon() -> Icon {
-    let icon_bytes = include_bytes!("../../../assets/logos/icon.png");
+    let icon_bytes = include_bytes!("../../../../assets/logos/icon.png");
     let image = image::load_from_memory(icon_bytes)
         .expect("Failed to load icon image")
         .into_rgba8();
