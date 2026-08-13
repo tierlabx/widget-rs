@@ -6,6 +6,23 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+## [0.4.0](https://github.com/tierlabx/widget-rs/releases/tag/v0.4.0) - 2026-08-13
+
+### Added
+
+- 增加允许跳过和推迟的设置项
+- add pre-commit git hook for automated code checks
+
+### Fixed
+
+- 彻底修复多屏幕下休息遮罩在边缘的几像素漏光缝隙
+- 修复跨分辨率和缩放显示器切换时的窗口大小恢复与主屏幕识别
+- 修复没设置置顶，还经常压不下去的问题
+
+### Changed
+
+- 重构底层应用架构并按功能域拆分目录结构
+
 ## [0.3.2](https://github.com/tierlabx/widget-rs/releases/tag/v0.3.2) - 2026-08-12
 
 ### Fixed
