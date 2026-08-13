@@ -21,7 +21,7 @@ fn main() {
     // 1. 初始化存储和加载配置
     let store = Arc::new(Store::new());
     let mut app_config = store.load_config();
-    println!("[main] 已加载配置: {:?}", app_config);
+    // println!("[main] 已加载配置: {:?}", app_config);
 
     system::autostart::sync_auto_start_with_registry(&mut app_config, &store);
 

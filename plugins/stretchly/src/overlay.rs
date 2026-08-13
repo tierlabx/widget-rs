@@ -6,8 +6,9 @@ use std::sync::{Mutex, OnceLock};
 use windows_sys::Win32::Foundation::{HWND, LPARAM, LRESULT, WPARAM};
 use windows_sys::Win32::UI::WindowsAndMessaging::{
     CallWindowProcW, DefWindowProcW, GetWindowLongW, SetWindowLongPtrW, SetWindowLongW,
-    SetWindowPos, GWLP_WNDPROC, GWL_STYLE, HWND_TOPMOST, SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOSIZE,
-    WINDOWPOS, WM_WINDOWPOSCHANGING, WS_CAPTION, WS_POPUP, WS_THICKFRAME,
+    SetWindowPos, GWLP_WNDPROC, GWL_EXSTYLE, GWL_STYLE, HWND_TOPMOST, SWP_FRAMECHANGED,
+    SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOSIZE, WINDOWPOS, WM_NCCALCSIZE, WM_WINDOWPOSCHANGING,
+    WS_BORDER, WS_CAPTION, WS_EX_CLIENTEDGE, WS_EX_WINDOWEDGE, WS_POPUP, WS_SYSMENU, WS_THICKFRAME,
 };
 
 fn original_procs() -> &'static Mutex<HashMap<isize, isize>> {
@@ -26,9 +27,18 @@ unsafe extern "system" fn overlay_wnd_proc(
     wparam: WPARAM,
     lparam: LPARAM,
 ) -> LRESULT {
+    if msg == WM_NCCALCSIZE {
+        if wparam != 0 {
+            // 当 wparam 为 TRUE 时，拦截并返回 0 强制让系统把整个窗口当做客户区，
+            // 彻底消灭左右下的不可见缩放边框（Invisible resize border）带来的缝隙。
+            return 0;
+        }
+    }
+
     if msg == WM_WINDOWPOSCHANGING {
         if let Some(&(x, y, w, h)) = forced_bounds().lock().unwrap().get(&(hwnd as isize)) {
             let wp = &mut *(lparam as *mut WINDOWPOS);
+            // 恢复为严格贴合屏幕
             wp.x = x;
             wp.y = y;
             wp.cx = w;
@@ -93,17 +103,37 @@ impl Render for BreakOverlay {
                                 .insert(hwnd as isize, old_proc);
                         }
 
-                        // 置顶，并强行改变位置到绑定的物理屏幕（触发一次 WM_WINDOWPOSCHANGING）
-                        let (x, y, w, h) = self.bounds;
-                        SetWindowPos(hwnd, HWND_TOPMOST, x, y, w, h, SWP_NOACTIVATE);
-
                         // 移除标题栏和边框样式，防止拖动
                         let style = GetWindowLongW(hwnd, GWL_STYLE);
                         SetWindowLongW(
                             hwnd,
                             GWL_STYLE,
-                            (style & !(WS_CAPTION as i32) & !(WS_THICKFRAME as i32))
+                            (style
+                                & !(WS_CAPTION as i32)
+                                & !(WS_THICKFRAME as i32)
+                                & !(WS_BORDER as i32)
+                                & !(WS_SYSMENU as i32))
                                 | WS_POPUP as i32,
+                        );
+
+                        let ex_style = GetWindowLongW(hwnd, GWL_EXSTYLE);
+                        SetWindowLongW(
+                            hwnd,
+                            GWL_EXSTYLE,
+                            ex_style & !(WS_EX_CLIENTEDGE as i32) & !(WS_EX_WINDOWEDGE as i32),
+                        );
+
+                        // 置顶，并强行改变位置到绑定的物理屏幕（触发一次 WM_WINDOWPOSCHANGING）
+                        // 注意：必须包含 SWP_FRAMECHANGED 才能让 Windows 重新计算并去除边框造成的客户区缝隙
+                        let (x, y, w, h) = self.bounds;
+                        SetWindowPos(
+                            hwnd,
+                            HWND_TOPMOST,
+                            x,
+                            y,
+                            w,
+                            h,
+                            SWP_NOACTIVATE | SWP_FRAMECHANGED,
                         );
                     }
                 }
