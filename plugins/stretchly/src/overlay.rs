@@ -275,49 +275,58 @@ impl Render for BreakOverlay {
                             .justify_center()
                             .gap(px(10.0))
                             // 推迟
-                            .child(
-                                div()
-                                    .px(px(18.0))
-                                    .py(px(9.0))
-                                    .rounded(px(8.0))
-                                    .bg(rgba(0xffffff0cu32))
-                                    .hover(|s| s.bg(rgba(0xffffff18u32)))
-                                    .cursor_pointer()
-                                    .text_sm()
-                                    .text_color(rgba(0xc8d4f0a0u32))
-                                    .id("postpone-break-btn")
-                                    .on_click(cx.listener(|_, _: &ClickEvent, _, cx| {
-                                        cx.set_global(crate::StretchlyOverlayRequest(Some(
-                                            crate::StretchlyOverlayAction::Postpone,
-                                        )));
-                                    }))
-                                    .child(format!("推迟 {} 分钟", snap.postpone_mins)),
-                            )
+                            .when(snap.allow_postpone, |d| {
+                                d.child(
+                                    div()
+                                        .px(px(18.0))
+                                        .py(px(9.0))
+                                        .rounded(px(8.0))
+                                        .bg(rgba(0xffffff0cu32))
+                                        .hover(|s| s.bg(rgba(0xffffff18u32)))
+                                        .cursor_pointer()
+                                        .text_sm()
+                                        .text_color(rgba(0xc8d4f0a0u32))
+                                        .id("postpone-break-btn")
+                                        .on_click(cx.listener(|_, _: &ClickEvent, _, cx| {
+                                            cx.set_global(crate::StretchlyOverlayRequest(Some(
+                                                crate::StretchlyOverlayAction::Postpone,
+                                            )));
+                                        }))
+                                        .child(format!("推迟 {} 分钟", snap.postpone_mins)),
+                                )
+                            })
                             // 结束休息
-                            .child(
-                                div()
-                                    .px(px(18.0))
-                                    .py(px(9.0))
-                                    .rounded(px(8.0))
-                                    .text_sm()
-                                    .font_weight(FontWeight::MEDIUM)
-                                    .id("skip-break-btn")
-                                    .when(snap.skip_available, |d| {
-                                        d.bg(accent_bg)
-                                            .hover(|s| s.bg(rgba(0x34d39930u32)))
-                                            .cursor_pointer()
-                                            .text_color(accent_color)
-                                            .on_click(cx.listener(|_, _: &ClickEvent, _, cx| {
-                                                cx.set_global(crate::StretchlyOverlayRequest(
-                                                    Some(crate::StretchlyOverlayAction::Skip),
-                                                ));
-                                            }))
-                                    })
-                                    .when(!snap.skip_available, |d| {
-                                        d.bg(rgba(0xffffff08u32)).text_color(rgba(0xffffff35u32))
-                                    })
-                                    .child(snap.skip_label.clone()),
-                            ),
+                            .when(snap.allow_skip, |d| {
+                                d.child(
+                                    div()
+                                        .px(px(18.0))
+                                        .py(px(9.0))
+                                        .rounded(px(8.0))
+                                        .text_sm()
+                                        .font_weight(FontWeight::MEDIUM)
+                                        .id("skip-break-btn")
+                                        .when(snap.skip_available, |d2| {
+                                            d2.bg(accent_bg)
+                                                .hover(|s| s.bg(rgba(0x34d39930u32)))
+                                                .cursor_pointer()
+                                                .text_color(accent_color)
+                                                .on_click(cx.listener(
+                                                    |_, _: &ClickEvent, _, cx| {
+                                                        cx.set_global(
+                                                            crate::StretchlyOverlayRequest(Some(
+                                                                crate::StretchlyOverlayAction::Skip,
+                                                            )),
+                                                        );
+                                                    },
+                                                ))
+                                        })
+                                        .when(!snap.skip_available, |d2| {
+                                            d2.bg(rgba(0xffffff08u32))
+                                                .text_color(rgba(0xffffff35u32))
+                                        })
+                                        .child(snap.skip_label.clone()),
+                                )
+                            }),
                     ),
             )
     }

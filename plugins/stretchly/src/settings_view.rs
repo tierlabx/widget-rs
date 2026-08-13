@@ -1,4 +1,5 @@
 use crate::model::{StretchlyConfig, StretchlyStats};
+use gpui::prelude::FluentBuilder;
 use gpui::*;
 use raw_window_handle::{HasWindowHandle, RawWindowHandle};
 use widget_core::AppConfig;
@@ -139,6 +140,69 @@ impl StretchlySettingsView {
             )
     }
 
+    fn render_toggle(
+        &self,
+        id_prefix: &'static str,
+        label: &str,
+        desc: &str,
+        value: bool,
+        cx: &mut Context<Self>,
+        on_change: impl Fn(&mut Self, bool, &mut Context<Self>) + 'static,
+    ) -> impl IntoElement {
+        let on_toggle = std::rc::Rc::new(on_change);
+
+        div()
+            .flex()
+            .justify_between()
+            .items_center()
+            .w_full()
+            .px(px(12.0))
+            .py(px(8.0))
+            .rounded(px(8.0))
+            .bg(rgba(0xffffff05))
+            .child(
+                div()
+                    .flex()
+                    .flex_col()
+                    .gap(px(2.0))
+                    .child(
+                        div()
+                            .text_sm()
+                            .text_color(rgb(0xf2f2f2))
+                            .child(label.to_string()),
+                    )
+                    .child(
+                        div()
+                            .text_xs()
+                            .text_color(rgba(0x94a3b870))
+                            .child(desc.to_string()),
+                    ),
+            )
+            .child(
+                div()
+                    .id(SharedString::from(format!("{}-toggle", id_prefix)))
+                    .cursor_pointer()
+                    .w(px(40.0))
+                    .h(px(22.0))
+                    .rounded_full()
+                    .bg(if value { rgb(0x00d992) } else { rgb(0x3d3a39) })
+                    .flex()
+                    .items_center()
+                    .px(px(2.0))
+                    .on_click(cx.listener(move |this, _, _, cx| {
+                        on_toggle(this, !value, cx);
+                    }))
+                    .child(
+                        div()
+                            .w(px(18.0))
+                            .h(px(18.0))
+                            .rounded_full()
+                            .bg(rgb(0xffffff))
+                            .when(value, |d: gpui::Div| d.ml(px(18.0))),
+                    ),
+            )
+    }
+
     fn section_header(label: &str) -> impl IntoElement {
         div()
             .text_xs()
@@ -179,6 +243,8 @@ impl Render for StretchlySettingsView {
         let warning_seconds = self.config.warning_seconds;
         let skip_delay_seconds = self.config.skip_delay_seconds;
         let postpone_minutes = self.config.postpone_minutes;
+        let allow_skip = self.config.allow_skip;
+        let allow_postpone = self.config.allow_postpone;
         // P3: 统计快照
         if let Some(live) = cx.try_global::<StretchlyLiveStats>() {
             self.stats = live.0.clone();
@@ -444,6 +510,28 @@ impl Render for StretchlySettingsView {
                                     this.config.postpone_minutes = val;
                                     cx.notify();
                                 },
+                            ))
+                            .child(self.render_toggle(
+                                "allow-skip",
+                                "允许跳过",
+                                "是否允许手动跳过当前休息",
+                                allow_skip,
+                                cx,
+                                |this, val, cx| {
+                                    this.config.allow_skip = val;
+                                    cx.notify();
+                                }
+                            ))
+                            .child(self.render_toggle(
+                                "allow-postpone",
+                                "允许推迟",
+                                "是否允许推迟即将到来的休息",
+                                allow_postpone,
+                                cx,
+                                |this, val, cx| {
+                                    this.config.allow_postpone = val;
+                                    cx.notify();
+                                }
                             ))
                             // ── 按钮区 ────────────────────────────────────────
                             .child(

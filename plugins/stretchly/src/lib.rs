@@ -34,6 +34,8 @@ pub struct StretchlyBreakSnapshot {
     pub skip_label: String,
     pub postpone_mins: u64,
     pub tip: String,
+    pub allow_skip: bool,
+    pub allow_postpone: bool,
 }
 impl Global for StretchlyBreakSnapshot {}
 

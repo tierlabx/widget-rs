@@ -79,6 +79,10 @@ pub struct StretchlyConfig {
     pub skip_delay_seconds: u64,
     /// 推迟的分钟数
     pub postpone_minutes: u64,
+    /// 允许跳过休息
+    pub allow_skip: bool,
+    /// 允许推迟休息
+    pub allow_postpone: bool,
 }
 
 impl Default for StretchlyConfig {
@@ -91,6 +95,8 @@ impl Default for StretchlyConfig {
             warning_seconds: 30,
             skip_delay_seconds: 5,
             postpone_minutes: 5,
+            allow_skip: true,
+            allow_postpone: true,
         }
     }
 }

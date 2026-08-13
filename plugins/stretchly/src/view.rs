@@ -170,6 +170,8 @@ impl StretchlyWidget {
                                 },
                                 postpone_mins: this.model.config.postpone_minutes,
                                 tip: current_tip().to_string(),
+                                allow_skip: this.model.config.allow_skip,
+                                allow_postpone: this.model.config.allow_postpone,
                             });
                         }
 
@@ -344,6 +346,9 @@ impl Render for StretchlyWidget {
         let stats_skip = self.model.stats.breaks_skipped;
         let stats_focus = self.model.stats.focus_minutes;
 
+        let allow_skip = self.model.config.allow_skip;
+        let allow_postpone = self.model.config.allow_postpone;
+
         // P2: 预警开始时触发一次性系统通知
         if is_warning && !self.prev_warning {
             Self::trigger_warning_notification(hwnd);
@@ -488,7 +493,7 @@ impl Render for StretchlyWidget {
                                             .child(if is_paused { "继续" } else { "暂停" }),
                                     )
                                     // 预警时：推迟按钮
-                                    .when(is_warning, |d| {
+                                    .when(is_warning && allow_postpone, |d| {
                                         d.child(
                                             div()
                                                 .px(px(6.0))
@@ -510,8 +515,8 @@ impl Render for StretchlyWidget {
                                                 .child("推迟"),
                                         )
                                     })
-                                    // 正常工作时：立即休息按钮
-                                    .when(!is_warning && !is_paused, |d| {
+                                    // 正常工作时：立即休息按钮（当作跳过当前工作阶段，与 allow_skip 关联或总是允许？这里受 allow_skip 限制）
+                                    .when(!is_warning && !is_paused && allow_skip, |d| {
                                         d.child(
                                             div()
                                                 .px(px(6.0))
