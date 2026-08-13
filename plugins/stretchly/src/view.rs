@@ -15,11 +15,10 @@ fn get_all_monitor_rects(widget_hwnd: isize) -> Vec<(i32, i32, i32, i32, bool)> 
     unsafe {
         use windows_sys::Win32::Foundation::{BOOL, RECT};
         use windows_sys::Win32::Graphics::Gdi::{
-            EnumDisplayMonitors, GetMonitorInfoW, MonitorFromWindow, MONITORINFO,
-            MONITOR_DEFAULTTONEAREST,
+            EnumDisplayMonitors, GetMonitorInfoW, MONITORINFO,
         };
 
-        let widget_mon = MonitorFromWindow(widget_hwnd, MONITOR_DEFAULTTONEAREST);
+        let _ = widget_hwnd; // widget_hwnd is no longer needed since we detect primary differently, but we keep the parameter.
 
         struct State {
             rects: Vec<(i32, i32, i32, i32, bool)>,
