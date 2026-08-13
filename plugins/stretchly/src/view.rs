@@ -22,13 +22,9 @@ fn get_all_monitor_rects(widget_hwnd: isize) -> Vec<(i32, i32, i32, i32, bool)> 
         let widget_mon = MonitorFromWindow(widget_hwnd, MONITOR_DEFAULTTONEAREST);
 
         struct State {
-            widget_mon: isize,
             rects: Vec<(i32, i32, i32, i32, bool)>,
         }
-        let mut state = State {
-            widget_mon,
-            rects: Vec::new(),
-        };
+        let mut state = State { rects: Vec::new() };
 
         unsafe extern "system" fn cb(
             hmon: isize,
@@ -41,7 +37,7 @@ fn get_all_monitor_rects(widget_hwnd: isize) -> Vec<(i32, i32, i32, i32, bool)> 
             info.cbSize = std::mem::size_of::<MONITORINFO>() as u32;
             GetMonitorInfoW(hmon, &mut info as *mut _);
             let r = info.rcMonitor;
-            let is_primary = hmon == s.widget_mon;
+            let is_primary = (info.dwFlags & 1) != 0; // MONITORINFOF_PRIMARY = 1
             s.rects.push((
                 r.left,
                 r.top,

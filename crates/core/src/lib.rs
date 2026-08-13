@@ -390,15 +390,36 @@ pub fn get_saved_physical_bounds(cx: &App, plugin_id: &str) -> Option<(i32, i32,
     let cy_pt = p.phys_y as f32 + p.phys_h as f32 / 2.0;
 
     let monitors = enumerate_monitors();
-    let on_monitor = monitors.iter().any(|m| {
+    let monitor = monitors.iter().find(|m| {
         cx_pt >= m.left as f32
             && cx_pt < m.right as f32
             && cy_pt >= m.top as f32
             && cy_pt < m.bottom as f32
     });
 
-    if on_monitor {
-        Some((p.phys_x, p.phys_y, p.phys_w, p.phys_h))
+    if let Some(m) = monitor {
+        let current_scale = m.dpi as f32 / 96.0;
+        let saved_scale = if p.scale > 0.0 { p.scale } else { 1.0 };
+
+        if (current_scale - saved_scale).abs() > 0.01 {
+            let ratio = current_scale / saved_scale;
+            let new_w = (p.phys_w as f32 * ratio).round() as i32;
+            let new_h = (p.phys_h as f32 * ratio).round() as i32;
+
+            let rel_x = p.phys_x - m.left;
+            let rel_y = p.phys_y - m.top;
+            let new_x = m.left + (rel_x as f32 * ratio).round() as i32;
+            let new_y = m.top + (rel_y as f32 * ratio).round() as i32;
+
+            println!(
+                "[get_saved_physical_bounds] 插件 {} 跨缩放恢复: {}->{}, ({},{})->({},{}), {}x{}->{}x{}",
+                plugin_id, saved_scale, current_scale, p.phys_x, p.phys_y, new_x, new_y, p.phys_w, p.phys_h, new_w, new_h
+            );
+
+            Some((new_x, new_y, new_w, new_h))
+        } else {
+            Some((p.phys_x, p.phys_y, p.phys_w, p.phys_h))
+        }
     } else {
         None
     }
@@ -411,6 +432,8 @@ struct MonitorRect {
     right: i32,
     bottom: i32,
     dpi: u32,
+    #[allow(dead_code)]
+    is_primary: bool,
 }
 
 /// 枚举所有活跃显示器，返回物理像素坐标和 DPI
@@ -446,12 +469,15 @@ fn enumerate_monitors() -> Vec<MonitorRect> {
                 &mut dpi_x, &mut dpi_y,
             );
 
+            let is_primary = (info.dwFlags & 1) != 0; // MONITORINFOF_PRIMARY = 1
+
             s.monitors.push(MonitorRect {
                 left: r.left,
                 top: r.top,
                 right: r.right,
                 bottom: r.bottom,
                 dpi: dpi_x,
+                is_primary,
             });
             1
         }
