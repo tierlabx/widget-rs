@@ -210,13 +210,13 @@ pub fn apply_plugin_window_styles(
         if let Some(plugin_cfg) = cfg.plugins.get(id) {
             unsafe {
                 use windows_sys::Win32::UI::WindowsAndMessaging::{
-                    SetWindowPos, HWND_NOTOPMOST, HWND_TOPMOST, SWP_NOMOVE, SWP_NOSIZE,
+                    SetWindowPos, HWND_BOTTOM, HWND_TOPMOST, SWP_NOMOVE, SWP_NOSIZE,
                 };
                 // 恢复始终置顶
                 let insert_after = if plugin_cfg.always_on_top {
                     HWND_TOPMOST
                 } else {
-                    HWND_NOTOPMOST
+                    HWND_BOTTOM
                 };
                 SetWindowPos(hwnd, insert_after, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE);
 

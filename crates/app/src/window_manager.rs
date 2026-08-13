@@ -270,7 +270,7 @@ impl WindowManager {
     #[allow(dead_code)]
     pub fn apply_always_on_top(&self, always_on_top: bool) {
         use windows_sys::Win32::UI::WindowsAndMessaging::{
-            SetWindowPos, HWND_NOTOPMOST, HWND_TOPMOST, SWP_NOMOVE, SWP_NOSIZE,
+            SetWindowPos, HWND_BOTTOM, HWND_TOPMOST, SWP_NOMOVE, SWP_NOSIZE,
         };
         for (id, (_, hwnd, _)) in &self.widget_windows {
             if *hwnd == 0 {
@@ -280,7 +280,7 @@ impl WindowManager {
                 let insert_after = if always_on_top {
                     HWND_TOPMOST
                 } else {
-                    HWND_NOTOPMOST
+                    HWND_BOTTOM
                 };
                 SetWindowPos(*hwnd, insert_after, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE);
             }
