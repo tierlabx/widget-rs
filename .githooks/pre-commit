@@ -1,15 +1,21 @@
 #!/usr/bin/env bash
 
 # pre-commit hook
-# Checks if the code is properly formatted before committing.
+# Automatically formats code before committing.
 
-echo "🔍 正在检查代码格式 (cargo fmt)..."
+echo "✨ 正在自动格式化代码 (cargo fmt)..."
 
-if ! cargo fmt --all -- --check; then
-    echo "❌ 错误: 代码格式不规范。"
-    echo "👉 请运行 'cargo fmt --all' 修复格式问题后重新提交。"
-    exit 1
+# 运行自动格式化
+cargo fmt --all
+
+# 获取当前暂存区中的所有 .rs 文件
+STAGED_RS_FILES=$(git diff --cached --name-only --diff-filter=ACM | grep '\.rs$' || true)
+
+if [ -n "$STAGED_RS_FILES" ]; then
+    # 将格式化后的文件重新加入暂存区，确保提交中包含的是格式化后的代码
+    echo "$STAGED_RS_FILES" | xargs git add
+    echo "✅ 代码已自动格式化并重新加入暂存区！"
+else
+    echo "✅ 没有找到需要处理的暂存区 Rust 文件。"
 fi
-
-echo "✅ 代码格式检查通过！"
 exit 0
