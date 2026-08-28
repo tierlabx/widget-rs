@@ -99,10 +99,6 @@ impl Render for FencesWidget {
             .active_category
             .min(self.data.categories.len().saturating_sub(1));
         let categories = self.data.categories.clone();
-        let items = categories
-            .get(active_cat_idx)
-            .map(|c| c.items.clone())
-            .unwrap_or_default();
 
         div()
             .flex()
@@ -115,6 +111,35 @@ impl Render for FencesWidget {
             .border_color(rgba(0x38bdf825)) // 细腻的青蓝微光边框
             .overflow_hidden()
             .min_h_0()
+            // 支持将桌面文件、快捷方式、文件夹直接拖拽进收纳盒
+            .on_drop(
+                cx.listener(move |this, paths: &gpui::ExternalPaths, _, cx| {
+                    let act_idx = this.data.active_category;
+                    if let Some(cat) = this.data.categories.get_mut(act_idx) {
+                        for path in paths.paths() {
+                            let path_str = path.to_string_lossy().to_string();
+                            let is_dir = path.is_dir();
+                            let name = path
+                                .file_name()
+                                .and_then(|n| n.to_str())
+                                .unwrap_or("新建项目")
+                                .to_string();
+                            let display_name = if name.to_lowercase().ends_with(".lnk") {
+                                name[..name.len() - 4].to_string()
+                            } else {
+                                name
+                            };
+                            cat.items.push(crate::model::FenceItem {
+                                name: display_name,
+                                path: path_str,
+                                is_dir,
+                            });
+                        }
+                        FencesModel::save(&this.data, cx);
+                        cx.notify();
+                    }
+                }),
+            )
             // ── 顶部：分类导航 + 添加按钮 ────────────────────────────────
             .child(
                 div()
@@ -129,40 +154,69 @@ impl Render for FencesWidget {
                     .border_color(rgba(0x38bdf818))
                     .flex_shrink_0()
                     // 左：分类胶囊标签
-                    .child(div().flex().items_center().gap(px(4.0)).children(
-                        categories.iter().enumerate().map(|(idx, cat)| {
-                            let is_active = idx == active_cat_idx;
-                            div()
-                                .px(px(9.0))
-                                .py(px(3.0))
-                                .rounded_full()
-                                .cursor_pointer()
-                                .text_xs()
-                                .font_weight(if is_active {
-                                    FontWeight::BOLD
-                                } else {
-                                    FontWeight::NORMAL
-                                })
-                                .bg(if is_active {
-                                    rgba(0x38bdf835)
-                                } else {
-                                    rgba(0x00000000)
-                                })
-                                .text_color(if is_active {
-                                    rgb(0x38bdf8)
-                                } else {
-                                    rgba(0xffffff88)
-                                })
-                                .hover(|s| s.bg(rgba(0xffffff15)).text_color(rgb(0xffffff)))
-                                .id(ElementId::Name(format!("fence-cat-{idx}").into()))
-                                .on_click(cx.listener(move |this, _, _, cx| {
-                                    this.data.active_category = idx;
-                                    FencesModel::save(&this.data, cx);
-                                    cx.notify();
-                                }))
-                                .child(cat.name.clone())
-                        }),
-                    ))
+                    .child(
+                        div()
+                            .flex()
+                            .items_center()
+                            .gap(px(4.0))
+                            .children(categories.iter().enumerate().map(|(idx, cat)| {
+                                let is_active = idx == active_cat_idx;
+                                div()
+                                    .px(px(9.0))
+                                    .py(px(3.0))
+                                    .rounded_full()
+                                    .cursor_pointer()
+                                    .text_xs()
+                                    .font_weight(if is_active {
+                                        FontWeight::BOLD
+                                    } else {
+                                        FontWeight::NORMAL
+                                    })
+                                    .bg(if is_active {
+                                        rgba(0x38bdf835)
+                                    } else {
+                                        rgba(0x00000000)
+                                    })
+                                    .text_color(if is_active {
+                                        rgb(0x38bdf8)
+                                    } else {
+                                        rgba(0xffffff88)
+                                    })
+                                    .hover(|s| s.bg(rgba(0xffffff15)).text_color(rgb(0xffffff)))
+                                    .id(ElementId::Name(format!("fence-cat-{idx}").into()))
+                                    .on_click(cx.listener(move |this, _, _, cx| {
+                                        this.data.active_category = idx;
+                                        FencesModel::save(&this.data, cx);
+                                        cx.notify();
+                                    }))
+                                    .child(cat.name.clone())
+                            }))
+                            .child(
+                                div()
+                                    .w(px(20.0))
+                                    .h(px(20.0))
+                                    .flex()
+                                    .justify_center()
+                                    .items_center()
+                                    .rounded_full()
+                                    .cursor_pointer()
+                                    .text_xs()
+                                    .text_color(rgba(0xffffff66))
+                                    .hover(|s| s.bg(rgba(0xffffff20)).text_color(rgb(0xffffff)))
+                                    .id("fence-add-cat")
+                                    .on_click(cx.listener(|this, _, _, cx| {
+                                        let next_idx = this.data.categories.len() + 1;
+                                        this.data.categories.push(crate::model::FenceCategory {
+                                            name: format!("分类{}", next_idx),
+                                            items: vec![],
+                                        });
+                                        this.data.active_category = this.data.categories.len() - 1;
+                                        FencesModel::save(&this.data, cx);
+                                        cx.notify();
+                                    }))
+                                    .child("+"),
+                            ),
+                    )
                     // 右：添加按钮（统一高对比度天蓝）
                     .child(
                         div()
@@ -213,6 +267,10 @@ impl Render for FencesWidget {
             )
             // ── 图标网格内容区 ────────────────────────────────────────────
             .child({
+                let items = categories
+                    .get(active_cat_idx)
+                    .map(|c| c.items.clone())
+                    .unwrap_or_default();
                 let items_empty = items.is_empty();
                 let mut scroll_div = div()
                     .flex_1()
@@ -231,7 +289,7 @@ impl Render for FencesWidget {
                             .items_center()
                             .justify_center()
                             .h_full()
-                            .pt(px(30.0))
+                            .pt(px(40.0))
                             .gap(px(8.0))
                             .child(
                                 div()
@@ -241,8 +299,8 @@ impl Render for FencesWidget {
                             .child(
                                 div()
                                     .text_xs()
-                                    .text_color(rgba(0xffffff40))
-                                    .child("点击右上角 + 文件 或 + 文件夹 添加快捷方式"),
+                                    .text_color(rgba(0xffffff50))
+                                    .child("拖拽桌面文件 / 文件夹到此处，或点击右上角按钮添加"),
                             ),
                     );
                 }
