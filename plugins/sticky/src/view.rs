@@ -48,33 +48,6 @@ impl StickyWidget {
         .detach();
         input
     }
-
-    fn open_image_dialog(&mut self, cx: &mut Context<Self>) {
-        let this = cx.weak_entity();
-        let app_cx: &mut App = cx;
-        app_cx.spawn(async move |async_cx| {
-            let output = std::process::Command::new("powershell").args([
-                "-NoProfile", "-Command",
-                "[System.Reflection.Assembly]::LoadWithPartialName('System.Windows.Forms') | Out-Null; \
-                  = New-Object System.Windows.Forms.OpenFileDialog; \
-                 .Filter = '图片文件 (*.png;*.jpg;*.jpeg;*.webp;*.gif;*.bmp)|*.png;*.jpg;*.jpeg;*.webp;*.gif;*.bmp'; \
-                 .Title = '选择图片'; \
-                 if(.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK){ Write-Output .FileName }",
-            ]).output();
-            if let Ok(out) = output {
-                let path = String::from_utf8_lossy(&out.stdout).trim().to_string();
-                if !path.is_empty() {
-                    let _ = async_cx.update(|cx| {
-                        let _ = this.update(cx, |this, cx| {
-                            this.data.current_mut().images.push(path);
-                            StickyModel::save(&this.data, cx);
-                            cx.notify();
-                        });
-                    });
-                }
-            }
-        }).detach();
-    }
 }
 
 impl widget_core::WidgetContent for StickyWidget {
@@ -88,6 +61,12 @@ impl widget_core::WidgetContent for StickyWidget {
 
 impl Render for StickyWidget {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        // 确保在便签窗口中，Theme 文本颜色为深炭黑墨水色
+        gpui_component::Theme::global_mut(cx).colors.foreground = gpui::hsla(0.0, 0.0, 0.12, 1.0);
+        gpui_component::Theme::global_mut(cx)
+            .colors
+            .muted_foreground = gpui::hsla(0.0, 0.0, 0.40, 1.0);
+
         if self.pending_input_reset {
             self.pending_input_reset = false;
             self.input = Self::make_input(window, cx, &self.data);
@@ -125,6 +104,23 @@ impl Render for StickyWidget {
             .border_color(border_color)
             .overflow_hidden()
             .min_h_0()
+            .on_drop(cx.listener(|this, paths: &gpui::ExternalPaths, _, cx| {
+                for path in paths.paths() {
+                    let ext = path
+                        .extension()
+                        .and_then(|s| s.to_str())
+                        .unwrap_or("")
+                        .to_lowercase();
+                    if ["png", "jpg", "jpeg", "webp", "gif", "bmp"].contains(&ext.as_str()) {
+                        this.data
+                            .current_mut()
+                            .images
+                            .push(path.to_string_lossy().to_string());
+                        StickyModel::save(&this.data, cx);
+                        cx.notify();
+                    }
+                }
+            }))
             // ── Header ─────────────────────────────────────────────────
             .child(
                 div()
@@ -143,7 +139,7 @@ impl Render for StickyWidget {
                         div()
                             .flex()
                             .items_center()
-                            .gap(px(4.0))
+                            .gap(px(2.0))
                             .child(
                                 div()
                                     .w(px(22.0))
@@ -200,24 +196,6 @@ impl Render for StickyWidget {
                             .flex()
                             .items_center()
                             .gap(px(2.0))
-                            // 图片
-                            .child(
-                                div()
-                                    .w(px(24.0))
-                                    .h(px(24.0))
-                                    .flex()
-                                    .justify_center()
-                                    .items_center()
-                                    .rounded(px(4.0))
-                                    .cursor_pointer()
-                                    .text_color(text_faint)
-                                    .hover(|s| s.bg(rgba(0x00000018)).text_color(text_color))
-                                    .id("sticky-img")
-                                    .on_click(cx.listener(|this, _, _, cx| {
-                                        this.open_image_dialog(cx);
-                                    }))
-                                    .child(Icon::new(IconName::File).size(px(13.0))),
-                            )
                             // 颜色
                             .child(
                                 div()

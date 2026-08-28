@@ -95,6 +95,12 @@ impl widget_core::WidgetContent for TodoWidget {
 
 impl Render for TodoWidget {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        // 确保在待办窗口中，Theme 文本颜色为纯白色
+        gpui_component::Theme::global_mut(cx).colors.foreground = gpui::hsla(0.0, 0.0, 0.98, 1.0);
+        gpui_component::Theme::global_mut(cx)
+            .colors
+            .muted_foreground = gpui::hsla(0.0, 0.0, 0.65, 1.0);
+
         // 如果收到了重置信号，在 render 入口处重建输入框 Entity（此时 window 可用）
         if self.pending_reset {
             self.pending_reset = false;
