@@ -332,68 +332,77 @@ impl Render for FencesWidget {
                             (rgb(0x94a3b8), IconName::File)
                         };
 
-                        // 卡片：直接悬浮于壁纸之上，hover 时呈现深色微光浮岛卡片
+                        // 卡片：悬浮深色微光浮岛卡片
                         div()
                             .relative()
                             .w(px(80.0))
                             .h(px(88.0))
-                            .flex()
-                            .flex_col()
-                            .items_center()
-                            .justify_center()
-                            .p(px(6.0))
-                            .gap(px(8.0))
                             .rounded(px(10.0))
-                            .cursor_pointer()
-                            .bg(rgba(0x00000000))
+                            .bg(rgba(0x0f172a60))
                             .border_1()
-                            .border_color(rgba(0x00000000))
-                            .hover(|s| s.bg(rgba(0x0f172ad0)).border_color(rgba(0x38bdf840)))
-                            .id(ElementId::Name(format!("fence-item-{item_idx}").into()))
-                            .on_click(move |_, _, _| {
-                                Self::launch_item(&item_path);
-                            })
-                            // 纯色大图标
+                            .border_color(rgba(0x38bdf820))
+                            .hover(|s| s.bg(rgba(0x0f172ad0)).border_color(rgba(0x38bdf860)))
+                            // 1. 主点击区域（点击打开/运行）
                             .child(
                                 div()
-                                    .w(px(36.0))
-                                    .h(px(36.0))
+                                    .size_full()
                                     .flex()
-                                    .justify_center()
+                                    .flex_col()
                                     .items_center()
-                                    .text_color(icon_color)
-                                    .child(Icon::new(icon_name).size(px(28.0))),
+                                    .justify_center()
+                                    .p(px(6.0))
+                                    .gap(px(6.0))
+                                    .cursor_pointer()
+                                    .id(ElementId::Name(format!("fence-launch-{item_idx}").into()))
+                                    .on_click(move |_, _, _| {
+                                        Self::launch_item(&item_path);
+                                    })
+                                    // 图标
+                                    .child(
+                                        div()
+                                            .w(px(34.0))
+                                            .h(px(34.0))
+                                            .flex()
+                                            .justify_center()
+                                            .items_center()
+                                            .text_color(icon_color)
+                                            .child(Icon::new(icon_name).size(px(26.0))),
+                                    )
+                                    // 文件名（高对比度纯白字）
+                                    .child(
+                                        div()
+                                            .text_xs()
+                                            .font_weight(FontWeight::MEDIUM)
+                                            .text_color(rgb(0xf8fafc))
+                                            .text_ellipsis()
+                                            .text_center()
+                                            .max_w(px(72.0))
+                                            .overflow_hidden()
+                                            .child(item.name.clone()),
+                                    ),
                             )
-                            // 文件名（清晰高对比度白字）
-                            .child(
-                                div()
-                                    .text_xs()
-                                    .font_weight(FontWeight::MEDIUM)
-                                    .text_color(rgb(0xf8fafc))
-                                    .text_ellipsis()
-                                    .text_center()
-                                    .max_w(px(74.0))
-                                    .overflow_hidden()
-                                    .child(item.name.clone()),
-                            )
-                            // 删除角标：默认透明，自身 hover 时显现
+                            // 2. 右上角删除按钮（独立层级，清晰可见且不冒泡触发 launch）
                             .child(
                                 div()
                                     .absolute()
-                                    .top_0()
-                                    .right_0()
+                                    .top(px(3.0))
+                                    .right(px(3.0))
                                     .w(px(16.0))
                                     .h(px(16.0))
                                     .rounded_full()
-                                    .bg(rgba(0x00000000))
-                                    // 默认文字色完全透明——视觉上不存在
-                                    .text_color(rgba(0xffffff00))
+                                    .bg(rgba(0xff4d4d35))
+                                    .border_1()
+                                    .border_color(rgba(0xff4d4d60))
+                                    .text_color(rgb(0xff8888))
                                     .flex()
                                     .justify_center()
                                     .items_center()
                                     .cursor_pointer()
-                                    // hover 到角标本身时显现
-                                    .hover(|s| s.bg(rgba(0xff4d4dcc)).text_color(rgb(0xffffff)))
+                                    .hover(|s| {
+                                        s.bg(rgba(0xff3333ee))
+                                            .border_color(rgb(0xffffff))
+                                            .text_color(rgb(0xffffff))
+                                    })
                                     .id(ElementId::Name(format!("fence-del-{item_idx}").into()))
                                     .on_click(cx.listener(move |this, _, _, cx| {
                                         if let Some(cat) =
@@ -406,7 +415,7 @@ impl Render for FencesWidget {
                                             }
                                         }
                                     }))
-                                    .child(Icon::new(IconName::Close).size(px(7.0))),
+                                    .child(Icon::new(IconName::Close).size(px(8.0))),
                             )
                     }),
                 ))
