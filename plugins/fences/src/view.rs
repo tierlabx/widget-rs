@@ -109,11 +109,13 @@ impl Render for FencesWidget {
             .flex_col()
             .flex_1()
             .size_full()
-            .p(px(6.0))
-            .gap(px(6.0))
+            .bg(rgba(0x060e1db5)) // ~71% 优雅深邃青蓝黑半透明收纳底板
+            .rounded(px(14.0))
+            .border_1()
+            .border_color(rgba(0x38bdf825)) // 细腻的青蓝微光边框
             .overflow_hidden()
             .min_h_0()
-            // ── 顶部：独立悬浮分类胶囊导航 + 添加按钮 ────────────────────
+            // ── 顶部：分类导航 + 添加按钮 ────────────────────────────────
             .child(
                 div()
                     .flex()
@@ -122,10 +124,9 @@ impl Render for FencesWidget {
                     .w_full()
                     .px(px(10.0))
                     .py(px(7.0))
-                    .bg(rgba(0x0f172ae8)) // 高质感深海蓝黑悬浮胶囊栏
-                    .rounded(px(10.0))
-                    .border_1()
-                    .border_color(rgba(0x38bdf825))
+                    .bg(rgba(0x00000045))
+                    .border_b_1()
+                    .border_color(rgba(0x38bdf818))
                     .flex_shrink_0()
                     // 左：分类胶囊标签
                     .child(div().flex().items_center().gap(px(4.0)).children(

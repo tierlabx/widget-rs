@@ -389,16 +389,20 @@ impl Render for TodoWidget {
             }
         }
 
-        // ── 整体布局（100% 全透明直通桌面背景，悬浮胶囊卡片体系）──────────
+        // ── 整体布局（高质感深海蓝黑半透明毛玻璃底板）──────────────────
         div()
             .flex()
             .flex_col()
             .flex_1()
             .size_full()
-            .p(px(6.0))
+            .bg(rgba(0x0a1220b5)) // ~71% 优雅深海蓝黑半透明，完美透出壁纸又有清晰的组件轮廓
+            .rounded(px(14.0))
+            .border_1()
+            .border_color(rgba(0xffffff22)) // 细腻微光玻璃边框
+            .p(px(8.0))
             .gap(px(6.0))
             .overflow_hidden()
-            // 1. 顶部常驻新增输入栏（独立悬浮深色胶囊）
+            // 1. 顶部常驻新增输入栏
             .child(
                 div()
                     .flex()
@@ -407,10 +411,10 @@ impl Render for TodoWidget {
                     .px(px(12.0))
                     .py(px(9.0))
                     .gap(px(8.0))
-                    .bg(rgba(0x0f172ae8)) // 高质感深海蓝黑悬浮顶栏
+                    .bg(rgba(0x00000040)) // 微弱深色输入背景
                     .rounded(px(10.0))
                     .border_1()
-                    .border_color(rgba(0xffffff22))
+                    .border_color(rgba(0xffffff18))
                     .flex_shrink_0()
                     .child(
                         div()
