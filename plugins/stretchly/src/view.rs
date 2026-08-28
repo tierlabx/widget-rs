@@ -1,5 +1,6 @@
 use gpui::prelude::FluentBuilder;
 use gpui::*;
+use gpui_component::{Icon, IconName};
 use raw_window_handle::HasWindowHandle;
 use std::time::{Duration, Instant};
 
@@ -66,6 +67,7 @@ pub struct StretchlyWidget {
     break_started_at: Option<Instant>,
     /// 缓存最后一次从 render() 取到的 HWND，供 timer 使用
     cached_hwnd: isize,
+    show_details: bool,
     _timer: gpui::Task<()>,
 }
 
@@ -265,6 +267,7 @@ impl StretchlyWidget {
             model,
             break_started_at: None,
             cached_hwnd: 0,
+            show_details: false,
             _timer,
         }
     }
@@ -359,36 +362,27 @@ impl Render for StretchlyWidget {
         };
 
         // ══════════════════════════════════════════════════════════════════════
-        // 工作中/休息中：紧凑小组件（休息时作为底层显示）
+        // 工作中/休息中：紧凑小组件（甘特色系 + 鼠标移入/点击展示更多详情）
         // ══════════════════════════════════════════════════════════════════════
 
-        let bg_color = if is_warning {
-            rgba(0x1a0e04efu32)
+        // 甘特色系定义
+        let (dot_color, progress_color, bg_color, status_label) = if is_paused {
+            (rgb(0x94a3b8), rgb(0x64748b), rgba(0x0a1220db), "已暂停")
+        } else if is_warning {
+            (rgb(0xfb923c), rgb(0xfb923c), rgba(0x1a0e04eb), "即将休息") // 甘特预警橙
+        } else if is_on_break {
+            if matches!(self.model.state, BreakState::MiniBreak) {
+                (rgb(0x38bdf8), rgb(0x38bdf8), rgba(0x06182deb), "微休息中") // 甘特标准蓝
+            } else {
+                (rgb(0xa78bfa), rgb(0xa78bfa), rgba(0x160c2eeb), "长休息中") // 甘特核心紫
+            }
         } else {
-            rgba(0x0d111aefu32)
+            (rgb(0x34d399), rgb(0x34d399), rgba(0x0a1220db), "专注中") // 甘特进行绿
         };
 
-        let progress_color = if is_warning {
-            rgb(0xf59e0bu32)
-        } else {
-            rgb(0x34d399u32)
-        };
-        let dot_color = if is_paused {
-            rgb(0x6b7280u32)
-        } else if is_warning {
-            rgb(0xf59e0bu32)
-        } else {
-            rgb(0x34d399u32)
-        };
-        let status_label = if is_paused {
-            "已暂停"
-        } else if is_warning {
-            "即将休息"
-        } else {
-            "专注中"
-        };
-
+        let show_details = self.show_details;
         let dots: Vec<bool> = (0..mini_total).map(|i| i < mini_taken).collect();
+        let tip = current_tip();
 
         div()
             .flex()
@@ -396,14 +390,17 @@ impl Render for StretchlyWidget {
             .flex_1()
             .size_full()
             .bg(bg_color)
+            .rounded(px(14.0))
+            .border_1()
+            .border_color(rgba(0xffffff20))
+            .overflow_hidden()
             .child(
                 div()
                     .flex()
                     .flex_col()
                     .flex_1()
                     .px(px(12.0))
-                    .pt(px(10.0))
-                    .pb(px(8.0))
+                    .py(px(10.0))
                     .gap(px(6.0))
                     // ── 顶部行 ────────────────────────────────────────────────
                     .child(
@@ -411,7 +408,7 @@ impl Render for StretchlyWidget {
                             .flex()
                             .items_center()
                             .justify_between()
-                            // 左：圆点 + 状态 + 微休进度点
+                            // 左：甘特色指示灯 + 状态 + 微休进度点
                             .child(
                                 div()
                                     .flex()
@@ -419,17 +416,17 @@ impl Render for StretchlyWidget {
                                     .gap(px(6.0))
                                     .child(
                                         div()
-                                            .w(px(7.0))
-                                            .h(px(7.0))
-                                            .rounded(px(4.0))
+                                            .w(px(8.0))
+                                            .h(px(8.0))
+                                            .rounded_full()
                                             .bg(dot_color)
                                             .flex_shrink_0(),
                                     )
                                     .child(
                                         div()
                                             .text_sm()
-                                            .font_weight(FontWeight::MEDIUM)
-                                            .text_color(rgb(0xe2e8f0u32))
+                                            .font_weight(FontWeight::BOLD)
+                                            .text_color(rgb(0xf8fafc))
                                             .child(status_label),
                                     )
                                     .when(!is_warning && !is_paused && mini_total > 1, |d| {
@@ -440,18 +437,18 @@ impl Render for StretchlyWidget {
                                                 .gap(px(3.0))
                                                 .ml(px(2.0))
                                                 .children(dots.iter().map(|&done| {
-                                                    div().w(px(5.0)).h(px(5.0)).rounded(px(3.0)).bg(
+                                                    div().w(px(5.0)).h(px(5.0)).rounded_full().bg(
                                                         if done {
-                                                            rgba(0x34d39999u32)
+                                                            rgb(0x34d399)
                                                         } else {
-                                                            rgba(0xffffff18u32)
+                                                            rgba(0xffffff20)
                                                         },
                                                     )
                                                 })),
                                         )
                                     }),
                             )
-                            // 右：时间 + 按钮
+                            // 右：倒计时 + 按钮区 + 详情切换
                             .child(
                                 div()
                                     .flex()
@@ -460,24 +457,25 @@ impl Render for StretchlyWidget {
                                     .child(
                                         div()
                                             .text_xs()
-                                            .text_color(rgba(0x94a3b8a0u32))
-                                            .when(is_warning, |d| {
-                                                d.text_color(rgba(0xf59e0be0u32))
-                                                    .font_weight(FontWeight::MEDIUM)
+                                            .text_color(if is_warning {
+                                                rgb(0xfb923c)
+                                            } else {
+                                                rgba(0xffffffaa)
                                             })
+                                            .font_weight(FontWeight::MEDIUM)
                                             .child(time_str),
                                     )
                                     // 暂停/继续
                                     .child(
                                         div()
                                             .px(px(6.0))
-                                            .py(px(3.0))
-                                            .rounded(px(5.0))
-                                            .bg(rgba(0xffffff0du32))
-                                            .hover(|s| s.bg(rgba(0xffffff1au32)))
+                                            .py(px(2.5))
+                                            .rounded(px(4.0))
+                                            .bg(rgba(0xffffff10))
+                                            .hover(|s| s.bg(rgba(0xffffff20)))
                                             .cursor_pointer()
                                             .text_xs()
-                                            .text_color(rgba(0x94a3b8ccu32))
+                                            .text_color(rgb(0xf1f5f9))
                                             .id("pause-btn")
                                             .on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
                                                 this.model.toggle_pause();
@@ -490,14 +488,14 @@ impl Render for StretchlyWidget {
                                         d.child(
                                             div()
                                                 .px(px(6.0))
-                                                .py(px(3.0))
-                                                .rounded(px(5.0))
-                                                .bg(rgba(0xf59e0b18u32))
-                                                .hover(|s| s.bg(rgba(0xf59e0b28u32)))
+                                                .py(px(2.5))
+                                                .rounded(px(4.0))
+                                                .bg(rgba(0xfb923c25))
+                                                .hover(|s| s.bg(rgba(0xfb923c40)))
                                                 .cursor_pointer()
                                                 .text_xs()
                                                 .font_weight(FontWeight::MEDIUM)
-                                                .text_color(rgb(0xf59e0bu32))
+                                                .text_color(rgb(0xfb923c))
                                                 .id("postpone-warning-btn")
                                                 .on_click(cx.listener(
                                                     |this, _: &ClickEvent, _, cx| {
@@ -508,69 +506,165 @@ impl Render for StretchlyWidget {
                                                 .child("推迟"),
                                         )
                                     })
-                                    // 正常工作时：立即休息按钮（当作跳过当前工作阶段，与 allow_skip 关联或总是允许？这里受 allow_skip 限制）
-                                    .when(!is_warning && !is_paused && allow_skip, |d| {
-                                        d.child(
-                                            div()
-                                                .px(px(6.0))
-                                                .py(px(3.0))
-                                                .rounded(px(5.0))
-                                                .bg(rgba(0xffffff08u32))
-                                                .hover(|s| s.bg(rgba(0xffffff15u32)))
-                                                .cursor_pointer()
-                                                .text_xs()
-                                                .text_color(rgba(0x94a3b880u32))
-                                                .id("break-now-btn")
-                                                .on_click(cx.listener(
-                                                    |this, _: &ClickEvent, _, cx| {
-                                                        this.model.skip();
-                                                        cx.notify();
-                                                    },
-                                                ))
-                                                .child("休息"),
-                                        )
-                                    }),
+                                    // 正常专注时：提前休息按钮
+                                    .when(
+                                        !is_warning && !is_paused && !is_on_break && allow_skip,
+                                        |d| {
+                                            d.child(
+                                                div()
+                                                    .px(px(6.0))
+                                                    .py(px(2.5))
+                                                    .rounded(px(4.0))
+                                                    .bg(rgba(0x38bdf818))
+                                                    .hover(|s| s.bg(rgba(0x38bdf830)))
+                                                    .cursor_pointer()
+                                                    .text_xs()
+                                                    .text_color(rgb(0x38bdf8))
+                                                    .id("break-now-btn")
+                                                    .on_click(cx.listener(
+                                                        |this, _: &ClickEvent, _, cx| {
+                                                            this.model.skip();
+                                                            cx.notify();
+                                                        },
+                                                    ))
+                                                    .child("休息"),
+                                            )
+                                        },
+                                    )
+                                    // 展开/折叠更多详情按钮
+                                    .child(
+                                        div()
+                                            .w(px(20.0))
+                                            .h(px(20.0))
+                                            .flex()
+                                            .justify_center()
+                                            .items_center()
+                                            .rounded(px(4.0))
+                                            .cursor_pointer()
+                                            .text_color(rgba(0xffffff70))
+                                            .hover(|s| {
+                                                s.bg(rgba(0xffffff15)).text_color(rgb(0xffffff))
+                                            })
+                                            .id("stretchly-expand-btn")
+                                            .on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+                                                this.show_details = !this.show_details;
+                                                cx.notify();
+                                            }))
+                                            .child(
+                                                Icon::new(if show_details {
+                                                    IconName::ChevronUp
+                                                } else {
+                                                    IconName::ChevronDown
+                                                })
+                                                .size(px(11.0)),
+                                            ),
+                                    ),
                             ),
                     )
-                    // ── 进度条 ────────────────────────────────────────────────
+                    // ── 进度条（甘特色系呼吸高亮）─────────────────────────────
                     .child(
                         div()
                             .w_full()
-                            .h(px(3.0))
-                            .rounded(px(2.0))
-                            .bg(rgba(0xffffff0cu32))
+                            .h(px(3.5))
+                            .rounded_full()
+                            .bg(rgba(0xffffff12))
                             .child(
                                 div()
                                     .h_full()
-                                    .rounded(px(2.0))
+                                    .rounded_full()
                                     .bg(progress_color)
                                     .w(relative(progress)),
                             ),
                     )
-                    // ── P3: 今日统计摘要（极简，不喧宾夺主）────────────────
+                    // ── 常驻统计摘要 ──────────────────────────────────────────
                     .child(
                         div()
                             .w_full()
                             .flex()
                             .justify_between()
                             .items_center()
-                            .pt(px(3.0))
+                            .pt(px(2.0))
+                            .child(div().text_xs().text_color(rgba(0xffffff50)).child(format!(
+                                "微休 {}  长休 {}  跳过 {}",
+                                stats_mini, stats_long, stats_skip
+                            )))
                             .child(
                                 div()
                                     .text_xs()
-                                    .text_color(rgba(0xffffff28u32))
-                                    .child(format!(
-                                        "微休 {}  长休 {}  跳过 {}",
-                                        stats_mini, stats_long, stats_skip
-                                    )),
-                            )
-                            .child(
-                                div()
-                                    .text_xs()
-                                    .text_color(rgba(0xffffff1cu32))
-                                    .child(format!("专注 {} 分", stats_focus)),
+                                    .text_color(rgba(0xffffff50))
+                                    .child(format!("专注 {} 分钟", stats_focus)),
                             ),
-                    ),
+                    )
+                    // ── 鼠标移入/点击展开的“更多内容”详情卡片 ─────────────────
+                    .when(show_details, |container| {
+                        container.child(
+                            div()
+                                .flex()
+                                .flex_col()
+                                .w_full()
+                                .pt(px(6.0))
+                                .mt(px(4.0))
+                                .gap(px(6.0))
+                                .border_t_1()
+                                .border_color(rgba(0xffffff15))
+                                // 健康小贴士
+                                .child(
+                                    div()
+                                        .flex()
+                                        .items_center()
+                                        .gap(px(6.0))
+                                        .p(px(6.0))
+                                        .rounded(px(6.0))
+                                        .bg(rgba(0x00000030))
+                                        .child(
+                                            div()
+                                                .text_xs()
+                                                .text_color(rgb(0x38bdf8))
+                                                .font_weight(FontWeight::MEDIUM)
+                                                .child("💡 建议:"),
+                                        )
+                                        .child(
+                                            div()
+                                                .flex_1()
+                                                .text_xs()
+                                                .text_color(rgba(0xffffff85))
+                                                .child(tip),
+                                        ),
+                                )
+                                // 甘特阶段与规则详情
+                                .child(
+                                    div()
+                                        .flex()
+                                        .items_center()
+                                        .justify_between()
+                                        .w_full()
+                                        .px(px(2.0))
+                                        .child(div().text_xs().text_color(rgba(0xffffff50)).child(
+                                            format!(
+                                                "微休周期: 第 {}/{} 轮",
+                                                mini_taken + 1,
+                                                mini_total
+                                            ),
+                                        ))
+                                        .child(
+                                            div()
+                                                .px(px(6.0))
+                                                .py(px(1.5))
+                                                .rounded_full()
+                                                .text_xs()
+                                                .text_color(dot_color)
+                                                .bg(rgba(0xffffff10))
+                                                .child(if is_warning {
+                                                    "预警中"
+                                                } else if is_paused {
+                                                    "计时暂停"
+                                                } else {
+                                                    "高效专注"
+                                                }),
+                                        ),
+                                ),
+                        )
+                    }),
             )
     }
 }
