@@ -33,7 +33,7 @@ impl Plugin for FencesWidgetPlugin {
         let options = widget_core::default_widget_window_options(
             cx,
             "fences_widget",
-            (850.0, 50.0, 360.0, 360.0),
+            (850.0, 50.0, 360.0, 480.0),
         );
 
         cx.open_window(options, |window, cx| {

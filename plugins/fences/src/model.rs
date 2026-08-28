@@ -13,22 +13,35 @@ pub struct FenceItem {
 pub struct FenceCategory {
     pub name: String,
     pub items: Vec<FenceItem>,
+    #[serde(default)]
+    pub collapsed: bool,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct FencesData {
-    pub active_category: usize,
     pub categories: Vec<FenceCategory>,
 }
 
 impl Default for FencesData {
     fn default() -> Self {
         Self {
-            active_category: 0,
-            categories: vec![FenceCategory {
-                name: "常用".to_string(),
-                items: vec![],
-            }],
+            categories: vec![
+                FenceCategory {
+                    name: "程序".to_string(),
+                    items: vec![],
+                    collapsed: false,
+                },
+                FenceCategory {
+                    name: "文件夹".to_string(),
+                    items: vec![],
+                    collapsed: false,
+                },
+                FenceCategory {
+                    name: "文件".to_string(),
+                    items: vec![],
+                    collapsed: false,
+                },
+            ],
         }
     }
 }
@@ -37,9 +50,16 @@ pub struct FencesModel;
 
 impl FencesModel {
     pub fn load(cx: &mut App) -> FencesData {
-        cx.try_global::<AppConfig>()
+        let mut data = cx
+            .try_global::<AppConfig>()
             .and_then(|cfg| cfg.get_plugin_data::<FencesData>("fences_widget"))
-            .unwrap_or_default()
+            .unwrap_or_default();
+
+        // 确保必须包含三栏：程序、文件夹、文件
+        if data.categories.len() < 3 {
+            data = FencesData::default();
+        }
+        data
     }
 
     pub fn save(data: &FencesData, cx: &mut App) {
