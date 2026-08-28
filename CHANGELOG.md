@@ -6,6 +6,29 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+## [0.5.0](https://github.com/tierlabx/widget-rs/releases/tag/v0.5.0) - 2026-08-28
+
+### Added
+
+- 将分类标签重构为左侧纵向突出吸附 Tab 侧边栏，支持胶囊状态高亮与一键添加标签
+- 推出精准定时与周期循环提醒引擎，新增横向分类标签导航与聚焦过滤
+- 支持项目管理甘特色系，待办列表与通知提醒新增移入展开更多详情面板
+- 重构为程序、文件夹、文件三栏可折叠桌面收纳盒架构，支持智能拖拽归类与独立快速添加
+- 默认内容清空为纯净初始态，并全面支持桌面文件/文件夹拖拽收纳与新分类创建
+- 桌面小组件全面升级，新增 Fences 收纳、Sticky 多便签、Todo 悬浮胶囊及透明白底修复
+
+### Fixed
+
+- 移除默认写死的示例待办，初始状态干净清爽并增加空状态提示
+- 在删除按钮的 on_mouse_down 与 on_click 均添加 stop_propagation，彻底阻断事件冒泡打开文件
+- 优化条目卡片删除按钮视觉显色，并将启动触发区与删除操作彻底解耦，防止误触打开
+- 修复便签输入文字颜色为深墨水黑，并移除右上角冗余的文件按钮（支持直接拖拽图片）
+- 切换为深色模式全局主题，解决 Input 输入框文字在深色背景下呈黑色看不见的问题
+
+### Changed
+
+- remove legacy design and architecture generation scripts
+
 ## [0.4.1](https://github.com/tierlabx/widget-rs/releases/tag/v0.4.1) - 2026-08-13
 
 ### Fixed
