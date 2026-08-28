@@ -2,16 +2,20 @@ use gpui::prelude::FluentBuilder;
 use gpui::*;
 use gpui_component::input::{Input, InputEvent, InputState};
 use gpui_component::{Icon, IconName};
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
-use crate::model::{TodoItem, TodoModel, GANTT_COLORS};
+use crate::model::{ReminderRule, TodoData, TodoItem, TodoModel, GANTT_COLORS};
 
-fn get_simple_time_str() -> String {
-    use std::time::{SystemTime, UNIX_EPOCH};
-    let secs = SystemTime::now()
+fn get_now_secs() -> u64 {
+    SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .unwrap_or_default()
-        .as_secs();
-    let local_secs = (secs + 28800) % 86400;
+        .as_secs()
+}
+
+fn get_simple_time_str() -> String {
+    let secs = get_now_secs();
+    let local_secs = (secs + 28800) % 86400; // UTC+8
     let hours = local_secs / 3600;
     let mins = (local_secs % 3600) / 60;
     format!("{:02}:{:02}", hours, mins)
@@ -39,7 +43,7 @@ impl Render for DragTodoView {
 }
 
 pub struct TodoWidget {
-    items: Vec<TodoItem>,
+    data: TodoData,
     new_input: Entity<InputState>,
     pending_reset: bool,
     editing_idx: Option<usize>,
@@ -47,11 +51,12 @@ pub struct TodoWidget {
     expanded_idx: Option<usize>,
     show_completed: bool,
     scroll_handle: ScrollHandle,
+    _timer: gpui::Task<()>,
 }
 
 impl TodoWidget {
     pub fn new(window: &mut Window, cx: &mut Context<Self>) -> Self {
-        let saved_items = TodoModel::load(cx);
+        let data = TodoModel::load(cx);
 
         let new_input =
             cx.new(|cx| InputState::new(window, cx).placeholder("输入新待办，回车即保存..."));
@@ -63,13 +68,27 @@ impl TodoWidget {
                     let text = input.read(cx).value().to_string();
                     let trimmed = text.trim().to_string();
                     if !trimmed.is_empty() {
-                        this.items.push(TodoItem {
+                        let active_tag = if this.data.active_tag_id == "all" {
+                            this.data
+                                .tags
+                                .first()
+                                .map(|t| t.id.clone())
+                                .unwrap_or_else(|| "work".to_string())
+                        } else {
+                            this.data.active_tag_id.clone()
+                        };
+
+                        this.data.items.push(TodoItem {
+                            id: format!("todo-{}", get_now_secs()),
                             text: trimmed,
                             done: false,
+                            tag_id: active_tag,
                             gantt_color: 0,
+                            reminder: None,
+                            last_reminded_at: None,
                             created_at: Some(format!("今日 {}", get_simple_time_str())),
                         });
-                        TodoModel::save(&this.items, cx);
+                        TodoModel::save(&this.data, cx);
                         this.scroll_handle.scroll_to_bottom();
                     }
                     this.pending_reset = true;
@@ -81,8 +100,78 @@ impl TodoWidget {
 
         let edit_input = cx.new(|cx| InputState::new(window, cx).placeholder("编辑待办内容..."));
 
+        // ── 后台定时提醒检查引擎 ────────────────────────────────────
+        let this_weak = cx.weak_entity();
+        let app_cx: &mut App = cx;
+        let _timer = app_cx.spawn(async move |async_cx| loop {
+            async_cx
+                .background_executor()
+                .timer(Duration::from_secs(2))
+                .await;
+
+            let res = async_cx.update(|cx| {
+                let _ = this_weak.update(cx, |this, cx| {
+                    let now = get_now_secs();
+                    let local_secs = (now + 28800) % 86400;
+                    let curr_minute_of_day = (local_secs / 60) as u32;
+
+                    let mut needs_save = false;
+                    for item in &mut this.data.items {
+                        if item.done {
+                            continue;
+                        }
+                        if let Some(rule) = &item.reminder {
+                            let should_remind = match rule {
+                                ReminderRule::Once { target_time_secs } => {
+                                    now >= *target_time_secs && item.last_reminded_at.is_none()
+                                }
+                                ReminderRule::Daily { minute_of_day } => {
+                                    curr_minute_of_day == *minute_of_day
+                                        && item
+                                            .last_reminded_at
+                                            .map(|t| now.saturating_sub(t) > 60)
+                                            .unwrap_or(true)
+                                }
+                                ReminderRule::Weekly { minute_of_day, .. } => {
+                                    curr_minute_of_day == *minute_of_day
+                                        && item
+                                            .last_reminded_at
+                                            .map(|t| now.saturating_sub(t) > 60)
+                                            .unwrap_or(true)
+                                }
+                                ReminderRule::Monthly { minute_of_day, .. } => {
+                                    curr_minute_of_day == *minute_of_day
+                                        && item
+                                            .last_reminded_at
+                                            .map(|t| now.saturating_sub(t) > 60)
+                                            .unwrap_or(true)
+                                }
+                                ReminderRule::Interval { interval_mins } => item
+                                    .last_reminded_at
+                                    .map(|t| now.saturating_sub(t) >= (*interval_mins as u64 * 60))
+                                    .unwrap_or(true),
+                            };
+
+                            if should_remind {
+                                item.last_reminded_at = Some(now);
+                                needs_save = true;
+                            }
+                        }
+                    }
+                    if needs_save {
+                        TodoModel::save(&this.data, cx);
+                        cx.notify();
+                    }
+                });
+            });
+
+            if res.is_err() {
+                break;
+            }
+        });
+
         Self {
-            items: saved_items,
+            data,
             new_input,
             pending_reset: false,
             editing_idx: None,
@@ -90,6 +179,7 @@ impl TodoWidget {
             expanded_idx: None,
             show_completed: false,
             scroll_handle: ScrollHandle::new(),
+            _timer,
         }
     }
 }
@@ -122,13 +212,27 @@ impl Render for TodoWidget {
                         let text = input.read(cx).value().to_string();
                         let trimmed = text.trim().to_string();
                         if !trimmed.is_empty() {
-                            this.items.push(TodoItem {
+                            let active_tag = if this.data.active_tag_id == "all" {
+                                this.data
+                                    .tags
+                                    .first()
+                                    .map(|t| t.id.clone())
+                                    .unwrap_or_else(|| "work".to_string())
+                            } else {
+                                this.data.active_tag_id.clone()
+                            };
+
+                            this.data.items.push(TodoItem {
+                                id: format!("todo-{}", get_now_secs()),
                                 text: trimmed,
                                 done: false,
+                                tag_id: active_tag,
                                 gantt_color: 0,
+                                reminder: None,
+                                last_reminded_at: None,
                                 created_at: Some(format!("今日 {}", get_simple_time_str())),
                             });
-                            TodoModel::save(&this.items, cx);
+                            TodoModel::save(&this.data, cx);
                             this.scroll_handle.scroll_to_bottom();
                         }
                         this.pending_reset = true;
@@ -144,27 +248,38 @@ impl Render for TodoWidget {
         let expanded_idx = self.expanded_idx;
         let edit_input = &self.edit_input;
         let new_input = &self.new_input;
+        let active_tag_id = self.data.active_tag_id.clone();
 
         let mut pending_elements = Vec::new();
         let mut completed_elements = Vec::new();
 
-        for (idx, item) in self.items.iter().enumerate() {
+        // 标签映射表
+        let tags = self.data.tags.clone();
+
+        for (idx, item) in self.data.items.iter().enumerate() {
+            // 过滤标签（若非 "all" 且标签不匹配则跳过）
+            if active_tag_id != "all" && item.tag_id != active_tag_id {
+                continue;
+            }
+
             let done = item.done;
             let text = item.text.clone();
             let is_editing = editing_idx == Some(idx);
             let is_expanded = expanded_idx == Some(idx);
             let color_idx = item.gantt_color % GANTT_COLORS.len();
             let gantt = &GANTT_COLORS[color_idx];
+            let item_tag = tags.iter().find(|t| t.id == item.tag_id).cloned();
+            let reminder_text = item.reminder.as_ref().map(|r| r.display_text());
             let created_time = item
                 .created_at
                 .clone()
                 .unwrap_or_else(|| "今天".to_string());
 
             let toggle_handler = cx.listener(move |this, _: &ClickEvent, _, cx| {
-                if let Some(it) = this.items.get_mut(idx) {
+                if let Some(it) = this.data.items.get_mut(idx) {
                     it.done = !it.done;
                 }
-                TodoModel::save(&this.items, cx);
+                TodoModel::save(&this.data, cx);
                 cx.notify();
             });
 
@@ -175,10 +290,10 @@ impl Render for TodoWidget {
                 if this.expanded_idx == Some(idx) {
                     this.expanded_idx = None;
                 }
-                if idx < this.items.len() {
-                    this.items.remove(idx);
+                if idx < this.data.items.len() {
+                    this.data.items.remove(idx);
                 }
-                TodoModel::save(&this.items, cx);
+                TodoModel::save(&this.data, cx);
                 cx.notify();
             });
 
@@ -187,14 +302,14 @@ impl Render for TodoWidget {
                     let text = this.edit_input.read(cx).value().to_string();
                     let trimmed = text.trim().to_string();
                     if !trimmed.is_empty() {
-                        if let Some(item) = this.items.get_mut(idx) {
+                        if let Some(item) = this.data.items.get_mut(idx) {
                             item.text = trimmed;
                         }
                     }
                     this.editing_idx = None;
-                    TodoModel::save(&this.items, cx);
+                    TodoModel::save(&this.data, cx);
                 } else {
-                    let current = this.items[idx].text.clone();
+                    let current = this.data.items[idx].text.clone();
                     let new_edit = cx.new(|cx| {
                         InputState::new(window, cx)
                             .default_value(current)
@@ -208,13 +323,13 @@ impl Render for TodoWidget {
                                 let trimmed = text.trim().to_string();
                                 if let Some(idx) = this.editing_idx {
                                     if !trimmed.is_empty() {
-                                        if let Some(item) = this.items.get_mut(idx) {
+                                        if let Some(item) = this.data.items.get_mut(idx) {
                                             item.text = trimmed;
                                         }
                                     }
                                 }
                                 this.editing_idx = None;
-                                TodoModel::save(&this.items, cx);
+                                TodoModel::save(&this.data, cx);
                                 cx.notify();
                             }
                         },
@@ -290,11 +405,12 @@ impl Render for TodoWidget {
                     .on_drop(cx.listener(move |this, drag: &DragTodo, _, cx| {
                         let from = drag.0;
                         let to = idx;
-                        if from != to && from < this.items.len() && to < this.items.len() {
-                            let item = this.items.remove(from);
+                        if from != to && from < this.data.items.len() && to < this.data.items.len()
+                        {
+                            let item = this.data.items.remove(from);
                             let adjusted_to = if from < to { to - 1 } else { to };
-                            this.items.insert(adjusted_to, item);
-                            TodoModel::save(&this.items, cx);
+                            this.data.items.insert(adjusted_to, item);
+                            TodoModel::save(&this.data, cx);
                             cx.notify();
                         }
                     }))
@@ -325,8 +441,8 @@ impl Render for TodoWidget {
                             .px(px(8.0))
                             .py(px(8.0))
                             .gap(px(8.0))
-                            // 1. 甘特色系竖条（Gantt Bar）
-                            .child(div().w(px(3.5)).h(px(20.0)).rounded_full().bg(if done {
+                            // 1. 甘特色系竖条
+                            .child(div().w(px(3.5)).h(px(22.0)).rounded_full().bg(if done {
                                 rgba(0xffffff30)
                             } else {
                                 rgb(gantt.hex)
@@ -364,21 +480,60 @@ impl Render for TodoWidget {
                                         )
                                     }),
                             )
-                            // 3. 待办文本
+                            // 3. 待办文本与提醒徽章
                             .child(
                                 div()
                                     .flex_1()
-                                    .text_sm()
-                                    .font_weight(FontWeight::NORMAL)
-                                    .text_color(if done {
-                                        rgba(0x94a3b8aa)
-                                    } else {
-                                        rgb(0xf8fafc)
-                                    })
-                                    .when(done, |d: Div| d.line_through())
-                                    .child(item_text_display),
+                                    .flex()
+                                    .flex_col()
+                                    .gap(px(2.0))
+                                    .child(
+                                        div()
+                                            .text_sm()
+                                            .font_weight(FontWeight::NORMAL)
+                                            .text_color(if done {
+                                                rgba(0x94a3b8aa)
+                                            } else {
+                                                rgb(0xf8fafc)
+                                            })
+                                            .when(done, |d: Div| d.line_through())
+                                            .child(item_text_display),
+                                    )
+                                    .when(reminder_text.is_some() || item_tag.is_some(), |d| {
+                                        let mut row = div().flex().items_center().gap(px(4.0));
+                                        if let Some(tag) = &item_tag {
+                                            let tag_color =
+                                                &GANTT_COLORS[tag.gantt_color % GANTT_COLORS.len()];
+                                            row = row.child(
+                                                div()
+                                                    .px(px(4.0))
+                                                    .py(px(0.5))
+                                                    .rounded(px(3.0))
+                                                    .text_xs()
+                                                    .text_color(rgb(tag_color.hex))
+                                                    .bg(rgba(tag_color.bg_alpha_hex))
+                                                    .child(tag.name.clone()),
+                                            );
+                                        }
+                                        if let Some(r_text) = reminder_text {
+                                            row = row.child(
+                                                div()
+                                                    .flex()
+                                                    .items_center()
+                                                    .gap(px(2.0))
+                                                    .px(px(4.0))
+                                                    .py(px(0.5))
+                                                    .rounded(px(3.0))
+                                                    .text_xs()
+                                                    .text_color(rgb(0xfb923c))
+                                                    .bg(rgba(0xfb923c20))
+                                                    .child(format!("⏰ {}", r_text)),
+                                            );
+                                        }
+                                        d.child(row)
+                                    }),
                             )
-                            // 4. 右侧操作区（展开详情、编辑、删除）
+                            // 4. 右侧操作区
                             .child(
                                 div()
                                     .flex()
@@ -460,45 +615,21 @@ impl Render for TodoWidget {
                                     ),
                             ),
                     )
-                    // ── 鼠标移入/点击展开的“更多内容”卡片 ───────────────
+                    // ── 鼠标移入/点击展开的“更多内容与设置”面板 ──────────
                     .when(is_expanded, |card| {
+                        let all_tags = tags.clone();
                         card.child(
                             div()
                                 .flex()
                                 .flex_col()
                                 .w_full()
                                 .px(px(10.0))
-                                .py(px(6.0))
-                                .gap(px(6.0))
-                                .bg(rgba(0x00000030))
+                                .py(px(8.0))
+                                .gap(px(8.0))
+                                .bg(rgba(0x00000035))
                                 .border_t_1()
                                 .border_color(rgba(0xffffff10))
-                                // 时间与分类标签
-                                .child(
-                                    div()
-                                        .flex()
-                                        .items_center()
-                                        .justify_between()
-                                        .w_full()
-                                        .child(
-                                            div()
-                                                .text_xs()
-                                                .text_color(rgba(0xffffff50))
-                                                .child(format!("⏱ {}", created_time)),
-                                        )
-                                        .child(
-                                            div()
-                                                .px(px(6.0))
-                                                .py(px(1.5))
-                                                .rounded_full()
-                                                .text_xs()
-                                                .font_weight(FontWeight::MEDIUM)
-                                                .text_color(rgb(gantt.hex))
-                                                .bg(rgba(gantt.bg_alpha_hex))
-                                                .child(gantt.name),
-                                        ),
-                                )
-                                // 甘特色系快速切换栏
+                                // 1. 分类标签选择
                                 .child(
                                     div()
                                         .flex()
@@ -508,36 +639,284 @@ impl Render for TodoWidget {
                                             div()
                                                 .text_xs()
                                                 .text_color(rgba(0xffffff60))
-                                                .child("甘特色:"),
+                                                .child("分类:"),
                                         )
-                                        .children(GANTT_COLORS.iter().enumerate().map(
-                                            |(g_idx, g_color)| {
-                                                let is_curr = g_idx == color_idx;
-                                                div()
-                                                    .w(px(14.0))
-                                                    .h(px(14.0))
-                                                    .rounded_full()
-                                                    .cursor_pointer()
-                                                    .bg(rgb(g_color.hex))
-                                                    .border_2()
-                                                    .border_color(if is_curr {
-                                                        rgb(0xffffff)
-                                                    } else {
-                                                        rgba(0x00000000)
-                                                    })
-                                                    .hover(|s| s.border_color(rgb(0xffffff)))
-                                                    .id(ElementId::Name(
-                                                        format!("todo-gantt-{idx}-{g_idx}").into(),
-                                                    ))
-                                                    .on_click(cx.listener(move |this, _, _, cx| {
-                                                        if let Some(it) = this.items.get_mut(idx) {
-                                                            it.gantt_color = g_idx;
-                                                            TodoModel::save(&this.items, cx);
-                                                            cx.notify();
-                                                        }
-                                                    }))
-                                            },
-                                        )),
+                                        .children(all_tags.iter().map(|tag| {
+                                            let is_curr = item.tag_id == tag.id;
+                                            let tag_id_clone = tag.id.clone();
+                                            let tag_color =
+                                                &GANTT_COLORS[tag.gantt_color % GANTT_COLORS.len()];
+                                            div()
+                                                .px(px(6.0))
+                                                .py(px(1.5))
+                                                .rounded(px(4.0))
+                                                .cursor_pointer()
+                                                .text_xs()
+                                                .text_color(if is_curr {
+                                                    rgb(0xffffff)
+                                                } else {
+                                                    rgb(tag_color.hex)
+                                                })
+                                                .bg(if is_curr {
+                                                    rgb(tag_color.hex)
+                                                } else {
+                                                    rgba(tag_color.bg_alpha_hex)
+                                                })
+                                                .hover(|s| s.opacity(0.8))
+                                                .id(ElementId::Name(
+                                                    format!("todo-tag-{idx}-{}", tag.id).into(),
+                                                ))
+                                                .on_click(cx.listener(move |this, _, _, cx| {
+                                                    if let Some(it) = this.data.items.get_mut(idx) {
+                                                        it.tag_id = tag_id_clone.clone();
+                                                        TodoModel::save(&this.data, cx);
+                                                        cx.notify();
+                                                    }
+                                                }))
+                                                .child(tag.name.clone())
+                                        })),
+                                )
+                                // 2. 智能定时与重复提醒设置
+                                .child(
+                                    div()
+                                        .flex()
+                                        .flex_col()
+                                        .gap(px(4.0))
+                                        .child(
+                                            div()
+                                                .text_xs()
+                                                .text_color(rgba(0xffffff60))
+                                                .child("提醒设置:"),
+                                        )
+                                        .child(
+                                            div()
+                                                .flex()
+                                                .flex_wrap()
+                                                .gap(px(4.0))
+                                                // 无提醒
+                                                .child(
+                                                    div()
+                                                        .px(px(6.0))
+                                                        .py(px(2.0))
+                                                        .rounded(px(4.0))
+                                                        .cursor_pointer()
+                                                        .text_xs()
+                                                        .text_color(if item.reminder.is_none() {
+                                                            rgb(0xffffff)
+                                                        } else {
+                                                            rgba(0xffffff60)
+                                                        })
+                                                        .bg(if item.reminder.is_none() {
+                                                            rgba(0x38bdf840)
+                                                        } else {
+                                                            rgba(0xffffff10)
+                                                        })
+                                                        .id(ElementId::Name(
+                                                            format!("todo-rem-none-{idx}").into(),
+                                                        ))
+                                                        .on_click(cx.listener(
+                                                            move |this, _, _, cx| {
+                                                                if let Some(it) =
+                                                                    this.data.items.get_mut(idx)
+                                                                {
+                                                                    it.reminder = None;
+                                                                    TodoModel::save(&this.data, cx);
+                                                                    cx.notify();
+                                                                }
+                                                            },
+                                                        ))
+                                                        .child("无"),
+                                                )
+                                                // 30分钟后
+                                                .child(
+                                                    div()
+                                                        .px(px(6.0))
+                                                        .py(px(2.0))
+                                                        .rounded(px(4.0))
+                                                        .cursor_pointer()
+                                                        .text_xs()
+                                                        .text_color(rgb(0x38bdf8))
+                                                        .bg(rgba(0x38bdf818))
+                                                        .hover(|s| s.bg(rgba(0x38bdf835)))
+                                                        .id(ElementId::Name(
+                                                            format!("todo-rem-30m-{idx}").into(),
+                                                        ))
+                                                        .on_click(cx.listener(
+                                                            move |this, _, _, cx| {
+                                                                if let Some(it) =
+                                                                    this.data.items.get_mut(idx)
+                                                                {
+                                                                    it.reminder =
+                                                                        Some(ReminderRule::Once {
+                                                                            target_time_secs:
+                                                                                get_now_secs()
+                                                                                    + 30 * 60,
+                                                                        });
+                                                                    TodoModel::save(&this.data, cx);
+                                                                    cx.notify();
+                                                                }
+                                                            },
+                                                        ))
+                                                        .child("30分钟后"),
+                                                )
+                                                // 每天 18:00
+                                                .child(
+                                                    div()
+                                                        .px(px(6.0))
+                                                        .py(px(2.0))
+                                                        .rounded(px(4.0))
+                                                        .cursor_pointer()
+                                                        .text_xs()
+                                                        .text_color(rgb(0x34d399))
+                                                        .bg(rgba(0x34d39918))
+                                                        .hover(|s| s.bg(rgba(0x34d39935)))
+                                                        .id(ElementId::Name(
+                                                            format!("todo-rem-daily-{idx}").into(),
+                                                        ))
+                                                        .on_click(cx.listener(
+                                                            move |this, _, _, cx| {
+                                                                if let Some(it) =
+                                                                    this.data.items.get_mut(idx)
+                                                                {
+                                                                    it.reminder =
+                                                                        Some(ReminderRule::Daily {
+                                                                            minute_of_day: 18 * 60,
+                                                                        });
+                                                                    TodoModel::save(&this.data, cx);
+                                                                    cx.notify();
+                                                                }
+                                                            },
+                                                        ))
+                                                        .child("每天 18:00"),
+                                                )
+                                                // 每周五 17:00
+                                                .child(
+                                                    div()
+                                                        .px(px(6.0))
+                                                        .py(px(2.0))
+                                                        .rounded(px(4.0))
+                                                        .cursor_pointer()
+                                                        .text_xs()
+                                                        .text_color(rgb(0xa78bfa))
+                                                        .bg(rgba(0xa78bfa18))
+                                                        .hover(|s| s.bg(rgba(0xa78bfa35)))
+                                                        .id(ElementId::Name(
+                                                            format!("todo-rem-weekly-{idx}").into(),
+                                                        ))
+                                                        .on_click(cx.listener(
+                                                            move |this, _, _, cx| {
+                                                                if let Some(it) =
+                                                                    this.data.items.get_mut(idx)
+                                                                {
+                                                                    it.reminder = Some(
+                                                                        ReminderRule::Weekly {
+                                                                            weekday: 5,
+                                                                            minute_of_day: 17 * 60,
+                                                                        },
+                                                                    );
+                                                                    TodoModel::save(&this.data, cx);
+                                                                    cx.notify();
+                                                                }
+                                                            },
+                                                        ))
+                                                        .child("周五 17:00"),
+                                                )
+                                                // 每30分钟催办
+                                                .child(
+                                                    div()
+                                                        .px(px(6.0))
+                                                        .py(px(2.0))
+                                                        .rounded(px(4.0))
+                                                        .cursor_pointer()
+                                                        .text_xs()
+                                                        .font_weight(FontWeight::MEDIUM)
+                                                        .text_color(rgb(0xfb923c))
+                                                        .bg(rgba(0xfb923c20))
+                                                        .hover(|s| s.bg(rgba(0xfb923c40)))
+                                                        .id(ElementId::Name(
+                                                            format!("todo-rem-loop30-{idx}").into(),
+                                                        ))
+                                                        .on_click(cx.listener(
+                                                            move |this, _, _, cx| {
+                                                                if let Some(it) =
+                                                                    this.data.items.get_mut(idx)
+                                                                {
+                                                                    it.reminder = Some(
+                                                                        ReminderRule::Interval {
+                                                                            interval_mins: 30,
+                                                                        },
+                                                                    );
+                                                                    TodoModel::save(&this.data, cx);
+                                                                    cx.notify();
+                                                                }
+                                                            },
+                                                        ))
+                                                        .child("⚡ 每30分催办"),
+                                                ),
+                                        ),
+                                )
+                                // 3. 甘特色系与创建时间
+                                .child(
+                                    div()
+                                        .flex()
+                                        .items_center()
+                                        .justify_between()
+                                        .w_full()
+                                        .child(
+                                            div()
+                                                .flex()
+                                                .items_center()
+                                                .gap(px(6.0))
+                                                .child(
+                                                    div()
+                                                        .text_xs()
+                                                        .text_color(rgba(0xffffff60))
+                                                        .child("甘特色:"),
+                                                )
+                                                .children(GANTT_COLORS.iter().enumerate().map(
+                                                    |(g_idx, g_color)| {
+                                                        let is_curr = g_idx == color_idx;
+                                                        div()
+                                                            .w(px(14.0))
+                                                            .h(px(14.0))
+                                                            .rounded_full()
+                                                            .cursor_pointer()
+                                                            .bg(rgb(g_color.hex))
+                                                            .border_2()
+                                                            .border_color(if is_curr {
+                                                                rgb(0xffffff)
+                                                            } else {
+                                                                rgba(0x00000000)
+                                                            })
+                                                            .hover(|s| {
+                                                                s.border_color(rgb(0xffffff))
+                                                            })
+                                                            .id(ElementId::Name(
+                                                                format!("todo-gantt-{idx}-{g_idx}")
+                                                                    .into(),
+                                                            ))
+                                                            .on_click(cx.listener(
+                                                                move |this, _, _, cx| {
+                                                                    if let Some(it) =
+                                                                        this.data.items.get_mut(idx)
+                                                                    {
+                                                                        it.gantt_color = g_idx;
+                                                                        TodoModel::save(
+                                                                            &this.data, cx,
+                                                                        );
+                                                                        cx.notify();
+                                                                    }
+                                                                },
+                                                            ))
+                                                    },
+                                                )),
+                                        )
+                                        .child(
+                                            div()
+                                                .text_xs()
+                                                .text_color(rgba(0xffffff40))
+                                                .child(created_time),
+                                        ),
                                 ),
                         )
                     })
@@ -564,7 +943,90 @@ impl Render for TodoWidget {
             .p(px(8.0))
             .gap(px(6.0))
             .overflow_hidden()
-            // 1. 顶部常驻新增输入栏
+            // ── 顶部分类标签导航条（横向可滑动聚焦）─────────────────────────
+            .child(
+                div()
+                    .flex()
+                    .items_center()
+                    .gap(px(4.0))
+                    .w_full()
+                    .pb(px(2.0))
+                    // 全部
+                    .child({
+                        let is_active = self.data.active_tag_id == "all";
+                        let all_count = self.data.items.len();
+                        div()
+                            .px(px(8.0))
+                            .py(px(3.0))
+                            .rounded(px(6.0))
+                            .cursor_pointer()
+                            .text_xs()
+                            .font_weight(if is_active {
+                                FontWeight::BOLD
+                            } else {
+                                FontWeight::NORMAL
+                            })
+                            .text_color(if is_active {
+                                rgb(0xffffff)
+                            } else {
+                                rgba(0xffffff70)
+                            })
+                            .bg(if is_active {
+                                rgba(0x38bdf840)
+                            } else {
+                                rgba(0x00000030)
+                            })
+                            .hover(|s| s.bg(rgba(0x38bdf825)))
+                            .id("todo-tab-all")
+                            .on_click(cx.listener(|this, _, _, cx| {
+                                this.data.active_tag_id = "all".to_string();
+                                cx.notify();
+                            }))
+                            .child(format!("全部 ({})", all_count))
+                    })
+                    // 各分类标签
+                    .children(self.data.tags.iter().map(|tag| {
+                        let is_active = self.data.active_tag_id == tag.id;
+                        let tag_id_clone = tag.id.clone();
+                        let tag_count = self
+                            .data
+                            .items
+                            .iter()
+                            .filter(|it| it.tag_id == tag.id)
+                            .count();
+                        let tag_color = &GANTT_COLORS[tag.gantt_color % GANTT_COLORS.len()];
+
+                        div()
+                            .px(px(8.0))
+                            .py(px(3.0))
+                            .rounded(px(6.0))
+                            .cursor_pointer()
+                            .text_xs()
+                            .font_weight(if is_active {
+                                FontWeight::BOLD
+                            } else {
+                                FontWeight::NORMAL
+                            })
+                            .text_color(if is_active {
+                                rgb(0xffffff)
+                            } else {
+                                rgb(tag_color.hex)
+                            })
+                            .bg(if is_active {
+                                rgb(tag_color.hex)
+                            } else {
+                                rgba(tag_color.bg_alpha_hex)
+                            })
+                            .hover(|s| s.opacity(0.85))
+                            .id(ElementId::Name(format!("todo-tab-{}", tag.id).into()))
+                            .on_click(cx.listener(move |this, _, _, cx| {
+                                this.data.active_tag_id = tag_id_clone.clone();
+                                cx.notify();
+                            }))
+                            .child(format!("{} ({})", tag.name, tag_count))
+                    })),
+            )
+            // ── 顶部常驻新增输入栏 ─────────────────────────────────────────
             .child(
                 div()
                     .flex()
@@ -598,7 +1060,7 @@ impl Render for TodoWidget {
                             .child(Input::new(new_input).appearance(false).bordered(false)),
                     ),
             )
-            // 2. 待办条目列表
+            // ── 待办条目列表 ───────────────────────────────────────────────
             .child(
                 div()
                     .flex()
