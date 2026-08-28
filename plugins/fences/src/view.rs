@@ -354,9 +354,9 @@ impl Render for FencesWidget {
                                     .gap(px(6.0))
                                     .cursor_pointer()
                                     .id(ElementId::Name(format!("fence-launch-{item_idx}").into()))
-                                    .on_click(move |_, _, _| {
+                                    .on_click(cx.listener(move |_, _, _, _| {
                                         Self::launch_item(&item_path);
-                                    })
+                                    }))
                                     // 图标
                                     .child(
                                         div()
@@ -381,30 +381,34 @@ impl Render for FencesWidget {
                                             .child(item.name.clone()),
                                     ),
                             )
-                            // 2. 右上角删除按钮（独立层级，清晰可见且不冒泡触发 launch）
+                            // 2. 右上角删除按钮（独立层级，阻断事件冒泡）
                             .child(
                                 div()
                                     .absolute()
                                     .top(px(3.0))
                                     .right(px(3.0))
-                                    .w(px(16.0))
-                                    .h(px(16.0))
+                                    .w(px(18.0))
+                                    .h(px(18.0))
                                     .rounded_full()
-                                    .bg(rgba(0xff4d4d35))
+                                    .bg(rgba(0xff4d4d45))
                                     .border_1()
-                                    .border_color(rgba(0xff4d4d60))
-                                    .text_color(rgb(0xff8888))
+                                    .border_color(rgba(0xff4d4d80))
+                                    .text_color(rgb(0xffa0a0))
                                     .flex()
                                     .justify_center()
                                     .items_center()
                                     .cursor_pointer()
                                     .hover(|s| {
-                                        s.bg(rgba(0xff3333ee))
+                                        s.bg(rgb(0xef4444))
                                             .border_color(rgb(0xffffff))
                                             .text_color(rgb(0xffffff))
                                     })
                                     .id(ElementId::Name(format!("fence-del-{item_idx}").into()))
+                                    .on_mouse_down(MouseButton::Left, |_, _, cx| {
+                                        cx.stop_propagation();
+                                    })
                                     .on_click(cx.listener(move |this, _, _, cx| {
+                                        cx.stop_propagation();
                                         if let Some(cat) =
                                             this.data.categories.get_mut(active_cat_idx)
                                         {
