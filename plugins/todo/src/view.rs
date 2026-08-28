@@ -4,7 +4,7 @@ use gpui_component::input::{Input, InputEvent, InputState};
 use gpui_component::{Icon, IconName};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
-use crate::model::{ReminderRule, TodoData, TodoItem, TodoModel, GANTT_COLORS};
+use crate::model::{ReminderRule, TodoData, TodoItem, TodoModel, TodoTag, GANTT_COLORS};
 
 fn get_now_secs() -> u64 {
     SystemTime::now()
@@ -59,7 +59,7 @@ impl TodoWidget {
         let data = TodoModel::load(cx);
 
         let new_input =
-            cx.new(|cx| InputState::new(window, cx).placeholder("输入新待办，回车即保存..."));
+            cx.new(|cx| InputState::new(window, cx).placeholder("输入待办，回车保存..."));
 
         cx.subscribe(
             &new_input,
@@ -100,7 +100,6 @@ impl TodoWidget {
 
         let edit_input = cx.new(|cx| InputState::new(window, cx).placeholder("编辑待办内容..."));
 
-        // ── 后台定时提醒检查引擎 ────────────────────────────────────
         let this_weak = cx.weak_entity();
         let app_cx: &mut App = cx;
         let _timer = app_cx.spawn(async move |async_cx| loop {
@@ -204,7 +203,7 @@ impl Render for TodoWidget {
         if self.pending_reset {
             self.pending_reset = false;
             let new_entity =
-                cx.new(|cx| InputState::new(window, cx).placeholder("输入新待办，回车即保存..."));
+                cx.new(|cx| InputState::new(window, cx).placeholder("输入待办，回车保存..."));
             cx.subscribe(
                 &new_entity,
                 |this: &mut Self, input: Entity<InputState>, event: &InputEvent, cx| {
@@ -253,11 +252,10 @@ impl Render for TodoWidget {
         let mut pending_elements = Vec::new();
         let mut completed_elements = Vec::new();
 
-        // 标签映射表
         let tags = self.data.tags.clone();
+        let active_tag_obj = tags.iter().find(|t| t.id == active_tag_id).cloned();
 
         for (idx, item) in self.data.items.iter().enumerate() {
-            // 过滤标签（若非 "all" 且标签不匹配则跳过）
             if active_tag_id != "all" && item.tag_id != active_tag_id {
                 continue;
             }
@@ -346,9 +344,9 @@ impl Render for TodoWidget {
                     .flex()
                     .items_center()
                     .w_full()
-                    .px(px(10.0))
-                    .py(px(8.0))
-                    .gap(px(8.0))
+                    .px(px(8.0))
+                    .py(px(6.0))
+                    .gap(px(6.0))
                     .bg(rgba(0x0f172af0))
                     .rounded(px(8.0))
                     .border_1()
@@ -360,35 +358,35 @@ impl Render for TodoWidget {
                     )
                     .child(
                         div()
-                            .w(px(24.0))
-                            .h(px(24.0))
+                            .w(px(22.0))
+                            .h(px(22.0))
                             .flex()
                             .justify_center()
                             .items_center()
-                            .rounded(px(6.0))
+                            .rounded(px(4.0))
                             .cursor_pointer()
                             .bg(rgba(0x00d99220))
                             .text_color(rgb(0x00d992))
                             .hover(|s| s.bg(rgba(0x00d99245)))
                             .id(ElementId::Name(format!("todo-confirm-{idx}").into()))
                             .on_click(edit_handler)
-                            .child(Icon::new(IconName::Check).size(px(12.0))),
+                            .child(Icon::new(IconName::Check).size(px(11.0))),
                     )
                     .child(
                         div()
-                            .w(px(24.0))
-                            .h(px(24.0))
+                            .w(px(22.0))
+                            .h(px(22.0))
                             .flex()
                             .justify_center()
                             .items_center()
-                            .rounded(px(6.0))
+                            .rounded(px(4.0))
                             .cursor_pointer()
                             .bg(rgba(0xff4d4d20))
                             .text_color(rgb(0xff6b6b))
                             .hover(|s| s.bg(rgba(0xff4d4d40)))
                             .id(ElementId::Name(format!("todo-del-{idx}").into()))
                             .on_click(delete_handler)
-                            .child(Icon::new(IconName::Delete).size(px(12.0))),
+                            .child(Icon::new(IconName::Delete).size(px(11.0))),
                     )
                     .into_any_element()
             } else {
@@ -439,10 +437,10 @@ impl Render for TodoWidget {
                             .items_center()
                             .w_full()
                             .px(px(8.0))
-                            .py(px(8.0))
-                            .gap(px(8.0))
+                            .py(px(7.0))
+                            .gap(px(6.0))
                             // 1. 甘特色系竖条
-                            .child(div().w(px(3.5)).h(px(22.0)).rounded_full().bg(if done {
+                            .child(div().w(px(3.0)).h(px(20.0)).rounded_full().bg(if done {
                                 rgba(0xffffff30)
                             } else {
                                 rgb(gantt.hex)
@@ -450,8 +448,8 @@ impl Render for TodoWidget {
                             // 2. 勾选圈
                             .child(
                                 div()
-                                    .w(px(18.0))
-                                    .h(px(18.0))
+                                    .w(px(16.0))
+                                    .h(px(16.0))
                                     .flex_shrink_0()
                                     .rounded_full()
                                     .border_2()
@@ -476,7 +474,7 @@ impl Render for TodoWidget {
                                         d.child(
                                             div()
                                                 .text_color(rgb(0x00d992))
-                                                .child(Icon::new(IconName::Check).size(px(11.0))),
+                                                .child(Icon::new(IconName::Check).size(px(10.0))),
                                         )
                                     }),
                             )
@@ -486,10 +484,10 @@ impl Render for TodoWidget {
                                     .flex_1()
                                     .flex()
                                     .flex_col()
-                                    .gap(px(2.0))
+                                    .gap(px(1.5))
                                     .child(
                                         div()
-                                            .text_sm()
+                                            .text_xs()
                                             .font_weight(FontWeight::NORMAL)
                                             .text_color(if done {
                                                 rgba(0x94a3b8aa)
@@ -499,39 +497,45 @@ impl Render for TodoWidget {
                                             .when(done, |d: Div| d.line_through())
                                             .child(item_text_display),
                                     )
-                                    .when(reminder_text.is_some() || item_tag.is_some(), |d| {
-                                        let mut row = div().flex().items_center().gap(px(4.0));
-                                        if let Some(tag) = &item_tag {
-                                            let tag_color =
-                                                &GANTT_COLORS[tag.gantt_color % GANTT_COLORS.len()];
-                                            row = row.child(
-                                                div()
-                                                    .px(px(4.0))
-                                                    .py(px(0.5))
-                                                    .rounded(px(3.0))
-                                                    .text_xs()
-                                                    .text_color(rgb(tag_color.hex))
-                                                    .bg(rgba(tag_color.bg_alpha_hex))
-                                                    .child(tag.name.clone()),
-                                            );
-                                        }
-                                        if let Some(r_text) = reminder_text {
-                                            row = row.child(
-                                                div()
-                                                    .flex()
-                                                    .items_center()
-                                                    .gap(px(2.0))
-                                                    .px(px(4.0))
-                                                    .py(px(0.5))
-                                                    .rounded(px(3.0))
-                                                    .text_xs()
-                                                    .text_color(rgb(0xfb923c))
-                                                    .bg(rgba(0xfb923c20))
-                                                    .child(format!("⏰ {}", r_text)),
-                                            );
-                                        }
-                                        d.child(row)
-                                    }),
+                                    .when(
+                                        reminder_text.is_some()
+                                            || (item_tag.is_some() && active_tag_id == "all"),
+                                        |d| {
+                                            let mut row = div().flex().items_center().gap(px(4.0));
+                                            if active_tag_id == "all" {
+                                                if let Some(tag) = &item_tag {
+                                                    let tag_color = &GANTT_COLORS
+                                                        [tag.gantt_color % GANTT_COLORS.len()];
+                                                    row = row.child(
+                                                        div()
+                                                            .px(px(4.0))
+                                                            .py(px(0.5))
+                                                            .rounded(px(3.0))
+                                                            .text_xs()
+                                                            .text_color(rgb(tag_color.hex))
+                                                            .bg(rgba(tag_color.bg_alpha_hex))
+                                                            .child(tag.name.clone()),
+                                                    );
+                                                }
+                                            }
+                                            if let Some(r_text) = reminder_text {
+                                                row = row.child(
+                                                    div()
+                                                        .flex()
+                                                        .items_center()
+                                                        .gap(px(2.0))
+                                                        .px(px(4.0))
+                                                        .py(px(0.5))
+                                                        .rounded(px(3.0))
+                                                        .text_xs()
+                                                        .text_color(rgb(0xfb923c))
+                                                        .bg(rgba(0xfb923c20))
+                                                        .child(format!("⏰ {}", r_text)),
+                                                );
+                                            }
+                                            d.child(row)
+                                        },
+                                    ),
                             )
                             // 4. 右侧操作区
                             .child(
@@ -539,11 +543,10 @@ impl Render for TodoWidget {
                                     .flex()
                                     .items_center()
                                     .gap(px(2.0))
-                                    // 展开/折叠更多详情按钮
                                     .child(
                                         div()
-                                            .w(px(20.0))
-                                            .h(px(20.0))
+                                            .w(px(18.0))
+                                            .h(px(18.0))
                                             .flex()
                                             .justify_center()
                                             .items_center()
@@ -574,14 +577,13 @@ impl Render for TodoWidget {
                                                 } else {
                                                     IconName::ChevronDown
                                                 })
-                                                .size(px(10.0)),
+                                                .size(px(9.0)),
                                             ),
                                     )
-                                    // 编辑
                                     .child(
                                         div()
-                                            .w(px(20.0))
-                                            .h(px(20.0))
+                                            .w(px(18.0))
+                                            .h(px(18.0))
                                             .flex()
                                             .justify_center()
                                             .items_center()
@@ -593,13 +595,12 @@ impl Render for TodoWidget {
                                             })
                                             .id(ElementId::Name(format!("todo-edit-{idx}").into()))
                                             .on_click(edit_handler)
-                                            .child(Icon::new(IconName::Redo).size(px(10.0))),
+                                            .child(Icon::new(IconName::Redo).size(px(9.0))),
                                     )
-                                    // 删除
                                     .child(
                                         div()
-                                            .w(px(20.0))
-                                            .h(px(20.0))
+                                            .w(px(18.0))
+                                            .h(px(18.0))
                                             .flex()
                                             .justify_center()
                                             .items_center()
@@ -611,11 +612,11 @@ impl Render for TodoWidget {
                                             })
                                             .id(ElementId::Name(format!("todo-del-{idx}").into()))
                                             .on_click(delete_handler)
-                                            .child(Icon::new(IconName::Delete).size(px(10.0))),
+                                            .child(Icon::new(IconName::Delete).size(px(9.0))),
                                     ),
                             ),
                     )
-                    // ── 鼠标移入/点击展开的“更多内容与设置”面板 ──────────
+                    // ── 展开面板 ─────────────────────────────────────
                     .when(is_expanded, |card| {
                         let all_tags = tags.clone();
                         card.child(
@@ -623,9 +624,9 @@ impl Render for TodoWidget {
                                 .flex()
                                 .flex_col()
                                 .w_full()
-                                .px(px(10.0))
-                                .py(px(8.0))
-                                .gap(px(8.0))
+                                .px(px(8.0))
+                                .py(px(6.0))
+                                .gap(px(6.0))
                                 .bg(rgba(0x00000035))
                                 .border_t_1()
                                 .border_color(rgba(0xffffff10))
@@ -634,7 +635,7 @@ impl Render for TodoWidget {
                                     div()
                                         .flex()
                                         .items_center()
-                                        .gap(px(6.0))
+                                        .gap(px(4.0))
                                         .child(
                                             div()
                                                 .text_xs()
@@ -647,9 +648,9 @@ impl Render for TodoWidget {
                                             let tag_color =
                                                 &GANTT_COLORS[tag.gantt_color % GANTT_COLORS.len()];
                                             div()
-                                                .px(px(6.0))
-                                                .py(px(1.5))
-                                                .rounded(px(4.0))
+                                                .px(px(5.0))
+                                                .py(px(1.0))
+                                                .rounded(px(3.0))
                                                 .cursor_pointer()
                                                 .text_xs()
                                                 .text_color(if is_curr {
@@ -676,12 +677,12 @@ impl Render for TodoWidget {
                                                 .child(tag.name.clone())
                                         })),
                                 )
-                                // 2. 智能定时与重复提醒设置
+                                // 2. 提醒设置
                                 .child(
                                     div()
                                         .flex()
                                         .flex_col()
-                                        .gap(px(4.0))
+                                        .gap(px(3.0))
                                         .child(
                                             div()
                                                 .text_xs()
@@ -692,13 +693,12 @@ impl Render for TodoWidget {
                                             div()
                                                 .flex()
                                                 .flex_wrap()
-                                                .gap(px(4.0))
-                                                // 无提醒
+                                                .gap(px(3.0))
                                                 .child(
                                                     div()
-                                                        .px(px(6.0))
-                                                        .py(px(2.0))
-                                                        .rounded(px(4.0))
+                                                        .px(px(5.0))
+                                                        .py(px(1.5))
+                                                        .rounded(px(3.0))
                                                         .cursor_pointer()
                                                         .text_xs()
                                                         .text_color(if item.reminder.is_none() {
@@ -727,12 +727,11 @@ impl Render for TodoWidget {
                                                         ))
                                                         .child("无"),
                                                 )
-                                                // 30分钟后
                                                 .child(
                                                     div()
-                                                        .px(px(6.0))
-                                                        .py(px(2.0))
-                                                        .rounded(px(4.0))
+                                                        .px(px(5.0))
+                                                        .py(px(1.5))
+                                                        .rounded(px(3.0))
                                                         .cursor_pointer()
                                                         .text_xs()
                                                         .text_color(rgb(0x38bdf8))
@@ -759,12 +758,11 @@ impl Render for TodoWidget {
                                                         ))
                                                         .child("30分钟后"),
                                                 )
-                                                // 每天 18:00
                                                 .child(
                                                     div()
-                                                        .px(px(6.0))
-                                                        .py(px(2.0))
-                                                        .rounded(px(4.0))
+                                                        .px(px(5.0))
+                                                        .py(px(1.5))
+                                                        .rounded(px(3.0))
                                                         .cursor_pointer()
                                                         .text_xs()
                                                         .text_color(rgb(0x34d399))
@@ -789,12 +787,11 @@ impl Render for TodoWidget {
                                                         ))
                                                         .child("每天 18:00"),
                                                 )
-                                                // 每周五 17:00
                                                 .child(
                                                     div()
-                                                        .px(px(6.0))
-                                                        .py(px(2.0))
-                                                        .rounded(px(4.0))
+                                                        .px(px(5.0))
+                                                        .py(px(1.5))
+                                                        .rounded(px(3.0))
                                                         .cursor_pointer()
                                                         .text_xs()
                                                         .text_color(rgb(0xa78bfa))
@@ -821,12 +818,11 @@ impl Render for TodoWidget {
                                                         ))
                                                         .child("周五 17:00"),
                                                 )
-                                                // 每30分钟催办
                                                 .child(
                                                     div()
-                                                        .px(px(6.0))
-                                                        .py(px(2.0))
-                                                        .rounded(px(4.0))
+                                                        .px(px(5.0))
+                                                        .py(px(1.5))
+                                                        .rounded(px(3.0))
                                                         .cursor_pointer()
                                                         .text_xs()
                                                         .font_weight(FontWeight::MEDIUM)
@@ -855,7 +851,7 @@ impl Render for TodoWidget {
                                                 ),
                                         ),
                                 )
-                                // 3. 甘特色系与创建时间
+                                // 3. 甘特色系
                                 .child(
                                     div()
                                         .flex()
@@ -866,7 +862,7 @@ impl Render for TodoWidget {
                                             div()
                                                 .flex()
                                                 .items_center()
-                                                .gap(px(6.0))
+                                                .gap(px(4.0))
                                                 .child(
                                                     div()
                                                         .text_xs()
@@ -877,8 +873,8 @@ impl Render for TodoWidget {
                                                     |(g_idx, g_color)| {
                                                         let is_curr = g_idx == color_idx;
                                                         div()
-                                                            .w(px(14.0))
-                                                            .h(px(14.0))
+                                                            .w(px(12.0))
+                                                            .h(px(12.0))
                                                             .rounded_full()
                                                             .cursor_pointer()
                                                             .bg(rgb(g_color.hex))
@@ -930,35 +926,36 @@ impl Render for TodoWidget {
             }
         }
 
-        // ── 整体布局（高质感深海蓝黑半透明毛玻璃底板）──────────────────
+        // ══════════════════════════════════════════════════════════════════════
+        // 整体双栏布局：左侧敬业签吸附 Tab 侧栏 + 右侧毛玻璃主面板
+        // ══════════════════════════════════════════════════════════════════════
         div()
             .flex()
-            .flex_col()
-            .flex_1()
+            .flex_row()
             .size_full()
-            .bg(rgba(0x0a1220b5))
-            .rounded(px(14.0))
-            .border_1()
-            .border_color(rgba(0xffffff22))
-            .p(px(8.0))
-            .gap(px(6.0))
+            .gap(px(2.0))
             .overflow_hidden()
-            // ── 顶部分类标签导航条（横向可滑动聚焦）─────────────────────────
+            // ── 左侧：纵向吸附 Tab 侧边栏 ──────────────────────────────
             .child(
                 div()
+                    .w(px(46.0))
                     .flex()
-                    .items_center()
-                    .gap(px(4.0))
-                    .w_full()
-                    .pb(px(2.0))
-                    // 全部
+                    .flex_col()
+                    .gap(px(3.0))
+                    .pt(px(16.0))
+                    .pb(px(8.0))
+                    .overflow_hidden()
+                    // 1. "全部" 标签
                     .child({
-                        let is_active = self.data.active_tag_id == "all";
-                        let all_count = self.data.items.len();
+                        let is_active = active_tag_id == "all";
                         div()
-                            .px(px(8.0))
-                            .py(px(3.0))
-                            .rounded(px(6.0))
+                            .relative()
+                            .w_full()
+                            .h(px(32.0))
+                            .rounded_l(px(8.0))
+                            .flex()
+                            .items_center()
+                            .justify_center()
                             .cursor_pointer()
                             .text_xs()
                             .font_weight(if is_active {
@@ -969,37 +966,47 @@ impl Render for TodoWidget {
                             .text_color(if is_active {
                                 rgb(0xffffff)
                             } else {
-                                rgba(0xffffff70)
+                                rgba(0xffffff80)
                             })
                             .bg(if is_active {
-                                rgba(0x38bdf840)
+                                rgb(0x38bdf8)
                             } else {
-                                rgba(0x00000030)
+                                rgba(0x0f172a65)
                             })
-                            .hover(|s| s.bg(rgba(0x38bdf825)))
+                            .border_1()
+                            .border_color(if is_active {
+                                rgb(0x7dd3fc)
+                            } else {
+                                rgba(0xffffff15)
+                            })
+                            .hover(|s| {
+                                s.bg(if is_active {
+                                    rgb(0x38bdf8)
+                                } else {
+                                    rgba(0x1e293ba0)
+                                })
+                            })
                             .id("todo-tab-all")
                             .on_click(cx.listener(|this, _, _, cx| {
                                 this.data.active_tag_id = "all".to_string();
                                 cx.notify();
                             }))
-                            .child(format!("全部 ({})", all_count))
+                            .child("全部")
                     })
-                    // 各分类标签
-                    .children(self.data.tags.iter().map(|tag| {
-                        let is_active = self.data.active_tag_id == tag.id;
+                    // 2. 自定义分类标签列表
+                    .children(tags.iter().map(|tag| {
+                        let is_active = active_tag_id == tag.id;
                         let tag_id_clone = tag.id.clone();
-                        let tag_count = self
-                            .data
-                            .items
-                            .iter()
-                            .filter(|it| it.tag_id == tag.id)
-                            .count();
                         let tag_color = &GANTT_COLORS[tag.gantt_color % GANTT_COLORS.len()];
 
                         div()
-                            .px(px(8.0))
-                            .py(px(3.0))
-                            .rounded(px(6.0))
+                            .relative()
+                            .w_full()
+                            .h(px(32.0))
+                            .rounded_l(px(8.0))
+                            .flex()
+                            .items_center()
+                            .justify_center()
                             .cursor_pointer()
                             .text_xs()
                             .font_weight(if is_active {
@@ -1010,118 +1017,228 @@ impl Render for TodoWidget {
                             .text_color(if is_active {
                                 rgb(0xffffff)
                             } else {
-                                rgb(tag_color.hex)
+                                rgba(0xffffff85)
                             })
                             .bg(if is_active {
                                 rgb(tag_color.hex)
                             } else {
-                                rgba(tag_color.bg_alpha_hex)
+                                rgba(0x0f172a65)
                             })
-                            .hover(|s| s.opacity(0.85))
+                            .border_1()
+                            .border_color(if is_active {
+                                rgb(0xffffff)
+                            } else {
+                                rgba(0xffffff15)
+                            })
+                            .hover(|s| {
+                                s.bg(if is_active {
+                                    rgb(tag_color.hex)
+                                } else {
+                                    rgba(0x1e293ba0)
+                                })
+                            })
                             .id(ElementId::Name(format!("todo-tab-{}", tag.id).into()))
                             .on_click(cx.listener(move |this, _, _, cx| {
                                 this.data.active_tag_id = tag_id_clone.clone();
                                 cx.notify();
                             }))
-                            .child(format!("{} ({})", tag.name, tag_count))
-                    })),
-            )
-            // ── 顶部常驻新增输入栏 ─────────────────────────────────────────
-            .child(
-                div()
-                    .flex()
-                    .items_center()
-                    .w_full()
-                    .px(px(12.0))
-                    .py(px(9.0))
-                    .gap(px(8.0))
-                    .bg(rgba(0x00000040))
-                    .rounded(px(10.0))
-                    .border_1()
-                    .border_color(rgba(0xffffff18))
-                    .flex_shrink_0()
+                            // 左侧微型甘特色点
+                            .child(
+                                div()
+                                    .absolute()
+                                    .left(px(3.0))
+                                    .w(px(4.0))
+                                    .h(px(4.0))
+                                    .rounded_full()
+                                    .bg(if is_active {
+                                        rgb(0xffffff)
+                                    } else {
+                                        rgb(tag_color.hex)
+                                    }),
+                            )
+                            .child(tag.name.clone())
+                    }))
+                    // 3. 底部 "+" 快速添加标签按钮
                     .child(
                         div()
-                            .w(px(18.0))
-                            .h(px(18.0))
-                            .flex_shrink_0()
-                            .rounded_full()
-                            .border_2()
-                            .border_color(rgb(0x38bdf8))
+                            .w_full()
+                            .h(px(28.0))
+                            .rounded_l(px(6.0))
                             .flex()
-                            .justify_center()
                             .items_center()
-                            .text_color(rgb(0x38bdf8))
-                            .child(Icon::new(IconName::Plus).size(px(10.0))),
-                    )
-                    .child(
-                        div()
-                            .flex_1()
-                            .child(Input::new(new_input).appearance(false).bordered(false)),
+                            .justify_center()
+                            .cursor_pointer()
+                            .text_color(rgba(0xffffff50))
+                            .bg(rgba(0x00000030))
+                            .border_1()
+                            .border_color(rgba(0xffffff10))
+                            .hover(|s| s.bg(rgba(0x38bdf825)).text_color(rgb(0x38bdf8)))
+                            .id("todo-add-tag-btn")
+                            .on_click(cx.listener(|this, _, _, cx| {
+                                let new_id = format!("tag-{}", get_now_secs());
+                                let tag_idx = this.data.tags.len();
+                                this.data.tags.push(TodoTag {
+                                    id: new_id.clone(),
+                                    name: format!("分类{}", tag_idx + 1),
+                                    gantt_color: tag_idx % GANTT_COLORS.len(),
+                                });
+                                this.data.active_tag_id = new_id;
+                                TodoModel::save(&this.data, cx);
+                                cx.notify();
+                            }))
+                            .child(Icon::new(IconName::Plus).size(px(12.0))),
                     ),
             )
-            // ── 待办条目列表 ───────────────────────────────────────────────
+            // ── 右侧：主体内容毛玻璃主面板 ───────────────────────────────
             .child(
                 div()
                     .flex()
                     .flex_col()
                     .flex_1()
-                    .w_full()
-                    .gap(px(5.0))
-                    .id("todo-list-scroll")
-                    .track_scroll(&self.scroll_handle)
-                    .overflow_y_scroll()
-                    // 未完成列表
-                    .children(pending_elements)
-                    // 已完成折叠区
-                    .when(!completed_elements.is_empty(), |d: Stateful<Div>| {
-                        let completed_count = completed_elements.len();
-                        let show = self.show_completed;
+                    .h_full()
+                    .bg(rgba(0x0a1220b5))
+                    .rounded(px(14.0))
+                    .border_1()
+                    .border_color(rgba(0xffffff22))
+                    .p(px(8.0))
+                    .gap(px(6.0))
+                    .overflow_hidden()
+                    // 1. 面板顶部标题栏（当前分类徽标）
+                    .child(
+                        div()
+                            .flex()
+                            .items_center()
+                            .justify_between()
+                            .w_full()
+                            .px(px(4.0))
+                            .child(
+                                div()
+                                    .flex()
+                                    .items_center()
+                                    .gap(px(6.0))
+                                    .child(
+                                        div()
+                                            .text_xs()
+                                            .font_weight(FontWeight::BOLD)
+                                            .text_color(if let Some(t) = &active_tag_obj {
+                                                rgb(GANTT_COLORS
+                                                    [t.gantt_color % GANTT_COLORS.len()]
+                                                .hex)
+                                            } else {
+                                                rgb(0x38bdf8)
+                                            })
+                                            .child(if let Some(t) = &active_tag_obj {
+                                                format!("🏷️ {}", t.name)
+                                            } else {
+                                                "🏷️ 全部任务".to_string()
+                                            }),
+                                    )
+                                    .child(
+                                        div()
+                                            .text_xs()
+                                            .text_color(rgba(0xffffff50))
+                                            .child(format!("({} 项)", pending_elements.len())),
+                                    ),
+                            ),
+                    )
+                    // 2. 输入框
+                    .child(
+                        div()
+                            .flex()
+                            .items_center()
+                            .w_full()
+                            .px(px(10.0))
+                            .py(px(8.0))
+                            .gap(px(6.0))
+                            .bg(rgba(0x00000040))
+                            .rounded(px(8.0))
+                            .border_1()
+                            .border_color(rgba(0xffffff18))
+                            .flex_shrink_0()
+                            .child(
+                                div()
+                                    .w(px(16.0))
+                                    .h(px(16.0))
+                                    .flex_shrink_0()
+                                    .rounded_full()
+                                    .border_2()
+                                    .border_color(rgb(0x38bdf8))
+                                    .flex()
+                                    .justify_center()
+                                    .items_center()
+                                    .text_color(rgb(0x38bdf8))
+                                    .child(Icon::new(IconName::Plus).size(px(9.0))),
+                            )
+                            .child(
+                                div()
+                                    .flex_1()
+                                    .child(Input::new(new_input).appearance(false).bordered(false)),
+                            ),
+                    )
+                    // 3. 待办条目列表
+                    .child(
+                        div()
+                            .flex()
+                            .flex_col()
+                            .flex_1()
+                            .w_full()
+                            .gap(px(5.0))
+                            .id("todo-list-scroll")
+                            .track_scroll(&self.scroll_handle)
+                            .overflow_y_scroll()
+                            .children(pending_elements)
+                            .when(!completed_elements.is_empty(), |d: Stateful<Div>| {
+                                let completed_count = completed_elements.len();
+                                let show = self.show_completed;
 
-                        d.child(
-                            div()
-                                .flex()
-                                .flex_col()
-                                .w_full()
-                                .gap(px(4.0))
-                                .pt(px(6.0))
-                                .child(
+                                d.child(
                                     div()
                                         .flex()
-                                        .items_center()
-                                        .justify_between()
-                                        .px(px(6.0))
-                                        .py(px(4.0))
-                                        .rounded(px(6.0))
-                                        .cursor_pointer()
-                                        .hover(|s| s.bg(rgba(0xffffff10)))
-                                        .id("todo-toggle-completed")
-                                        .on_click(cx.listener(|this, _, _, cx| {
-                                            this.show_completed = !this.show_completed;
-                                            cx.notify();
-                                        }))
+                                        .flex_col()
+                                        .w_full()
+                                        .gap(px(4.0))
+                                        .pt(px(4.0))
                                         .child(
                                             div()
                                                 .flex()
                                                 .items_center()
-                                                .gap(px(6.0))
-                                                .text_xs()
-                                                .font_weight(FontWeight::MEDIUM)
-                                                .text_color(rgba(0xffffff77))
+                                                .justify_between()
+                                                .px(px(6.0))
+                                                .py(px(3.0))
+                                                .rounded(px(4.0))
+                                                .cursor_pointer()
+                                                .hover(|s| s.bg(rgba(0xffffff10)))
+                                                .id("todo-toggle-completed")
+                                                .on_click(cx.listener(|this, _, _, cx| {
+                                                    this.show_completed = !this.show_completed;
+                                                    cx.notify();
+                                                }))
                                                 .child(
-                                                    Icon::new(if show {
-                                                        IconName::ChevronDown
-                                                    } else {
-                                                        IconName::ChevronRight
-                                                    })
-                                                    .size(px(12.0)),
-                                                )
-                                                .child(format!("已完成 ({})", completed_count)),
-                                        ),
+                                                    div()
+                                                        .flex()
+                                                        .items_center()
+                                                        .gap(px(4.0))
+                                                        .text_xs()
+                                                        .font_weight(FontWeight::MEDIUM)
+                                                        .text_color(rgba(0xffffff77))
+                                                        .child(
+                                                            Icon::new(if show {
+                                                                IconName::ChevronDown
+                                                            } else {
+                                                                IconName::ChevronRight
+                                                            })
+                                                            .size(px(11.0)),
+                                                        )
+                                                        .child(format!(
+                                                            "已完成 ({})",
+                                                            completed_count
+                                                        )),
+                                                ),
+                                        )
+                                        .when(show, |d: Div| d.children(completed_elements)),
                                 )
-                                .when(show, |d: Div| d.children(completed_elements)),
-                        )
-                    }),
+                            }),
+                    ),
             )
     }
 }
