@@ -9,25 +9,18 @@ pub fn spawn_hwnd_polling_task(cx: &mut App, store: Arc<Store>) {
     let store_for_hwnd = store;
     cx.spawn(async move |cx| {
         let mut id_hwnd: Vec<(String, isize)> = Vec::new();
-        let mut main_hwnd = 0;
-
         for _ in 0..50 {
             cx.background_executor()
                 .timer(std::time::Duration::from_millis(100))
                 .await;
 
-            let (plugin_handles, main_handle): (
-                Vec<(String, AnyWindowHandle)>,
-                Option<AnyWindowHandle>,
-            ) = match cx.update_global::<WindowManager, _>(|wm, _| {
-                let ph = wm
-                    .widget_windows
-                    .iter()
-                    .map(|(id, (h, _, _))| (id.to_string(), *h))
-                    .collect();
-                let mh = wm.main_window.as_ref().map(|h| (*h).into());
-                (ph, mh)
-            }) {
+            let plugin_handles: Vec<(String, AnyWindowHandle)> = match cx
+                .update_global::<WindowManager, _>(|wm, _| {
+                    wm.widget_windows
+                        .iter()
+                        .map(|(id, (h, _, _))| (id.to_string(), *h))
+                        .collect()
+                }) {
                 Ok(v) => v,
                 Err(_) => return,
             };
@@ -58,40 +51,13 @@ pub fn spawn_hwnd_polling_task(cx: &mut App, store: Arc<Store>) {
                 }
             }
 
-            if !all_ready {
-                continue;
-            }
-
-            main_hwnd = if let Some(mh) = main_handle {
-                cx.update(|cx| {
-                    mh.update(cx, |_, win, _| {
-                        use raw_window_handle::HasWindowHandle;
-                        if let Ok(wh) = win.window_handle() {
-                            if let raw_window_handle::RawWindowHandle::Win32(h) = wh.as_raw() {
-                                return h.hwnd.get();
-                            }
-                        }
-                        0isize
-                    })
-                    .unwrap_or(0)
-                })
-                .unwrap_or(0)
-            } else {
-                0
-            };
-
-            if main_hwnd != 0 {
+            if all_ready && !id_hwnd.is_empty() {
                 break;
             }
         }
 
         for (id, hwnd) in &id_hwnd {
             println!("[main] 插件 {} HWND = {}", id, hwnd);
-        }
-        if main_hwnd != 0 {
-            println!("[main] 主窗口 HWND = {}", main_hwnd);
-        } else {
-            println!("[main] 警告：未能获取主窗口 HWND");
         }
 
         let _ = cx.update_global::<WindowManager, _>(|wm, cx| {
@@ -138,9 +104,6 @@ pub fn spawn_hwnd_polling_task(cx: &mut App, store: Arc<Store>) {
                         }
                     }
                 }
-            }
-            if main_hwnd != 0 {
-                wm.main_hwnd = main_hwnd;
             }
         });
 

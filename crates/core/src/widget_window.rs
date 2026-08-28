@@ -88,22 +88,18 @@ impl<T: WidgetContent> Render for WidgetWindow<T> {
             None
         };
 
-        div()
-            .flex()
-            .flex_col()
-            .size_full()
-            .border_1()
-            .border_color(if is_edit_mode {
-                rgb(0x00d992)
-            } else {
-                rgb(0x3d3a39)
-            })
-            .children(drag_handle)
-            .child(self.content.clone())
+        let root = div().flex().flex_col().size_full();
+        let root = if is_edit_mode {
+            root.border_1().border_color(rgb(0x00d992))
+        } else {
+            root
+        };
+
+        root.children(drag_handle).child(self.content.clone())
     }
 }
 
-/// 创建标准小组件窗口选项
+/// 创建标准小组件窗口选项（纯透明背景，适合有自身背景色的组件如 Sticky）
 ///
 /// 封装所有插件窗口共用的 `WindowOptions` 样板配置：
 /// 无标题栏、透明背景、PopUp 类型、不可缩放。
@@ -123,6 +119,35 @@ pub fn default_widget_window_options(
     WindowOptions {
         titlebar: None,
         window_background: WindowBackgroundAppearance::Transparent,
+        kind: WindowKind::PopUp,
+        is_resizable: false,
+        window_bounds: Some(WindowBounds::Windowed(Bounds::new(
+            Point::new(px(x), px(y)),
+            size(px(w), px(h)),
+        ))),
+        ..Default::default()
+    }
+}
+
+/// 创建标准小组件窗口选项（Acrylic 毛玻璃模糊背景，适合 Todo/Fences 等半透明组件）
+///
+/// 使用 `WindowBackgroundAppearance::Blurred` 启用 Windows Acrylic 效果，
+/// 插件 view 只需在根 div 上设置半透明背景色叠加即可实现磨砂玻璃效果。
+///
+/// # 参数
+/// * `cx` - GPUI 应用上下文
+/// * `plugin_id` - 插件 ID，用于从配置中读取已保存位置
+/// * `default_bounds` - 默认位置和大小 `(x, y, width, height)`
+pub fn default_widget_window_options_blurred(
+    cx: &App,
+    plugin_id: &str,
+    default_bounds: (f32, f32, f32, f32),
+) -> WindowOptions {
+    let (x, y, w, h) = crate::resolve_plugin_bounds(cx, plugin_id, default_bounds);
+
+    WindowOptions {
+        titlebar: None,
+        window_background: WindowBackgroundAppearance::Blurred,
         kind: WindowKind::PopUp,
         is_resizable: false,
         window_bounds: Some(WindowBounds::Windowed(Bounds::new(

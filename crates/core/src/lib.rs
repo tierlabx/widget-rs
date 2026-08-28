@@ -1,5 +1,8 @@
 mod widget_window;
-pub use widget_window::{default_widget_window_options, WidgetContent, WidgetWindow};
+pub use widget_window::{
+    default_widget_window_options, default_widget_window_options_blurred, WidgetContent,
+    WidgetWindow,
+};
 
 use gpui::*;
 use serde::{Deserialize, Serialize};
@@ -42,6 +45,8 @@ pub struct PluginConfig {
     pub always_on_top: bool,
     #[serde(default)]
     pub mouse_passthrough: bool,
+    #[serde(default)]
+    pub pinned_to_desktop: bool,
     #[serde(default = "default_true")]
     pub loaded: bool,
     #[serde(default = "default_true")]

@@ -5,5 +5,6 @@ pub fn register_all_plugins(pm: &mut PluginManager) {
     pm.register(sticky_plugin::create_plugin());
     pm.register(todo_plugin::create_plugin());
     pm.register(stretchly_plugin::create_plugin());
+    pm.register(fences_plugin::create_plugin());
     // [WIDGET_CLI_INJECT_PLUGINS_END]
 }

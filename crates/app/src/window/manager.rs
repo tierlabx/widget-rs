@@ -162,6 +162,7 @@ impl WindowManager {
                     phys_h: 0,
                     always_on_top: false,
                     mouse_passthrough: false,
+                    pinned_to_desktop: false,
                     loaded: true,
                     enabled: true,
                 });

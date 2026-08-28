@@ -1,0 +1,16 @@
+[package]
+name = "fences_plugin"
+version.workspace = true
+edition.workspace = true
+repository.workspace = true
+authors.workspace = true
+license.workspace = true
+description = "Desktop Fences / Organizer widget for files, folders, and applications"
+
+[dependencies]
+gpui.workspace = true
+gpui-component.workspace = true
+widget-core.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+windows-sys.workspace = true

@@ -30,17 +30,22 @@ pub unsafe extern "system" fn plugin_wnd_proc(
         && widget_core::NATIVE_EDIT_MODE.load(std::sync::atomic::Ordering::SeqCst)
     {
         unsafe {
+            use windows_sys::Win32::Foundation::RECT;
             use windows_sys::Win32::Graphics::Gdi::{
                 GetMonitorInfoW, MonitorFromWindow, MONITORINFO, MONITOR_DEFAULTTONEAREST,
             };
-            use windows_sys::Win32::UI::WindowsAndMessaging::WINDOWPOS;
+            use windows_sys::Win32::UI::WindowsAndMessaging::{
+                GetWindowRect, IsWindowVisible, WINDOWPOS,
+            };
             let pos = &mut *(lparam as *mut WINDOWPOS);
             if (pos.flags & windows_sys::Win32::UI::WindowsAndMessaging::SWP_NOMOVE) == 0 {
+                let snap = 18;
+
+                // 1. 屏幕边缘吸附与对齐 (Screen Edge Snap & Alignment)
                 let hmonitor = MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST);
                 let mut info: MONITORINFO = std::mem::zeroed();
                 info.cbSize = std::mem::size_of::<MONITORINFO>() as u32;
                 if GetMonitorInfoW(hmonitor, &mut info) != 0 {
-                    let snap = 20;
                     let work_rect = info.rcWork;
 
                     if (pos.x - work_rect.left).abs() < snap {
@@ -55,49 +60,58 @@ pub unsafe extern "system" fn plugin_wnd_proc(
                         pos.y = work_rect.bottom - pos.cy;
                     }
                 }
-            }
-        }
-    }
 
-    if msg == windows_sys::Win32::UI::WindowsAndMessaging::WM_MOUSEACTIVATE {
-        unsafe {
-            windows_sys::Win32::UI::WindowsAndMessaging::SetWindowLongPtrW(
-                hwnd,
-                windows_sys::Win32::UI::WindowsAndMessaging::GWLP_HWNDPARENT,
-                0,
-            );
-        }
-    } else if msg == windows_sys::Win32::UI::WindowsAndMessaging::WM_ACTIVATE {
-        let state = wparam & 0xFFFF;
-        if state == windows_sys::Win32::UI::WindowsAndMessaging::WA_INACTIVE as usize {
-            unsafe {
-                let class_name: [u16; 8] = [
-                    'P' as u16, 'r' as u16, 'o' as u16, 'g' as u16, 'm' as u16, 'a' as u16,
-                    'n' as u16, 0,
-                ];
-                let progman = windows_sys::Win32::UI::WindowsAndMessaging::FindWindowW(
-                    class_name.as_ptr(),
-                    std::ptr::null(),
-                );
-                if progman != 0 {
-                    windows_sys::Win32::UI::WindowsAndMessaging::SetWindowLongPtrW(
-                        hwnd,
-                        windows_sys::Win32::UI::WindowsAndMessaging::GWLP_HWNDPARENT,
-                        progman,
-                    );
+                // 2. 组件间磁力吸附与对齐 (Component-to-Component Magnet Snap)
+                if let Some(procs) = WND_PROCS.get() {
+                    if let Ok(guard) = procs.lock() {
+                        for &other_hwnd in guard.keys() {
+                            if other_hwnd != hwnd
+                                && other_hwnd != 0
+                                && IsWindowVisible(other_hwnd) != 0
+                            {
+                                let mut other_rect: RECT = std::mem::zeroed();
+                                if GetWindowRect(other_hwnd, &mut other_rect) != 0 {
+                                    // 左贴右 / 右贴左 (相贴吸附)
+                                    if (pos.x - other_rect.right).abs() < snap {
+                                        pos.x = other_rect.right;
+                                    } else if ((pos.x + pos.cx) - other_rect.left).abs() < snap {
+                                        pos.x = other_rect.left - pos.cx;
+                                    }
+
+                                    // 顶贴底 / 底贴顶 (相贴吸附)
+                                    if (pos.y - other_rect.bottom).abs() < snap {
+                                        pos.y = other_rect.bottom;
+                                    } else if ((pos.y + pos.cy) - other_rect.top).abs() < snap {
+                                        pos.y = other_rect.top - pos.cy;
+                                    }
+
+                                    // 左边缘对齐 / 右边缘对齐 (对齐吸附)
+                                    if (pos.x - other_rect.left).abs() < snap {
+                                        pos.x = other_rect.left;
+                                    } else if ((pos.x + pos.cx) - other_rect.right).abs() < snap {
+                                        pos.x = other_rect.right - pos.cx;
+                                    }
+
+                                    // 顶边缘对齐 / 底边缘对齐 (对齐吸附)
+                                    if (pos.y - other_rect.top).abs() < snap {
+                                        pos.y = other_rect.top;
+                                    } else if ((pos.y + pos.cy) - other_rect.bottom).abs() < snap {
+                                        pos.y = other_rect.bottom - pos.cy;
+                                    }
+                                }
+                            }
+                        }
+                    }
                 }
             }
-        } else {
-            unsafe {
-                windows_sys::Win32::UI::WindowsAndMessaging::SetWindowLongPtrW(
-                    hwnd,
-                    windows_sys::Win32::UI::WindowsAndMessaging::GWLP_HWNDPARENT,
-                    0,
-                );
-            }
         }
     }
 
+    if msg == windows_sys::Win32::UI::WindowsAndMessaging::WM_ERASEBKGND {
+        return 1; // 拦截默认背景擦除，彻底杜绝 Windows 默认白色画刷填充
+    }
+
+    // 移除编辑模式外的多余窗口过程拦截，仅在编辑模式或吸附时使用
     let res = windows_sys::Win32::UI::WindowsAndMessaging::CallWindowProcW(
         Some(old_proc_fn),
         hwnd,
@@ -119,38 +133,107 @@ pub unsafe extern "system" fn plugin_wnd_proc(
 
 /// 应用小组件窗口的特定样式，彻底禁用原生缩放、保留置顶等特性。
 ///
-/// 返回创建的隐藏所有者 HWND，以防止按 Win+D (显示桌面) 时小组件被隐藏。
+/// 使用与 stretchly 遮罩相同的纯净 Win32 样式，不注入破坏 DirectComposition 的 Parent 窗口。
 pub fn apply_plugin_window_styles(
     hwnd: isize,
     id: &str,
     config: Option<&widget_core::AppConfig>,
 ) -> isize {
-    // 防止 Win + D （显示桌面）操作导致小组件被隐藏，返回 Owner HWND
-    let owner_hwnd = attach_to_desktop(hwnd);
-    // 移除默认的 WS_THICKFRAME 并子类化窗口以彻底禁用原生缩放
     unsafe {
         use windows_sys::Win32::UI::WindowsAndMessaging::{
             GetWindowLongW, SetWindowLongPtrW, SetWindowLongW, SetWindowPos, GWLP_WNDPROC,
-            GWL_STYLE, SWP_FRAMECHANGED, SWP_NOMOVE, SWP_NOSIZE, SWP_NOZORDER, WS_BORDER,
-            WS_CAPTION, WS_THICKFRAME,
+            GWL_EXSTYLE, GWL_STYLE, SWP_FRAMECHANGED, SWP_NOMOVE, SWP_NOSIZE, SWP_NOZORDER,
+            WS_BORDER, WS_CAPTION, WS_EX_CLIENTEDGE, WS_EX_TOOLWINDOW, WS_EX_WINDOWEDGE, WS_POPUP,
+            WS_SYSMENU, WS_THICKFRAME,
         };
 
-        let ex_style = GetWindowLongW(
-            hwnd,
-            windows_sys::Win32::UI::WindowsAndMessaging::GWL_EXSTYLE,
-        );
-        SetWindowLongW(
-            hwnd,
-            windows_sys::Win32::UI::WindowsAndMessaging::GWL_EXSTYLE,
-            ex_style | windows_sys::Win32::UI::WindowsAndMessaging::WS_EX_TOOLWINDOW as i32,
-        );
-
+        // 1. 纯净设置 Window Style（与 stretchly 遮罩完全一致）
         let style = GetWindowLongW(hwnd, GWL_STYLE);
         SetWindowLongW(
             hwnd,
             GWL_STYLE,
-            style & !((WS_THICKFRAME | WS_CAPTION | WS_BORDER) as i32),
+            (style
+                & !(WS_CAPTION as i32)
+                & !(WS_THICKFRAME as i32)
+                & !(WS_BORDER as i32)
+                & !(WS_SYSMENU as i32))
+                | WS_POPUP as i32,
         );
+
+        // 2. 纯净设置 Extended Style（保留 TOOLWINDOW，清除无用边框）
+        let ex_style = GetWindowLongW(hwnd, GWL_EXSTYLE);
+        SetWindowLongW(
+            hwnd,
+            GWL_EXSTYLE,
+            (ex_style | WS_EX_TOOLWINDOW as i32)
+                & !(WS_EX_CLIENTEDGE as i32)
+                & !(WS_EX_WINDOWEDGE as i32),
+        );
+
+        // 3. 将 DWM 客户区玻璃拓展到全窗口（消除默认白色客户区，使 DirectComposition Alpha 直通桌面壁纸）
+        #[repr(C)]
+        struct MARGINS {
+            cx_left_width: i32,
+            cx_right_width: i32,
+            cy_top_height: i32,
+            cy_bottom_height: i32,
+        }
+
+        let margins = MARGINS {
+            cx_left_width: -1,
+            cx_right_width: -1,
+            cy_top_height: -1,
+            cy_bottom_height: -1,
+        };
+        windows_sys::Win32::Graphics::Dwm::DwmExtendFrameIntoClientArea(
+            hwnd,
+            &margins as *const _ as *const _,
+        );
+
+        // 4. 彻底覆盖并清除 GPUI 注入的 ACCENT_ENABLE_TRANSPARENTGRADIENT (导致 Win10/Win11 出现纯白实心背景的根源)
+        #[repr(C)]
+        struct AccentPolicy {
+            accent_state: u32,
+            accent_flags: u32,
+            gradient_color: u32,
+            animation_id: u32,
+        }
+
+        #[repr(C)]
+        struct WindowCompositionAttributeData {
+            attribute: u32,
+            p_data: *mut std::ffi::c_void,
+            data_size: usize,
+        }
+
+        type SetWindowCompositionAttributeFn =
+            unsafe extern "system" fn(isize, *mut WindowCompositionAttributeData) -> i32;
+
+        let user32 = windows_sys::Win32::System::LibraryLoader::GetModuleHandleW(
+            windows_sys::core::w!("user32.dll"),
+        );
+        if user32 != 0 {
+            let func_ptr = windows_sys::Win32::System::LibraryLoader::GetProcAddress(
+                user32,
+                windows_sys::core::s!("SetWindowCompositionAttribute"),
+            );
+            if let Some(func) = func_ptr {
+                let set_fn: SetWindowCompositionAttributeFn = std::mem::transmute(func);
+                let mut accent = AccentPolicy {
+                    accent_state: 0, // ACCENT_DISABLED (彻底清除 GPUI 的白色渐变残影)
+                    accent_flags: 0,
+                    gradient_color: 0,
+                    animation_id: 0,
+                };
+                let mut data = WindowCompositionAttributeData {
+                    attribute: 19, // WCA_ACCENT_POLICY
+                    p_data: &mut accent as *mut _ as *mut std::ffi::c_void,
+                    data_size: std::mem::size_of::<AccentPolicy>(),
+                };
+                set_fn(hwnd, &mut data);
+            }
+        }
+
         SetWindowPos(
             hwnd,
             0,
@@ -161,7 +244,7 @@ pub fn apply_plugin_window_styles(
             SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_FRAMECHANGED,
         );
 
-        // 注入自定义窗口过程
+        // 5. 注入自定义窗口过程（用于拦截 WM_ERASEBKGND、组件对齐吸附与编辑模式拖拽）
         let old_proc = SetWindowLongPtrW(hwnd, GWLP_WNDPROC, plugin_wnd_proc as *const () as isize);
         if old_proc != 0 {
             let procs = WND_PROCS.get_or_init(|| Mutex::new(std::collections::HashMap::new()));
@@ -169,14 +252,13 @@ pub fn apply_plugin_window_styles(
         }
     }
 
-    // 恢复独立设置（置顶和鼠标穿透）
+    // 4. 恢复独立设置（置顶和鼠标穿透）
     if let Some(cfg) = config {
         if let Some(plugin_cfg) = cfg.plugins.get(id) {
             unsafe {
                 use windows_sys::Win32::UI::WindowsAndMessaging::{
                     SetWindowPos, HWND_BOTTOM, HWND_TOPMOST, SWP_NOMOVE, SWP_NOSIZE,
                 };
-                // 恢复始终置顶
                 let insert_after = if plugin_cfg.always_on_top {
                     HWND_TOPMOST
                 } else {
@@ -184,26 +266,23 @@ pub fn apply_plugin_window_styles(
                 };
                 SetWindowPos(hwnd, insert_after, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE);
 
-                use windows_sys::Win32::UI::WindowsAndMessaging::{
-                    GetWindowLongW, SetWindowLongW, GWL_EXSTYLE, WS_EX_LAYERED, WS_EX_TRANSPARENT,
-                };
-                let style = GetWindowLongW(
-                    hwnd,
-                    windows_sys::Win32::UI::WindowsAndMessaging::GWL_EXSTYLE,
-                );
-                SetWindowLongW(
-                    hwnd,
-                    GWL_EXSTYLE,
-                    if plugin_cfg.mouse_passthrough {
-                        style | WS_EX_TRANSPARENT as i32 | WS_EX_LAYERED as i32
-                    } else {
-                        style & !(WS_EX_TRANSPARENT as i32 | WS_EX_LAYERED as i32)
-                    },
-                );
+                if plugin_cfg.mouse_passthrough {
+                    use windows_sys::Win32::UI::WindowsAndMessaging::{
+                        GetWindowLongW, SetWindowLongW, GWL_EXSTYLE, WS_EX_LAYERED,
+                        WS_EX_TRANSPARENT,
+                    };
+                    let style = GetWindowLongW(hwnd, GWL_EXSTYLE);
+                    SetWindowLongW(
+                        hwnd,
+                        GWL_EXSTYLE,
+                        style | WS_EX_TRANSPARENT as i32 | WS_EX_LAYERED as i32,
+                    );
+                }
             }
         }
     }
-    owner_hwnd
+
+    0
 }
 
 /// 移除小组件窗口的自定义样式，还原原生的窗口回调过程。
@@ -224,46 +303,6 @@ pub fn cleanup_plugin_window_styles(hwnd: isize) {
             "[cleanup_plugin_window_styles] 已还原 HWND {} 的 WndProc",
             hwnd
         );
-    }
-}
-
-/// 将窗口附加到桌面级独立隐藏 Owner，以防止“显示桌面”时窗口被一起最小化。
-///
-/// 返回 owner 的 HWND。
-pub fn attach_to_desktop(hwnd: isize) -> isize {
-    if hwnd == 0 {
-        return 0;
-    }
-    unsafe {
-        let class_name: [u16; 7] = [
-            'S' as u16, 'T' as u16, 'A' as u16, 'T' as u16, 'I' as u16, 'C' as u16, 0,
-        ];
-        let owner = windows_sys::Win32::UI::WindowsAndMessaging::CreateWindowExW(
-            windows_sys::Win32::UI::WindowsAndMessaging::WS_EX_TOOLWINDOW,
-            class_name.as_ptr(),
-            std::ptr::null(),
-            windows_sys::Win32::UI::WindowsAndMessaging::WS_POPUP,
-            0,
-            0,
-            0,
-            0,
-            0,
-            0,
-            0,
-            std::ptr::null(),
-        );
-        if owner != 0 {
-            windows_sys::Win32::UI::WindowsAndMessaging::SetWindowLongPtrW(
-                hwnd,
-                windows_sys::Win32::UI::WindowsAndMessaging::GWLP_HWNDPARENT,
-                owner,
-            );
-            println!(
-                "[WindowManager] 已将 HWND {} 附加到独立隐藏 Owner: {}",
-                hwnd, owner
-            );
-        }
-        owner
     }
 }
 

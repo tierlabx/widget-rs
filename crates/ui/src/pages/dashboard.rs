@@ -402,6 +402,43 @@ fn widget_card(
                             .child("休息提醒 - 专注中..."),
                     ),
             ),
+        "fences_widget" => div()
+            .flex()
+            .flex_wrap()
+            .content_start()
+            .w_full()
+            .h_full()
+            .p(px(8.0))
+            .gap(px(6.0))
+            .rounded(px(6.0))
+            .bg(rgb(0x0d1117))
+            .border_1()
+            .border_color(rgba(0x3d3a3940))
+            .children(["文档", "下载", "项目", "工具"].iter().map(|label| {
+                div()
+                    .flex()
+                    .flex_col()
+                    .items_center()
+                    .gap(px(3.0))
+                    .p(px(6.0))
+                    .w(px(48.0))
+                    .child(
+                        div()
+                            .w(px(24.0))
+                            .h(px(24.0))
+                            .rounded(px(6.0))
+                            .bg(rgba(0x60a5fa18))
+                            .flex()
+                            .justify_center()
+                            .items_center()
+                            .text_color(rgb(0x60a5fa))
+                            .child(
+                                gpui_component::Icon::new(gpui_component::IconName::Folder)
+                                    .size(px(14.0)),
+                            ),
+                    )
+                    .child(div().text_xs().text_color(rgb(0x8b949e)).child(*label))
+            })),
         _ => div()
             .flex()
             .flex_col()
@@ -414,12 +451,7 @@ fn widget_card(
             .bg(rgb(0x050507))
             .border_1()
             .border_color(rgba(0x3d3a3940))
-            .child(
-                div()
-                    .text_sm()
-                    .text_color(rgb(0x8b949e))
-                    .child("桌面宠物 3D 渲染中..."),
-            ),
+            .child(div().text_sm().text_color(rgb(0x8b949e)).child("暂无预览")),
     };
 
     Card::new()
@@ -495,7 +527,7 @@ fn widget_card(
                                 .on_click(move |_, _, cx| {
                                     cx.update_global::<widget_core::AppConfig, _>(|c, _| {
                                         let p = c.plugins.entry(plugin_id.to_string()).or_insert_with(|| widget_core::PluginConfig {
-                                            x: 0.0, y: 0.0, width: 300.0, height: 300.0, scale: 1.0, phys_x: 0, phys_y: 0, phys_w: 0, phys_h: 0, always_on_top: false, mouse_passthrough: false, loaded: true, enabled: true
+                                            x: 0.0, y: 0.0, width: 300.0, height: 300.0, scale: 1.0, phys_x: 0, phys_y: 0, phys_w: 0, phys_h: 0, always_on_top: false, mouse_passthrough: false, pinned_to_desktop: false, loaded: true, enabled: true
                                         });
                                         p.always_on_top = !always_on_top;
                                     });
@@ -529,7 +561,7 @@ fn widget_card(
                                 .on_click(move |_, _, cx| {
                                     cx.update_global::<widget_core::AppConfig, _>(|c, _| {
                                         let p = c.plugins.entry(plugin_id.to_string()).or_insert_with(|| widget_core::PluginConfig {
-                                            x: 0.0, y: 0.0, width: 300.0, height: 300.0, scale: 1.0, phys_x: 0, phys_y: 0, phys_w: 0, phys_h: 0, always_on_top: false, mouse_passthrough: false, loaded: true, enabled: true
+                                            x: 0.0, y: 0.0, width: 300.0, height: 300.0, scale: 1.0, phys_x: 0, phys_y: 0, phys_w: 0, phys_h: 0, always_on_top: false, mouse_passthrough: false, pinned_to_desktop: false, loaded: true, enabled: true
                                         });
                                         p.mouse_passthrough = !mouse_passthrough;
                                     });
@@ -601,6 +633,7 @@ fn widget_card(
                                             phys_h: 0,
                                             always_on_top: false,
                                             mouse_passthrough: false,
+                                            pinned_to_desktop: false,
                                             loaded: next_loaded,
                                             enabled: next_loaded,
                                         });

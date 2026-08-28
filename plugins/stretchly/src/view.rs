@@ -83,7 +83,7 @@ impl StretchlyWidget {
             loop {
                 async_cx
                     .background_executor()
-                    .timer(Duration::from_secs(1))
+                    .timer(Duration::from_millis(50))
                     .await;
                 let res = async_cx.update(|cx| {
                     let _ = this.update(cx, |this, cx| {

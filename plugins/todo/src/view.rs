@@ -1,7 +1,6 @@
 use gpui::prelude::FluentBuilder;
 use gpui::*;
 use gpui_component::input::{Input, InputEvent, InputState};
-
 use gpui_component::{Icon, IconName};
 
 use crate::model::{TodoItem, TodoModel};
@@ -16,7 +15,7 @@ struct DragTodoView {
 impl Render for DragTodoView {
     fn render(&mut self, _window: &mut Window, _cx: &mut Context<Self>) -> impl IntoElement {
         div()
-            .bg(rgb(0x3d3a39))
+            .bg(rgba(0x1e2d40cc))
             .border_1()
             .border_color(rgb(0x00d992))
             .rounded(px(6.0))
@@ -29,9 +28,10 @@ impl Render for DragTodoView {
 
 pub struct TodoWidget {
     items: Vec<TodoItem>,
-    /// 新增输入框
+    /// 顶部常驻新增输入框
     new_input: Entity<InputState>,
-    show_input: bool,
+    /// 是否标记需要重置输入框（在 render 中判断）
+    pending_reset: bool,
     /// 正在编辑的条目索引 + 对应输入框
     editing_idx: Option<usize>,
     edit_input: Entity<InputState>,
@@ -41,12 +41,12 @@ pub struct TodoWidget {
 
 impl TodoWidget {
     pub fn new(window: &mut Window, cx: &mut Context<Self>) -> Self {
-        // 从全局配置加载已持久化的待办数据
         let saved_items = TodoModel::load(cx);
 
-        // ── 新增输入框 ──────────────────────────────────────────────
+        // ── 顶部常驻输入框 ──────────────────────────────────────────
         let new_input =
-            cx.new(|cx| InputState::new(window, cx).placeholder("输入新待办，按 Enter 确认..."));
+            cx.new(|cx| InputState::new(window, cx).placeholder("输入新待办，回车即保存..."));
+
         cx.subscribe(
             &new_input,
             |this: &mut Self, input: Entity<InputState>, event: &InputEvent, cx| {
@@ -61,20 +61,20 @@ impl TodoWidget {
                         TodoModel::save(&this.items, cx);
                         this.scroll_handle.scroll_to_bottom();
                     }
-                    this.show_input = false;
+                    // 标记需要在下次 render 时重置输入框 Entity
+                    this.pending_reset = true;
                     cx.notify();
                 }
             },
         )
         .detach();
 
-        // ── 编辑输入框（占位，实际每次编辑时重建）─────────────────
         let edit_input = cx.new(|cx| InputState::new(window, cx).placeholder("编辑待办内容..."));
 
         Self {
             items: saved_items,
             new_input,
-            show_input: false,
+            pending_reset: false,
             editing_idx: None,
             edit_input,
             show_completed: false,
@@ -94,13 +94,38 @@ impl widget_core::WidgetContent for TodoWidget {
 }
 
 impl Render for TodoWidget {
-    fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        let done_count = self.items.iter().filter(|i| i.done).count();
-        let total = self.items.len();
+    fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        // 如果收到了重置信号，在 render 入口处重建输入框 Entity（此时 window 可用）
+        if self.pending_reset {
+            self.pending_reset = false;
+            let new_entity =
+                cx.new(|cx| InputState::new(window, cx).placeholder("输入新待办，回车即保存..."));
+            cx.subscribe(
+                &new_entity,
+                |this: &mut Self, input: Entity<InputState>, event: &InputEvent, cx| {
+                    if let InputEvent::PressEnter { .. } = event {
+                        let text = input.read(cx).value().to_string();
+                        let trimmed = text.trim().to_string();
+                        if !trimmed.is_empty() {
+                            this.items.push(TodoItem {
+                                text: trimmed,
+                                done: false,
+                            });
+                            TodoModel::save(&this.items, cx);
+                            this.scroll_handle.scroll_to_bottom();
+                        }
+                        this.pending_reset = true;
+                        cx.notify();
+                    }
+                },
+            )
+            .detach();
+            self.new_input = new_entity;
+        }
+
         let editing_idx = self.editing_idx;
         let edit_input = &self.edit_input;
         let new_input = &self.new_input;
-        let show_input = self.show_input;
 
         // ── 条目列表 ──────────────────────────────────────────────
         let mut pending_elements = Vec::new();
@@ -132,7 +157,6 @@ impl Render for TodoWidget {
 
             let edit_handler = cx.listener(move |this, _: &ClickEvent, window, cx| {
                 if this.editing_idx == Some(idx) {
-                    // 已在编辑此条：提交
                     let text = this.edit_input.read(cx).value().to_string();
                     let trimmed = text.trim().to_string();
                     if !trimmed.is_empty() {
@@ -143,7 +167,6 @@ impl Render for TodoWidget {
                     this.editing_idx = None;
                     TodoModel::save(&this.items, cx);
                 } else {
-                    // 重建 InputState 并用 default_value 预填当前文字
                     let current = this.items[idx].text.clone();
                     let new_edit = cx.new(|cx| {
                         InputState::new(window, cx)
@@ -172,73 +195,68 @@ impl Render for TodoWidget {
                     .detach();
                     this.edit_input = new_edit;
                     this.editing_idx = Some(idx);
-                    this.show_input = false;
                 }
                 cx.notify();
             });
 
             let item_element = if is_editing {
-                // ── 编辑状态：显示输入框 ──────────────────────────
+                // ── 编辑状态：悬浮输入卡片 ──────────────────────────
                 div()
                     .flex()
                     .items_center()
                     .w_full()
                     .gap(px(8.0))
                     .px(px(10.0))
-                    .py(px(4.0))
-                    // 编辑行容器：整行使用 Input 默认外观（白底黑字）
+                    .py(px(8.0))
+                    .bg(rgba(0x0f172ae6)) // 高对比度深色悬浮胶囊
+                    .rounded(px(8.0))
+                    .border_1()
+                    .border_color(rgba(0x00d99266))
                     .child(
-                        // 勾选圆圈（灰色，编辑中不可点击）
                         div()
-                            .w(px(22.0))
-                            .h(px(22.0))
+                            .w(px(16.0))
+                            .h(px(16.0))
                             .flex_shrink_0()
                             .rounded_full()
                             .border_2()
-                            .border_color(rgb(0x4a4a4e))
-                            .bg(rgba(0x00000000)),
+                            .border_color(rgb(0x00d992)),
                     )
-                    .child(
-                        // Input 保持默认 appearance，让它自带白色背景+深色文字
-                        div().flex_1().child(Input::new(edit_input)),
-                    )
-                    // 确认按钮
+                    .child(div().flex_1().child(Input::new(edit_input)))
                     .child(
                         div()
-                            .w(px(28.0))
-                            .h(px(28.0))
+                            .w(px(24.0))
+                            .h(px(24.0))
                             .flex()
                             .justify_center()
                             .items_center()
-                            .rounded(px(4.0))
+                            .rounded(px(6.0))
                             .cursor_pointer()
-                            .bg(rgba(0x00d99220))
+                            .bg(rgba(0x00d99225))
                             .text_color(rgb(0x00d992))
-                            .hover(|s| s.bg(rgba(0x00d99240)))
+                            .hover(|s| s.bg(rgba(0x00d99245)))
                             .id(ElementId::Name(format!("todo-confirm-{idx}").into()))
                             .on_click(edit_handler)
-                            .child(Icon::new(IconName::Check).size(px(13.0))),
+                            .child(Icon::new(IconName::Check).size(px(12.0))),
                     )
-                    // 删除按钮
                     .child(
                         div()
-                            .w(px(28.0))
-                            .h(px(28.0))
+                            .w(px(24.0))
+                            .h(px(24.0))
                             .flex()
                             .justify_center()
                             .items_center()
-                            .rounded(px(4.0))
+                            .rounded(px(6.0))
                             .cursor_pointer()
-                            .bg(rgba(0xff4d4d15))
+                            .bg(rgba(0xff4d4d20))
                             .text_color(rgb(0xff6b6b))
-                            .hover(|s| s.bg(rgba(0xff4d4d30)))
+                            .hover(|s| s.bg(rgba(0xff4d4d40)))
                             .id(ElementId::Name(format!("todo-del-{idx}").into()))
                             .on_click(delete_handler)
-                            .child(Icon::new(IconName::Delete).size(px(13.0))),
+                            .child(Icon::new(IconName::Delete).size(px(12.0))),
                     )
                     .into_any_element()
             } else {
-                // ── 普通显示状态 ──────────────────────────────────
+                // ── 悬浮条目胶囊卡片（独立悬浮于透明桌面）──
                 let drag_text = text.clone();
                 div()
                     .id(ElementId::Name(format!("todo-item-{idx}").into()))
@@ -262,29 +280,42 @@ impl Render for TodoWidget {
                     .items_center()
                     .w_full()
                     .px(px(12.0))
-                    .py(px(10.0))
-                    .gap(px(12.0))
-                    .bg(rgb(0x101010)) // VoltAgent Carbon Surface
+                    .py(px(9.0))
+                    .gap(px(10.0))
+                    .bg(if done {
+                        rgba(0x0f172a75) // 已完成半透明淡深色
+                    } else {
+                        rgba(0x0f172ad0) // 未完成高质感深海蓝黑胶囊
+                    })
+                    .rounded(px(8.0))
                     .border_1()
-                    .border_color(rgb(0x3d3a39)) // VoltAgent Warm Charcoal
-                    .rounded(px(6.0))
-                    .hover(|s| s.border_color(rgba(0x00d99240)))
-                    // 勾选圆圈
+                    .border_color(if done {
+                        rgba(0xffffff0a)
+                    } else {
+                        rgba(0xffffff18)
+                    })
+                    .hover(|s| s.bg(rgba(0x1e293be0)).border_color(rgba(0xffffff30)))
+                    // 精致圆形勾选圈
                     .child(
                         div()
-                            .w(px(22.0))
-                            .h(px(22.0))
+                            .w(px(18.0))
+                            .h(px(18.0))
                             .flex_shrink_0()
                             .rounded_full()
                             .border_2()
                             .cursor_pointer()
                             .id(ElementId::Name(format!("todo-check-{idx}").into()))
-                            .border_color(if done { rgb(0x00d992) } else { rgb(0x4a4a4e) })
+                            .border_color(if done {
+                                rgb(0x00d992)
+                            } else {
+                                rgba(0xffffff77)
+                            })
                             .bg(if done {
                                 rgba(0x00d99230)
                             } else {
                                 rgba(0x00000000)
                             })
+                            .hover(|s| s.border_color(rgb(0x00d992)))
                             .flex()
                             .justify_center()
                             .items_center()
@@ -293,50 +324,60 @@ impl Render for TodoWidget {
                                 d.child(
                                     div()
                                         .text_color(rgb(0x00d992))
-                                        .child(Icon::new(IconName::Check).size(px(12.0))),
+                                        .child(Icon::new(IconName::Check).size(px(11.0))),
                                 )
                             }),
                     )
-                    // 待办文字（点击进入编辑）
+                    // 待办文字（高清晰度纯白）
                     .child(
                         div()
                             .flex_1()
                             .text_sm()
-                            .text_color(if done { rgb(0x6e6e7a) } else { rgb(0xe8e8ea) })
+                            .font_weight(FontWeight::NORMAL)
+                            .text_color(if done {
+                                rgba(0x94a3b8aa)
+                            } else {
+                                rgb(0xf8fafc)
+                            })
                             .when(done, |d: Div| d.line_through())
                             .child(text),
                     )
-                    // 编辑按钮
+                    // 右侧动作按钮区
                     .child(
                         div()
-                            .w(px(26.0))
-                            .h(px(26.0))
                             .flex()
-                            .justify_center()
                             .items_center()
-                            .rounded(px(4.0))
-                            .cursor_pointer()
-                            .text_color(rgb(0x5a5a64))
-                            .hover(|s| s.bg(rgba(0xffffff10)).text_color(rgb(0x00d992)))
-                            .id(ElementId::Name(format!("todo-edit-{idx}").into()))
-                            .on_click(edit_handler)
-                            .child(Icon::new(IconName::Redo).size(px(12.0))),
-                    )
-                    // 删除按钮
-                    .child(
-                        div()
-                            .w(px(26.0))
-                            .h(px(26.0))
-                            .flex()
-                            .justify_center()
-                            .items_center()
-                            .rounded(px(4.0))
-                            .cursor_pointer()
-                            .text_color(rgb(0x5a5a64))
-                            .hover(|s| s.bg(rgba(0xff4d4d20)).text_color(rgb(0xff6b6b)))
-                            .id(ElementId::Name(format!("todo-del-{idx}").into()))
-                            .on_click(delete_handler)
-                            .child(Icon::new(IconName::Delete).size(px(12.0))),
+                            .gap(px(4.0))
+                            .child(
+                                div()
+                                    .w(px(22.0))
+                                    .h(px(22.0))
+                                    .flex()
+                                    .justify_center()
+                                    .items_center()
+                                    .rounded(px(4.0))
+                                    .cursor_pointer()
+                                    .text_color(rgba(0xffffff88))
+                                    .hover(|s| s.bg(rgba(0xffffff15)).text_color(rgb(0x00d992)))
+                                    .id(ElementId::Name(format!("todo-edit-{idx}").into()))
+                                    .on_click(edit_handler)
+                                    .child(Icon::new(IconName::Redo).size(px(11.0))),
+                            )
+                            .child(
+                                div()
+                                    .w(px(22.0))
+                                    .h(px(22.0))
+                                    .flex()
+                                    .justify_center()
+                                    .items_center()
+                                    .rounded(px(4.0))
+                                    .cursor_pointer()
+                                    .text_color(rgba(0xffffff88))
+                                    .hover(|s| s.bg(rgba(0xff4d4d25)).text_color(rgb(0xff6b6b)))
+                                    .id(ElementId::Name(format!("todo-del-{idx}").into()))
+                                    .on_click(delete_handler)
+                                    .child(Icon::new(IconName::Delete).size(px(11.0))),
+                            ),
                     )
                     .into_any_element()
             };
@@ -348,67 +389,62 @@ impl Render for TodoWidget {
             }
         }
 
-        // ── 整体布局 ──────────────────────────────────────────────
+        // ── 整体布局（100% 全透明直通桌面背景，悬浮胶囊卡片体系）──────────
         div()
             .flex()
             .flex_col()
             .flex_1()
             .size_full()
-            .bg(rgba(0x050507f2)) // VoltAgent Abyss Black with slight transparency
-            // 标题栏
+            .p(px(6.0))
+            .gap(px(6.0))
+            .overflow_hidden()
+            // 1. 顶部常驻新增输入栏（独立悬浮深色胶囊）
             .child(
                 div()
                     .flex()
                     .items_center()
-                    .justify_between()
                     .w_full()
-                    .px(px(16.0))
-                    .py(px(10.0))
-                    .bg(rgb(0x050507)) // VoltAgent Abyss Black
-                    .border_b_1()
-                    .border_color(rgb(0x3d3a39)) // VoltAgent Warm Charcoal
+                    .px(px(12.0))
+                    .py(px(9.0))
+                    .gap(px(8.0))
+                    .bg(rgba(0x0f172ae8)) // 高质感深海蓝黑悬浮顶栏
+                    .rounded(px(10.0))
+                    .border_1()
+                    .border_color(rgba(0xffffff22))
+                    .flex_shrink_0()
                     .child(
                         div()
+                            .w(px(18.0))
+                            .h(px(18.0))
+                            .flex_shrink_0()
+                            .rounded_full()
+                            .border_2()
+                            .border_color(rgba(0xffffff88))
                             .flex()
+                            .justify_center()
                             .items_center()
-                            .gap(px(8.0))
-                            .child(
-                                div()
-                                    .text_color(rgb(0x00d992)) // VoltAgent Emerald Green
-                                    .child(Icon::new(IconName::CircleCheck).size(px(16.0))),
-                            )
-                            .child(
-                                div()
-                                    .text_sm()
-                                    .font_weight(FontWeight::BOLD)
-                                    .text_color(rgb(0xf0f0f2))
-                                    .child("待办事项"),
-                            ),
+                            .text_color(rgb(0xffffff))
+                            .child(Icon::new(IconName::Plus).size(px(10.0))),
                     )
                     .child(
                         div()
-                            .px(px(8.0))
-                            .py(px(2.0))
-                            .rounded_full()
-                            .bg(rgba(0x00d99220))
-                            .text_xs()
-                            .text_color(rgb(0x00d992))
-                            .child(format!("{}/{}", done_count, total)),
+                            .flex_1()
+                            .child(Input::new(new_input).appearance(false).bordered(false)),
                     ),
             )
-            // 条目列表
+            // 2. 待办条目列表（卡片间自然透出桌面壁纸）
             .child(
                 div()
                     .flex()
                     .flex_col()
                     .flex_1()
                     .w_full()
-                    .p(px(10.0))
                     .gap(px(5.0))
                     .id("todo-list-scroll")
                     .track_scroll(&self.scroll_handle)
                     .overflow_y_scroll()
                     .children(pending_elements)
+                    // 已完成折叠标头
                     .when(!completed_elements.is_empty(), |d| {
                         let show = self.show_completed;
                         d.child(
@@ -417,9 +453,14 @@ impl Render for TodoWidget {
                                 .items_center()
                                 .justify_between()
                                 .w_full()
-                                .mt(px(10.0))
-                                .mb(px(4.0))
+                                .px(px(10.0))
+                                .py(px(6.0))
+                                .mt(px(4.0))
+                                .rounded(px(6.0))
                                 .cursor_pointer()
+                                .bg(rgba(0x0f172a60))
+                                .border_1()
+                                .border_color(rgba(0xffffff10))
                                 .id("toggle-completed")
                                 .on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
                                     this.show_completed = !this.show_completed;
@@ -429,116 +470,24 @@ impl Render for TodoWidget {
                                     div()
                                         .text_xs()
                                         .font_weight(FontWeight::BOLD)
-                                        .text_color(rgb(0x6e6e7a))
+                                        .text_color(rgba(0xffffff88))
                                         .child(format!("已完成 ({})", completed_elements.len())),
                                 )
-                                .child(div().text_xs().text_color(rgb(0x6e6e7a)).child(if show {
-                                    "▼"
-                                } else {
-                                    "▶"
-                                })),
+                                .child(
+                                    div().text_color(rgba(0xffffff88)).child(
+                                        Icon::new(if show {
+                                            IconName::ChevronDown
+                                        } else {
+                                            IconName::ChevronRight
+                                        })
+                                        .size(px(12.0)),
+                                    ),
+                                ),
                         )
                     })
                     .when(self.show_completed && !completed_elements.is_empty(), |d| {
                         d.children(completed_elements)
-                    })
-                    // 新增输入框：使用默认 Input 外观（白底黑字，完全可见）
-                    .when(show_input, |d| {
-                        d.child(
-                            div()
-                                .flex()
-                                .items_center()
-                                .w_full()
-                                .gap(px(8.0))
-                                .px(px(10.0))
-                                .py(px(4.0))
-                                .child(
-                                    div()
-                                        .w(px(22.0))
-                                        .h(px(22.0))
-                                        .flex_shrink_0()
-                                        .rounded_full()
-                                        .border_2()
-                                        .border_color(rgb(0x4a4a4e)),
-                                )
-                                .child(
-                                    div()
-                                        .flex_1()
-                                        // 不传 appearance(false)，保留默认白色背景+深色文字
-                                        .child(Input::new(new_input)),
-                                ),
-                        )
                     }),
-            )
-            // 底部"添加"按钮
-            .child(
-                div()
-                    .flex()
-                    .justify_center()
-                    .items_center()
-                    .w_full()
-                    .px(px(12.0))
-                    .py(px(12.0))
-                    .gap(px(6.0))
-                    .border_t_1()
-                    .border_color(rgb(0x3d3a39)) // VoltAgent Warm Charcoal
-                    .bg(rgb(0x050507))
-                    .cursor_pointer()
-                    .id("todo-add-btn")
-                    .hover(|s| s.bg(rgba(0x00d9921a)))
-                    .on_click(cx.listener(|this, _: &ClickEvent, window, cx| {
-                        this.show_input = !this.show_input;
-                        if this.show_input {
-                            // 关闭正在编辑的条目
-                            this.editing_idx = None;
-
-                            // 重新初始化 InputState，清空之前的输入
-                            let new_input = cx.new(|cx| {
-                                InputState::new(window, cx)
-                                    .placeholder("输入新待办，按 Enter 确认...")
-                            });
-                            cx.subscribe(
-                                &new_input,
-                                |this: &mut Self,
-                                 input: Entity<InputState>,
-                                 event: &InputEvent,
-                                 cx| {
-                                    if let InputEvent::PressEnter { .. } = event {
-                                        let text = input.read(cx).value().to_string();
-                                        let trimmed = text.trim().to_string();
-                                        if !trimmed.is_empty() {
-                                            this.items.push(TodoItem {
-                                                text: trimmed,
-                                                done: false,
-                                            });
-                                            TodoModel::save(&this.items, cx);
-                                            this.scroll_handle.scroll_to_bottom();
-                                        }
-                                        this.show_input = false;
-                                        cx.notify();
-                                    }
-                                },
-                            )
-                            .detach();
-                            this.new_input = new_input;
-
-                            // 打开输入框时也滚动到底部
-                            this.scroll_handle.scroll_to_bottom();
-                        }
-                        cx.notify();
-                    }))
-                    .child(div().text_color(rgb(0x00d992)).child(if show_input {
-                        Icon::new(IconName::Minus).size(px(14.0)).into_any_element()
-                    } else {
-                        Icon::new(IconName::Plus).size(px(14.0)).into_any_element()
-                    }))
-                    .child(
-                        div()
-                            .text_sm()
-                            .text_color(rgb(0x00d992))
-                            .font_weight(FontWeight::MEDIUM)
-                            .child(if show_input { "取消" } else { "添加待办" }),
-                    ),
             )
     }
 }

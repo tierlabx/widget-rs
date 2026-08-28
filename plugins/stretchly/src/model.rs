@@ -114,8 +114,10 @@ pub struct StretchlyModel {
     pending_config: Option<StretchlyConfig>,
     /// P3 — 今日统计
     pub stats: StretchlyStats,
-    /// P3 — 专注分钟累计用的秒计数器
-    focus_seconds_acc: u32,
+    /// P3 — 专注分钟累计用的毫秒计数器
+    focus_millis_acc: u64,
+    /// 上次 tick 时刻
+    last_tick: Instant,
     /// P3 — 上次 tick 时是否处于休息中（用于检测休息完成）
     prev_on_break: bool,
 }
@@ -124,16 +126,18 @@ impl Default for StretchlyModel {
     fn default() -> Self {
         let mut stats = StretchlyStats::default();
         stats.ensure_today();
+        let now = Instant::now();
         Self {
             state: BreakState::Working,
             config: StretchlyConfig::default(),
-            current_state_start: Instant::now(),
+            current_state_start: now,
             mini_breaks_taken: 0,
             is_paused: false,
             pause_offset: Duration::ZERO,
             pending_config: None,
             stats,
-            focus_seconds_acc: 0,
+            focus_millis_acc: 0,
+            last_tick: now,
             prev_on_break: false,
         }
     }
@@ -195,28 +199,33 @@ impl StretchlyModel {
         matches!(self.state, BreakState::MiniBreak | BreakState::LongBreak)
     }
 
-    /// 每秒 tick：处理暂停偏移和状态转换。返回 true 表示发生了状态切换。
+    /// 高频 tick：处理暂停偏移和状态转换。返回 true 表示发生了状态切换。
     pub fn tick(&mut self) -> bool {
         // 跨日自动清零统计
         self.stats.ensure_today();
+
+        let now = Instant::now();
+        let delta = now.saturating_duration_since(self.last_tick);
+        self.last_tick = now;
 
         let on_break = self.is_on_break();
 
         // 专注分钟累计（仅 Working 且非暂停）
         if !on_break && !self.is_paused {
-            self.focus_seconds_acc += 1;
-            if self.focus_seconds_acc >= 60 {
-                self.focus_seconds_acc = 0;
+            self.focus_millis_acc += delta.as_millis() as u64;
+            if self.focus_millis_acc >= 60_000 {
+                self.focus_millis_acc %= 60_000;
                 self.stats.focus_minutes += 1;
             }
         }
 
-        // 检测休息自然完成（上次在休息中，这次 time_remaining 归零自动转换）
+        // 检测暂停
         if self.is_paused {
-            self.pause_offset += Duration::from_secs(1);
+            self.pause_offset += delta;
             self.prev_on_break = on_break;
             return false;
         }
+
         if self.time_remaining().is_zero() {
             // 休息自然结束（非跳过）→ 记录完成次数
             if on_break {
