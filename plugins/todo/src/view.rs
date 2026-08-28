@@ -21,27 +21,6 @@ fn get_simple_time_str() -> String {
     format!("{:02}:{:02}", hours, mins)
 }
 
-#[derive(Clone)]
-struct DragTodo(usize);
-
-struct DragTodoView {
-    text: String,
-}
-
-impl Render for DragTodoView {
-    fn render(&mut self, _window: &mut Window, _cx: &mut Context<Self>) -> impl IntoElement {
-        div()
-            .bg(rgba(0x1e2d40cc))
-            .border_1()
-            .border_color(rgb(0x00d992))
-            .rounded(px(6.0))
-            .p(px(8.0))
-            .text_sm()
-            .text_color(rgb(0xf2f2f2))
-            .child(self.text.clone())
-    }
-}
-
 pub struct TodoWidget {
     data: TodoData,
     new_input: Entity<InputState>,
@@ -390,28 +369,10 @@ impl Render for TodoWidget {
                     )
                     .into_any_element()
             } else {
-                let drag_text = text.clone();
                 let item_text_display = text.clone();
 
                 div()
                     .id(ElementId::Name(format!("todo-item-{idx}").into()))
-                    .on_drag(DragTodo(idx), move |_, _, _, cx| {
-                        cx.new(|_| DragTodoView {
-                            text: drag_text.clone(),
-                        })
-                    })
-                    .on_drop(cx.listener(move |this, drag: &DragTodo, _, cx| {
-                        let from = drag.0;
-                        let to = idx;
-                        if from != to && from < this.data.items.len() && to < this.data.items.len()
-                        {
-                            let item = this.data.items.remove(from);
-                            let adjusted_to = if from < to { to - 1 } else { to };
-                            this.data.items.insert(adjusted_to, item);
-                            TodoModel::save(&this.data, cx);
-                            cx.notify();
-                        }
-                    }))
                     .flex()
                     .flex_col()
                     .w_full()
@@ -439,13 +400,11 @@ impl Render for TodoWidget {
                             .px(px(8.0))
                             .py(px(7.0))
                             .gap(px(6.0))
-                            // 1. 甘特色系竖条
                             .child(div().w(px(3.0)).h(px(20.0)).rounded_full().bg(if done {
                                 rgba(0xffffff30)
                             } else {
                                 rgb(gantt.hex)
                             }))
-                            // 2. 勾选圈
                             .child(
                                 div()
                                     .w(px(16.0))
@@ -478,7 +437,6 @@ impl Render for TodoWidget {
                                         )
                                     }),
                             )
-                            // 3. 待办文本与提醒徽章
                             .child(
                                 div()
                                     .flex_1()
@@ -537,7 +495,6 @@ impl Render for TodoWidget {
                                         },
                                     ),
                             )
-                            // 4. 右侧操作区
                             .child(
                                 div()
                                     .flex()
@@ -630,7 +587,6 @@ impl Render for TodoWidget {
                                 .bg(rgba(0x00000035))
                                 .border_t_1()
                                 .border_color(rgba(0xffffff10))
-                                // 1. 分类标签选择
                                 .child(
                                     div()
                                         .flex()
@@ -677,7 +633,6 @@ impl Render for TodoWidget {
                                                 .child(tag.name.clone())
                                         })),
                                 )
-                                // 2. 提醒设置
                                 .child(
                                     div()
                                         .flex()
@@ -851,7 +806,6 @@ impl Render for TodoWidget {
                                                 ),
                                         ),
                                 )
-                                // 3. 甘特色系
                                 .child(
                                     div()
                                         .flex()
@@ -927,7 +881,7 @@ impl Render for TodoWidget {
         }
 
         // ══════════════════════════════════════════════════════════════════════
-        // 整体双栏布局：左侧敬业签吸附 Tab 侧栏 + 右侧毛玻璃主面板
+        // 整体双栏布局：左侧吸附 Tab 侧栏 + 右侧毛玻璃主面板
         // ══════════════════════════════════════════════════════════════════════
         div()
             .flex()
@@ -945,7 +899,6 @@ impl Render for TodoWidget {
                     .pt(px(16.0))
                     .pb(px(8.0))
                     .overflow_hidden()
-                    // 1. "全部" 标签
                     .child({
                         let is_active = active_tag_id == "all";
                         div()
@@ -993,7 +946,6 @@ impl Render for TodoWidget {
                             }))
                             .child("全部")
                     })
-                    // 2. 自定义分类标签列表
                     .children(tags.iter().map(|tag| {
                         let is_active = active_tag_id == tag.id;
                         let tag_id_clone = tag.id.clone();
@@ -1042,7 +994,6 @@ impl Render for TodoWidget {
                                 this.data.active_tag_id = tag_id_clone.clone();
                                 cx.notify();
                             }))
-                            // 左侧微型甘特色点
                             .child(
                                 div()
                                     .absolute()
@@ -1058,7 +1009,6 @@ impl Render for TodoWidget {
                             )
                             .child(tag.name.clone())
                     }))
-                    // 3. 底部 "+" 快速添加标签按钮
                     .child(
                         div()
                             .w_full()
@@ -1103,7 +1053,7 @@ impl Render for TodoWidget {
                     .p(px(8.0))
                     .gap(px(6.0))
                     .overflow_hidden()
-                    // 1. 面板顶部标题栏（当前分类徽标）
+                    // 1. 顶部标题栏
                     .child(
                         div()
                             .flex()
@@ -1175,7 +1125,7 @@ impl Render for TodoWidget {
                                     .child(Input::new(new_input).appearance(false).bordered(false)),
                             ),
                     )
-                    // 3. 待办条目列表
+                    // 3. 待办条目列表（带空状态）
                     .child(
                         div()
                             .flex()
@@ -1186,6 +1136,33 @@ impl Render for TodoWidget {
                             .id("todo-list-scroll")
                             .track_scroll(&self.scroll_handle)
                             .overflow_y_scroll()
+                            // 空状态提示
+                            .when(
+                                pending_elements.is_empty() && completed_elements.is_empty(),
+                                |d| {
+                                    d.child(
+                                        div()
+                                            .flex()
+                                            .flex_col()
+                                            .items_center()
+                                            .justify_center()
+                                            .py(px(40.0))
+                                            .gap(px(6.0))
+                                            .child(
+                                                div()
+                                                    .text_xs()
+                                                    .text_color(rgba(0xffffff35))
+                                                    .child("暂无待办事项"),
+                                            )
+                                            .child(
+                                                div()
+                                                    .text_xs()
+                                                    .text_color(rgba(0xffffff20))
+                                                    .child("在上方输入内容即可添加"),
+                                            ),
+                                    )
+                                },
+                            )
                             .children(pending_elements)
                             .when(!completed_elements.is_empty(), |d: Stateful<Div>| {
                                 let completed_count = completed_elements.len();

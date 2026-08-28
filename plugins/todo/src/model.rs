@@ -184,41 +184,7 @@ impl Default for TodoData {
                     gantt_color: 3,
                 },
             ],
-            items: vec![
-                TodoItem {
-                    id: "1".to_string(),
-                    text: "完成项目架构设计与评审".into(),
-                    done: false,
-                    tag_id: "work".into(),
-                    gantt_color: 0,
-                    reminder: Some(ReminderRule::Interval { interval_mins: 30 }),
-                    last_reminded_at: None,
-                    created_at: Some("今日 09:00".into()),
-                },
-                TodoItem {
-                    id: "2".to_string(),
-                    text: "每周五提交周报与总结".into(),
-                    done: false,
-                    tag_id: "work".into(),
-                    gantt_color: 4,
-                    reminder: Some(ReminderRule::Weekly {
-                        weekday: 5,
-                        minute_of_day: 17 * 60,
-                    }),
-                    last_reminded_at: None,
-                    created_at: Some("今日 11:30".into()),
-                },
-                TodoItem {
-                    id: "3".to_string(),
-                    text: "阅读 Rust 高级异步编程章节".into(),
-                    done: true,
-                    tag_id: "study".into(),
-                    gantt_color: 1,
-                    reminder: None,
-                    last_reminded_at: None,
-                    created_at: Some("今日 14:00".into()),
-                },
-            ],
+            items: vec![],
         }
     }
 }
