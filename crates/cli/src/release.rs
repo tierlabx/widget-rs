@@ -546,11 +546,22 @@ pub fn run_release(workspace_root: &Path, manual_version: Option<&str>, dry_run:
     }
     println!("CHANGELOG.md 已更新");
 
-    // 8. Git commit + tag
+    // 8. 刷新 Cargo.lock
+    println!("正在更新 Cargo.lock...");
+    let _ = Command::new("cargo")
+        .args(["check", "--workspace"])
+        .current_dir(workspace_root)
+        .status();
+    println!("Cargo.lock 已更新");
+
+    // 9. Git commit + tag
     println!("\n正在提交变更...");
     let commit_msg = format!("chore: release v{}", version_str);
 
-    if let Err(e) = git_cmd(&["add", "Cargo.toml", "CHANGELOG.md"], workspace_root) {
+    if let Err(e) = git_cmd(
+        &["add", "Cargo.toml", "Cargo.lock", "CHANGELOG.md"],
+        workspace_root,
+    ) {
         eprintln!("git add 失败: {}", e);
         std::process::exit(1);
     }
