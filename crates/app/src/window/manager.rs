@@ -139,14 +139,30 @@ impl WindowManager {
 
                 // 优先使用物理扩展帧边界来修正由于 WS_THICKFRAME 及阴影引起的 GPUI 偏差
                 let mut actual_scale = scale;
+                let mut phys_x = 0;
+                let mut phys_y = 0;
+                let mut phys_w = 0;
+                let mut phys_h = 0;
                 if *hwnd != 0 {
-                    let (log_x, log_y, log_w, log_h, ascl, _px, _py, _pw, _ph) =
+                    let (log_x, log_y, log_w, log_h, ascl, px, py, pw, ph) =
                         crate::window::platform::windows::get_window_bounds(*hwnd, scale);
                     x = log_x;
                     y = log_y;
                     width = log_w;
                     height = log_h;
                     actual_scale = ascl;
+                    phys_x = px;
+                    phys_y = py;
+                    phys_w = pw;
+                    phys_h = ph;
+                }
+
+                // 对于固定尺寸药丸指示器小部件（如 stretchly），基准逻辑尺寸严格锁定为标准尺寸，杜绝误拉伸及二次放大污染
+                if *id == "stretchly_widget" {
+                    width = 280.0;
+                    height = 78.0;
+                    phys_w = (280.0 * actual_scale).round() as i32;
+                    phys_h = (78.0 * actual_scale).round() as i32;
                 }
 
                 let config_for_id = config.plugins.get(*id).cloned();
@@ -175,12 +191,10 @@ impl WindowManager {
 
                 // 同时保存物理像素坐标（用于 SetWindowPos 精确恢复）
                 if *hwnd != 0 {
-                    let (_, _, _, _, _, px, py, pw, ph) =
-                        crate::window::platform::windows::get_window_bounds(*hwnd, scale);
-                    entry.phys_x = px;
-                    entry.phys_y = py;
-                    entry.phys_w = pw;
-                    entry.phys_h = ph;
+                    entry.phys_x = phys_x;
+                    entry.phys_y = phys_y;
+                    entry.phys_w = phys_w;
+                    entry.phys_h = phys_h;
                 }
 
                 println!(

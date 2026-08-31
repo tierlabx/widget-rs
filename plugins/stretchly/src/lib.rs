@@ -75,8 +75,8 @@ impl Plugin for StretchlyWidgetPlugin {
         let options = widget_core::default_widget_window_options(
             cx,
             "stretchly_widget",
-            // 默认：右上角紧凑小组件，280x100
-            (1250.0, 100.0, 280.0, 100.0),
+            // 默认：右上角紧凑小组件，280x78
+            (1250.0, 100.0, 280.0, 78.0),
         );
 
         cx.open_window(options, |window, cx| {

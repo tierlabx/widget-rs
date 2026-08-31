@@ -235,25 +235,27 @@ pub fn get_window_bounds(hwnd: isize, scale: f32) -> (f32, f32, f32, f32, f32, i
             );
 
             if hr == 0 {
+                // 优先使用 DWM 真实视觉物理边界（彻底消除 Windows 10/11 系统的 Invisible resize border 误差）
+                phys_x = rect.left;
+                phys_y = rect.top;
+                phys_w = rect.right - rect.left;
+                phys_h = rect.bottom - rect.top;
                 log_x = rect.left as f32 / actual_scale;
                 log_y = rect.top as f32 / actual_scale;
-                log_w = (rect.right - rect.left) as f32 / actual_scale;
-                log_h = (rect.bottom - rect.top) as f32 / actual_scale;
+                log_w = phys_w as f32 / actual_scale;
+                log_h = phys_h as f32 / actual_scale;
             } else {
-                if GetWindowRect(hwnd, &mut rect) != 0 {
-                    log_x = rect.left as f32 / actual_scale;
-                    log_y = rect.top as f32 / actual_scale;
-                    log_w = (rect.right - rect.left) as f32 / actual_scale;
-                    log_h = (rect.bottom - rect.top) as f32 / actual_scale;
+                let mut phys_rect: RECT = std::mem::zeroed();
+                if GetWindowRect(hwnd, &mut phys_rect) != 0 {
+                    phys_x = phys_rect.left;
+                    phys_y = phys_rect.top;
+                    phys_w = phys_rect.right - phys_rect.left;
+                    phys_h = phys_rect.bottom - phys_rect.top;
+                    log_x = phys_rect.left as f32 / actual_scale;
+                    log_y = phys_rect.top as f32 / actual_scale;
+                    log_w = phys_w as f32 / actual_scale;
+                    log_h = phys_h as f32 / actual_scale;
                 }
-            }
-
-            let mut phys_rect: RECT = std::mem::zeroed();
-            if GetWindowRect(hwnd, &mut phys_rect) != 0 {
-                phys_x = phys_rect.left;
-                phys_y = phys_rect.top;
-                phys_w = phys_rect.right - phys_rect.left;
-                phys_h = phys_rect.bottom - phys_rect.top;
             }
         }
     }

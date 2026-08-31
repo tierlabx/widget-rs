@@ -271,6 +271,20 @@ pub fn resolve_plugin_bounds(
         );
     }
 
+    // 对于固定尺寸小组件（如 stretchly 药丸小部件），逻辑尺寸锁定为设计紧凑尺寸，只精准解析屏幕位置
+    if plugin_id == "stretchly_widget" {
+        let (fixed_w, fixed_h) = (default.2, default.3);
+        if p.phys_w > 0 && p.phys_h > 0 {
+            if let Some(m) = find_best_monitor(&monitors, p.phys_x, p.phys_y, p.phys_w, p.phys_h) {
+                let scale = m.scale_factor;
+                let log_x = p.phys_x as f32 / scale;
+                let log_y = p.phys_y as f32 / scale;
+                return (log_x, log_y, fixed_w, fixed_h);
+            }
+        }
+        return (p.x, p.y, fixed_w, fixed_h);
+    }
+
     // 优先使用物理坐标进行多屏定位匹配
     if p.phys_w > 0 && p.phys_h > 0 {
         if let Some(m) = find_best_monitor(&monitors, p.phys_x, p.phys_y, p.phys_w, p.phys_h) {
@@ -314,30 +328,15 @@ pub fn get_saved_physical_bounds(cx: &App, plugin_id: &str) -> Option<(i32, i32,
     let monitors = enumerate_monitors();
     let monitor = find_best_monitor(&monitors, p.phys_x, p.phys_y, p.phys_w, p.phys_h)?;
 
-    let current_scale = monitor.scale_factor;
-    let saved_scale = if p.scale > 0.0 { p.scale } else { 1.0 };
-
-    let (calc_x, calc_y, calc_w, calc_h) = if (current_scale - saved_scale).abs() > 0.01 {
-        let ratio = current_scale / saved_scale;
-        let new_w = (p.phys_w as f32 * ratio).round() as i32;
-        let new_h = (p.phys_h as f32 * ratio).round() as i32;
-
-        let rel_x = p.phys_x - monitor.rc_work.left;
-        let rel_y = p.phys_y - monitor.rc_work.top;
-        let new_x = monitor.rc_work.left + (rel_x as f32 * ratio).round() as i32;
-        let new_y = monitor.rc_work.top + (rel_y as f32 * ratio).round() as i32;
-
-        println!(
-            "[get_saved_physical_bounds] 插件 {} 跨缩放恢复: {}->{}, ({},{})->({},{}), {}x{}->{}x{}",
-            plugin_id, saved_scale, current_scale, p.phys_x, p.phys_y, new_x, new_y, p.phys_w, p.phys_h, new_w, new_h
-        );
-
-        (new_x, new_y, new_w, new_h)
+    let (phys_w, phys_h) = if plugin_id == "stretchly_widget" {
+        let pw = (280.0 * monitor.scale_factor).round() as i32;
+        let ph = (78.0 * monitor.scale_factor).round() as i32;
+        (pw, ph)
     } else {
-        (p.phys_x, p.phys_y, p.phys_w, p.phys_h)
+        (p.phys_w, p.phys_h)
     };
 
-    // 安全约束：确保窗口不会超出目标显示器工作区范围
-    let clamped = clamp_to_work_area(monitor, calc_x, calc_y, calc_w, calc_h);
+    // 直接使用保存的绝对物理坐标（在目标显示器内经 clamp 保证安全），杜绝多次启动反复缩放放大的恶性累积
+    let clamped = clamp_to_work_area(monitor, p.phys_x, p.phys_y, phys_w, phys_h);
     Some(clamped)
 }

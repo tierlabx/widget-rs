@@ -272,6 +272,66 @@ impl StretchlyWidget {
         }
     }
 
+    /// 展开/折叠健康建议时，根据内容动态自适应调节窗口高度
+    fn update_window_height(&self, hwnd: isize) {
+        if hwnd == 0 {
+            return;
+        }
+        unsafe {
+            use windows_sys::Win32::Foundation::RECT;
+            use windows_sys::Win32::Graphics::Dwm::{
+                DwmGetWindowAttribute, DWMWA_EXTENDED_FRAME_BOUNDS,
+            };
+            use windows_sys::Win32::Graphics::Gdi::{
+                InvalidateRect, RedrawWindow, RDW_ALLCHILDREN, RDW_FRAME, RDW_INVALIDATE,
+                RDW_UPDATENOW,
+            };
+            use windows_sys::Win32::UI::HiDpi::GetDpiForWindow;
+            use windows_sys::Win32::UI::WindowsAndMessaging::{
+                GetWindowRect, SetWindowPos, SWP_FRAMECHANGED, SWP_NOACTIVATE, SWP_NOMOVE,
+                SWP_NOZORDER,
+            };
+
+            let dpi = GetDpiForWindow(hwnd);
+            let scale = if dpi == 0 { 1.0 } else { dpi as f32 / 96.0 };
+            // 折叠状态为紧凑 78px（确保底部统计文字完全不被遮挡），展开状态自适应为 172px（确保周期信息完整呈现）
+            let target_log_h = if self.show_details { 172.0 } else { 78.0 };
+            let target_phys_h = (target_log_h * scale).round() as i32;
+
+            let mut rect: RECT = std::mem::zeroed();
+            let hr = DwmGetWindowAttribute(
+                hwnd,
+                DWMWA_EXTENDED_FRAME_BOUNDS as u32,
+                &mut rect as *mut _ as *mut _,
+                std::mem::size_of::<RECT>() as u32,
+            );
+            let phys_w = if hr == 0 {
+                rect.right - rect.left
+            } else if GetWindowRect(hwnd, &mut rect) != 0 {
+                rect.right - rect.left
+            } else {
+                (280.0 * scale).round() as i32
+            };
+
+            SetWindowPos(
+                hwnd,
+                0,
+                0,
+                0,
+                phys_w,
+                target_phys_h,
+                SWP_NOMOVE | SWP_NOZORDER | SWP_NOACTIVATE | SWP_FRAMECHANGED,
+            );
+            InvalidateRect(hwnd, std::ptr::null(), 1);
+            RedrawWindow(
+                hwnd,
+                std::ptr::null(),
+                0,
+                RDW_INVALIDATE | RDW_UPDATENOW | RDW_FRAME | RDW_ALLCHILDREN,
+            );
+        }
+    }
+
     /// P2: 预警通知 — 闪烁任务栏提醒用户即将休息
     fn trigger_warning_notification(hwnd: isize) {
         if hwnd == 0 {
@@ -534,21 +594,34 @@ impl Render for StretchlyWidget {
                                     // 展开/折叠更多详情按钮
                                     .child(
                                         div()
-                                            .w(px(20.0))
-                                            .h(px(20.0))
+                                            .w(px(24.0))
+                                            .h(px(22.0))
                                             .flex()
                                             .justify_center()
                                             .items_center()
                                             .rounded(px(4.0))
                                             .cursor_pointer()
-                                            .text_color(rgba(0xffffff70))
+                                            .text_color(rgba(0xffffffaa))
                                             .hover(|s| {
-                                                s.bg(rgba(0xffffff15)).text_color(rgb(0xffffff))
+                                                s.bg(rgba(0xffffff20)).text_color(rgb(0xffffff))
                                             })
                                             .id("stretchly-expand-btn")
-                                            .on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+                                            .on_click(cx.listener(|this, _: &ClickEvent, window, cx| {
                                                 this.show_details = !this.show_details;
+                                                let hwnd = window
+                                                    .window_handle()
+                                                    .ok()
+                                                    .and_then(|h| {
+                                                        if let raw_window_handle::RawWindowHandle::Win32(h) = h.as_raw() {
+                                                            Some(h.hwnd.get())
+                                                        } else {
+                                                            None
+                                                        }
+                                                    })
+                                                    .unwrap_or(this.cached_hwnd);
+                                                this.update_window_height(hwnd);
                                                 cx.notify();
+                                                cx.refresh_windows();
                                             }))
                                             .child(
                                                 Icon::new(if show_details {
@@ -556,7 +629,7 @@ impl Render for StretchlyWidget {
                                                 } else {
                                                     IconName::ChevronDown
                                                 })
-                                                .size(px(11.0)),
+                                                .size(px(12.0)),
                                             ),
                                     ),
                             ),
