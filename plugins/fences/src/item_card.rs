@@ -1,7 +1,11 @@
+use std::sync::Arc;
+
+use gpui::prelude::FluentBuilder;
 use gpui::*;
 use gpui_component::{Icon, IconName};
 
 use crate::dialog::launch_item;
+use crate::icon_extractor::get_or_extract_icon;
 use crate::model::{FenceItem, FencesModel};
 use crate::view::FencesWidget;
 
@@ -12,36 +16,187 @@ pub struct DraggedFenceItem {
     pub item_idx: usize,
 }
 
+pub struct FileVisualInfo {
+    pub icon_name: IconName,
+    pub icon_color: Hsla,
+    pub badge_text: Option<String>,
+    pub badge_color: Hsla,
+    pub bg_color: Hsla,
+}
+
+/// 解析文件类型并返回视觉配置
+pub fn resolve_file_visual(path_str: &str, is_dir: bool) -> FileVisualInfo {
+    if is_dir {
+        return FileVisualInfo {
+            icon_name: IconName::Folder,
+            icon_color: rgb(0xfbbf24).into(),
+            badge_text: None,
+            badge_color: rgb(0xfbbf24).into(),
+            bg_color: rgba(0xfbbf2415).into(),
+        };
+    }
+
+    let ext = path_str.split('.').next_back().unwrap_or("").to_lowercase();
+
+    match ext.as_str() {
+        // 程序与可执行文件
+        "exe" | "lnk" | "msi" | "bat" | "cmd" => FileVisualInfo {
+            icon_name: IconName::WindowMaximize,
+            icon_color: rgb(0x38bdf8).into(),
+            badge_text: Some(if ext == "lnk" { "LNK" } else { "EXE" }.to_string()),
+            badge_color: rgb(0x38bdf8).into(),
+            bg_color: rgba(0x38bdf818).into(),
+        },
+        // 源代码与脚本
+        "rs" | "js" | "ts" | "jsx" | "tsx" | "py" | "c" | "cpp" | "h" | "hpp" | "go" | "java"
+        | "html" | "css" | "json" | "toml" | "yaml" | "yml" | "xml" | "sql" | "sh" => {
+            let label = if ext.len() <= 4 {
+                ext.to_uppercase()
+            } else {
+                "CODE".to_string()
+            };
+            FileVisualInfo {
+                icon_name: IconName::File,
+                icon_color: rgb(0x34d399).into(),
+                badge_text: Some(label),
+                badge_color: rgb(0x34d399).into(),
+                bg_color: rgba(0x34d39918).into(),
+            }
+        }
+        // Word 文档
+        "doc" | "docx" => FileVisualInfo {
+            icon_name: IconName::File,
+            icon_color: rgb(0x3b82f6).into(),
+            badge_text: Some("DOC".to_string()),
+            badge_color: rgb(0x3b82f6).into(),
+            bg_color: rgba(0x3b82f620).into(),
+        },
+        // PDF 文档
+        "pdf" => FileVisualInfo {
+            icon_name: IconName::File,
+            icon_color: rgb(0xef4444).into(),
+            badge_text: Some("PDF".to_string()),
+            badge_color: rgb(0xef4444).into(),
+            bg_color: rgba(0xef444420).into(),
+        },
+        // Excel 表格
+        "xls" | "xlsx" | "csv" => FileVisualInfo {
+            icon_name: IconName::File,
+            icon_color: rgb(0x10b981).into(),
+            badge_text: Some("XLS".to_string()),
+            badge_color: rgb(0x10b981).into(),
+            bg_color: rgba(0x10b98120).into(),
+        },
+        // PPT 幻灯片
+        "ppt" | "pptx" => FileVisualInfo {
+            icon_name: IconName::File,
+            icon_color: rgb(0xf97316).into(),
+            badge_text: Some("PPT".to_string()),
+            badge_color: rgb(0xf97316).into(),
+            bg_color: rgba(0xf9731620).into(),
+        },
+        // 纯文本与 Markdown
+        "md" | "txt" | "log" | "rtf" => FileVisualInfo {
+            icon_name: IconName::File,
+            icon_color: rgb(0x86efac).into(),
+            badge_text: Some(if ext == "md" { "MD" } else { "TXT" }.to_string()),
+            badge_color: rgb(0x86efac).into(),
+            bg_color: rgba(0x86efac18).into(),
+        },
+        // 压缩包
+        "zip" | "rar" | "7z" | "tar" | "gz" | "iso" => FileVisualInfo {
+            icon_name: IconName::File,
+            icon_color: rgb(0xf59e0b).into(),
+            badge_text: Some(ext.to_uppercase()),
+            badge_color: rgb(0xf59e0b).into(),
+            bg_color: rgba(0xf59e0b20).into(),
+        },
+        // 图片
+        "png" | "jpg" | "jpeg" | "webp" | "gif" | "bmp" | "svg" | "ico" => FileVisualInfo {
+            icon_name: IconName::File,
+            icon_color: rgb(0xc084fc).into(),
+            badge_text: Some(ext.to_uppercase()),
+            badge_color: rgb(0xc084fc).into(),
+            bg_color: rgba(0xc084fc18).into(),
+        },
+        // 视频
+        "mp4" | "mkv" | "avi" | "mov" | "flv" | "wmv" => FileVisualInfo {
+            icon_name: IconName::File,
+            icon_color: rgb(0xe879f9).into(),
+            badge_text: Some("VID".to_string()),
+            badge_color: rgb(0xe879f9).into(),
+            bg_color: rgba(0xe879f918).into(),
+        },
+        // 音频
+        "mp3" | "wav" | "flac" | "aac" | "ogg" | "m4a" => FileVisualInfo {
+            icon_name: IconName::File,
+            icon_color: rgb(0xf472b6).into(),
+            badge_text: Some("AUD".to_string()),
+            badge_color: rgb(0xf472b6).into(),
+            bg_color: rgba(0xf472b618).into(),
+        },
+        _ => FileVisualInfo {
+            icon_name: IconName::File,
+            icon_color: rgb(0x94a3b8).into(),
+            badge_text: if !ext.is_empty() && ext.len() <= 4 {
+                Some(ext.to_uppercase())
+            } else {
+                None
+            },
+            badge_color: rgb(0x94a3b8).into(),
+            bg_color: rgba(0x94a3b815).into(),
+        },
+    }
+}
+
 struct DragPreview {
     name: String,
     icon_name: IconName,
     icon_color: Hsla,
+    native_icon_path: Option<String>,
 }
 
 impl Render for DragPreview {
     fn render(&mut self, _window: &mut Window, _cx: &mut Context<Self>) -> impl IntoElement {
-        div()
+        let mut row = div()
             .flex()
             .items_center()
-            .gap(px(4.0))
-            .px(px(6.0))
-            .py(px(4.0))
+            .gap(px(6.0))
+            .px(px(8.0))
+            .py(px(5.0))
             .rounded(px(6.0))
-            .bg(rgba(0x0f172ae0))
+            .bg(rgba(0x0f172af0))
             .border_1()
             .border_color(rgb(0x38bdf8))
-            .shadow_lg()
-            .child(
+            .shadow_lg();
+
+        if let Some(ref path) = self.native_icon_path {
+            let img_source = gpui::ImageSource::Resource(gpui::Resource::Path(Arc::from(
+                std::path::Path::new(path),
+            )));
+            row = row.child(
+                div()
+                    .w(px(20.0))
+                    .h(px(20.0))
+                    .rounded(px(3.0))
+                    .overflow_hidden()
+                    .child(img(img_source).size_full()),
+            );
+        } else {
+            row = row.child(
                 div()
                     .text_color(self.icon_color)
                     .child(Icon::new(self.icon_name.clone()).size(px(16.0))),
-            )
-            .child(
-                div()
-                    .text_xs()
-                    .text_color(rgb(0xf8fafc))
-                    .child(self.name.clone()),
-            )
+            );
+        }
+
+        row.child(
+            div()
+                .text_xs()
+                .font_weight(FontWeight::MEDIUM)
+                .text_color(rgb(0xf8fafc))
+                .child(self.name.clone()),
+        )
     }
 }
 
@@ -54,32 +209,19 @@ pub fn render_item_card(
 ) -> impl IntoElement {
     let item_path = item.path.clone();
     let is_dir = item.is_dir;
-    let ext = item_path
-        .split('.')
-        .next_back()
-        .unwrap_or("")
-        .to_lowercase();
+    let visual = resolve_file_visual(&item_path, is_dir);
 
-    let (icon_color, icon_name) = if is_dir {
-        (rgb(0xfbbf24), IconName::Folder)
-    } else if ext == "exe" || ext == "lnk" {
-        (rgb(0x38bdf8), IconName::WindowMaximize)
-    } else if ["png", "jpg", "jpeg", "webp", "gif", "bmp"].contains(&ext.as_str()) {
-        (rgb(0xc084fc), IconName::File)
-    } else if ["zip", "rar", "7z"].contains(&ext.as_str()) {
-        (rgb(0xfb923c), IconName::File)
-    } else if ["md", "txt"].contains(&ext.as_str()) {
-        (rgb(0x86efac), IconName::File)
-    } else if ["pdf"].contains(&ext.as_str()) {
-        (rgb(0xf87171), IconName::File)
-    } else if ["doc", "docx"].contains(&ext.as_str()) {
-        (rgb(0x67e8f9), IconName::File)
+    // 优先尝试获取或提取 Windows 原生高清程序/文件图标
+    let native_icon = if !is_dir {
+        get_or_extract_icon(&item_path)
     } else {
-        (rgb(0x94a3b8), IconName::File)
+        None
     };
 
     let preview_name = item.name.clone();
-    let preview_icon_name = icon_name.clone();
+    let preview_icon_name = visual.icon_name.clone();
+    let preview_icon_color = visual.icon_color;
+    let preview_native_icon = native_icon.clone();
 
     div()
         .id(ElementId::Name(
@@ -87,15 +229,15 @@ pub fn render_item_card(
         ))
         .group("item_card")
         .relative()
-        .w(px(54.0))
-        .h(px(58.0))
-        .rounded(px(6.0))
-        .bg(rgba(0x0f172a50))
+        .w(px(58.0))
+        .h(px(66.0))
+        .rounded(px(8.0))
+        .bg(visual.bg_color)
         .border_1()
-        .border_color(rgba(0x38bdf818))
-        .hover(|s| s.bg(rgba(0x0f172ad0)).border_color(rgba(0x38bdf850)))
+        .border_color(rgba(0x38bdf825))
+        .hover(|s| s.bg(rgba(0x0f172ae8)).border_color(rgba(0x38bdf880)))
         .drag_over::<DraggedFenceItem>(|s, _drag, _window, _cx| {
-            s.border_color(rgb(0x38bdf8)).bg(rgba(0x38bdf830))
+            s.border_color(rgb(0x38bdf8)).bg(rgba(0x38bdf840))
         })
         .on_drag(
             DraggedFenceItem { cat_idx, item_idx },
@@ -103,12 +245,12 @@ pub fn render_item_card(
                 cx.new(|_| DragPreview {
                     name: preview_name.clone(),
                     icon_name: preview_icon_name.clone(),
-                    icon_color: icon_color.into(),
+                    icon_color: preview_icon_color,
+                    native_icon_path: preview_native_icon.clone(),
                 })
             },
         )
         .on_drop(cx.listener(move |this, drag: &DraggedFenceItem, _, cx| {
-            // 拖拽排序逻辑
             if drag.cat_idx == cat_idx && drag.item_idx == item_idx {
                 return;
             }
@@ -133,7 +275,7 @@ pub fn render_item_card(
                 .items_center()
                 .justify_center()
                 .p(px(2.0))
-                .gap(px(2.0))
+                .gap(px(3.0))
                 .cursor_pointer()
                 .id(ElementId::Name(
                     format!("fence-launch-{cat_idx}-{item_idx}").into(),
@@ -141,16 +283,57 @@ pub fn render_item_card(
                 .on_click(cx.listener(move |_, _, _, _| {
                     launch_item(&item_path);
                 }))
+                // 图标展示区域：原生图标 或 精致矢量图标+Badge
                 .child(
                     div()
-                        .w(px(24.0))
-                        .h(px(24.0))
+                        .relative()
+                        .w(px(30.0))
+                        .h(px(30.0))
                         .flex()
                         .justify_center()
                         .items_center()
-                        .text_color(icon_color)
-                        .child(Icon::new(icon_name).size(px(20.0))),
+                        .map(|parent| {
+                            if let Some(ref icon_file) = native_icon {
+                                let img_source = gpui::ImageSource::Resource(gpui::Resource::Path(
+                                    Arc::from(std::path::Path::new(icon_file)),
+                                ));
+                                parent.child(
+                                    div()
+                                        .w(px(28.0))
+                                        .h(px(28.0))
+                                        .rounded(px(4.0))
+                                        .overflow_hidden()
+                                        .child(img(img_source).size_full()),
+                                )
+                            } else {
+                                let mut icon_box = parent
+                                    .text_color(visual.icon_color)
+                                    .child(Icon::new(visual.icon_name).size(px(22.0)));
+
+                                if let Some(badge) = visual.badge_text {
+                                    icon_box = icon_box.child(
+                                        div()
+                                            .absolute()
+                                            .bottom(px(-2.0))
+                                            .right(px(-4.0))
+                                            .px(px(2.5))
+                                            .py(px(0.5))
+                                            .rounded(px(3.0))
+                                            .bg(rgba(0x0f172af0))
+                                            .border_1()
+                                            .border_color(visual.badge_color)
+                                            .text_color(visual.badge_color)
+                                            .font_weight(FontWeight::BOLD)
+                                            .text_size(px(7.5))
+                                            .line_height(px(8.0))
+                                            .child(badge),
+                                    );
+                                }
+                                icon_box
+                            }
+                        }),
                 )
+                // 文件/程序名称
                 .child(
                     div()
                         .text_xs()
@@ -158,7 +341,7 @@ pub fn render_item_card(
                         .text_color(rgb(0xf8fafc))
                         .text_ellipsis()
                         .text_center()
-                        .max_w(px(50.0))
+                        .max_w(px(54.0))
                         .overflow_hidden()
                         .child(item.name.clone()),
                 ),
@@ -174,9 +357,9 @@ pub fn render_item_card(
                 .w(px(14.0))
                 .h(px(14.0))
                 .rounded_full()
-                .bg(rgba(0xff4d4d35))
+                .bg(rgba(0xff4d4d45))
                 .border_1()
-                .border_color(rgba(0xff4d4d80))
+                .border_color(rgba(0xff4d4d90))
                 .text_color(rgb(0xffa0a0))
                 .flex()
                 .justify_center()

@@ -80,10 +80,15 @@ pub fn open_add_dialog(this_entity: WeakEntity<FencesWidget>, target_cat: usize,
                 };
                 let is_dir = path.is_dir();
 
+                let is_file = !is_dir;
+                let added_path = path_str.clone();
                 let _ = async_cx.update(|cx| {
                     let _ = this_entity.update(cx, |this, cx| {
                         if let Some(cat) = this.data.categories.get_mut(target_cat) {
                             cat.collapsed = false;
+                            if target_cat < this.expand_progress.len() {
+                                this.expand_progress[target_cat] = 1.0;
+                            }
                             cat.items.push(FenceItem {
                                 name,
                                 path: path_str,
@@ -94,6 +99,15 @@ pub fn open_add_dialog(this_entity: WeakEntity<FencesWidget>, target_cat: usize,
                         }
                     });
                 });
+
+                if is_file {
+                    let _ = crate::icon_extractor::get_or_extract_icon(&added_path);
+                    let _ = async_cx.update(|cx| {
+                        let _ = this_entity.update(cx, |_, cx| {
+                            cx.notify();
+                        });
+                    });
+                }
             }
         }
     })
