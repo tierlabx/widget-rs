@@ -6,6 +6,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+## [0.7.1](https://github.com/tierlabx/widget-rs/releases/tag/v0.7.1) - 2026-08-31
+
+### Added
+
+- 支持手风琴平滑折叠动画、文件类型识别及原生应用图标提取渲染
+
 ## [0.7.0](https://github.com/tierlabx/widget-rs/releases/tag/v0.7.0) - 2026-08-31
 
 ### Added
