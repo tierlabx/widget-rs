@@ -64,6 +64,7 @@ fn main() {
         // 注册更新状态桥接（异步任务通过此全局变量回传更新检查/下载状态）
         cx.set_global(widget_ui::MainWindowUpdateBridge {
             status: widget_ui::UpdateStatus::Idle,
+            dismissed: false,
         });
 
         // 注册立即写盘回调，插件可调用 save_config_now(cx) 触发
@@ -226,5 +227,10 @@ fn main() {
         // 启动托盘菜单事件的独立轮询循环
         let store_for_tray = Arc::clone(&store_for_app);
         lifecycle::spawn_tray_polling_task(cx, tray_handles, store_for_tray);
+
+        // 若开启了自动检查更新，则在后台异步发起新版本检查
+        if app_config.auto_check_update {
+            widget_ui::check_for_update(cx);
+        }
     });
 }

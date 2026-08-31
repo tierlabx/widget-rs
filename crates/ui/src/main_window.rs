@@ -3,8 +3,9 @@ use gpui::*;
 use raw_window_handle::{HasWindowHandle, RawWindowHandle};
 use windows_sys::Win32::UI::WindowsAndMessaging::IsZoomed;
 
+use crate::components::update_modal::render_update_modal;
 use crate::pages::dashboard::render_dashboard_content;
-use crate::pages::settings::render_settings_content;
+use crate::pages::settings::{render_settings_page, SettingsTab};
 use crate::pages::widgets::render_widgets_content;
 use crate::sidebar::render_sidebar;
 use crate::titlebar::render_titlebar;
@@ -19,6 +20,7 @@ pub enum NavPage {
 pub struct MainWindow {
     pub is_maximized: bool,
     pub nav_page: NavPage,
+    pub settings_tab: SettingsTab,
 }
 
 impl Default for MainWindow {
@@ -32,6 +34,7 @@ impl MainWindow {
         Self {
             is_maximized: false,
             nav_page: NavPage::Dashboard,
+            settings_tab: SettingsTab::About,
         }
     }
 }
@@ -45,6 +48,7 @@ impl Render for MainWindow {
             .try_global::<widget_core::UIState>()
             .is_some_and(|s| s.is_edit_mode);
         let nav_page = self.nav_page;
+        let settings_tab = self.settings_tab;
 
         let is_maximized = if let Ok(h) = window.window_handle() {
             if let RawWindowHandle::Win32(h) = h.as_raw() {
@@ -65,7 +69,8 @@ impl Render for MainWindow {
             return div().bg(rgba(0x00000000)).into_any_element();
         }
 
-        div()
+        let mut root = div()
+            .relative()
             .flex()
             .flex_col()
             .size_full()
@@ -78,27 +83,43 @@ impl Render for MainWindow {
                     .flex()
                     .flex_1()
                     .w_full()
-                    .overflow_hidden() // Layout 统一处理滚动遮罩
-                    .min_h_0() // 防止 flex 子项撑开父级
+                    .overflow_hidden()
+                    .min_h_0()
                     .child(render_sidebar(nav_page, cx))
-                    .child(
-                        // 统一的可滚动页面容器
-                        div()
+                    .child(match nav_page {
+                        NavPage::Dashboard => div()
                             .id("page-scroll")
                             .flex_1()
                             .h_full()
-                            .overflow_y_scroll() // Layout 层负责滚动
+                            .overflow_y_scroll()
                             .flex()
                             .flex_col()
                             .p(px(24.0))
                             .gap(px(20.0))
-                            .children(match nav_page {
-                                NavPage::Dashboard => render_dashboard_content(is_edit_mode, cx),
-                                NavPage::Widgets => render_widgets_content(cx),
-                                NavPage::Settings => render_settings_content(cx),
-                            }),
-                    ),
-            )
-            .into_any_element()
+                            .children(render_dashboard_content(is_edit_mode, cx))
+                            .into_any_element(),
+                        NavPage::Widgets => div()
+                            .id("page-scroll")
+                            .flex_1()
+                            .h_full()
+                            .overflow_y_scroll()
+                            .flex()
+                            .flex_col()
+                            .p(px(24.0))
+                            .gap(px(20.0))
+                            .children(render_widgets_content(cx))
+                            .into_any_element(),
+                        NavPage::Settings => {
+                            render_settings_page(settings_tab, cx).into_any_element()
+                        }
+                    }),
+            );
+
+        // 顶层挂载更新提示弹窗
+        if let Some(modal) = render_update_modal(cx) {
+            root = root.child(modal);
+        }
+
+        root.into_any_element()
     }
 }
