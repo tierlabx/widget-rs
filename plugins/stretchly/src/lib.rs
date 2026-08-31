@@ -1,5 +1,7 @@
+mod details;
 mod model;
 pub mod overlay;
+mod timer;
 mod tips;
 mod view;
 

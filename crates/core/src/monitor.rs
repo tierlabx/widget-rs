@@ -340,3 +340,7 @@ pub fn get_saved_physical_bounds(cx: &App, plugin_id: &str) -> Option<(i32, i32,
     let clamped = clamp_to_work_area(monitor, p.phys_x, p.phys_y, phys_w, phys_h);
     Some(clamped)
 }
+
+#[cfg(test)]
+#[path = "monitor_tests.rs"]
+mod monitor_tests;

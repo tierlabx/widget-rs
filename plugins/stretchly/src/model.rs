@@ -321,3 +321,7 @@ impl StretchlyModel {
         self.is_paused = false;
     }
 }
+
+#[cfg(test)]
+#[path = "model_tests.rs"]
+mod model_tests;
