@@ -3,14 +3,34 @@ use gpui::*;
 use crate::model::{FenceItem, FencesModel};
 use crate::view::FencesWidget;
 
-/// 打开选中的文件或文件夹
+/// 打开选中的文件或文件夹（使用原生 ShellExecute API，杜绝控制台终端闪烁）
 pub fn launch_item(path: &str) {
-    let p = path.to_string();
-    std::thread::spawn(move || {
-        let _ = std::process::Command::new("powershell")
-            .args(["-NoProfile", "-Command", &format!("Start-Process '{}'", p)])
-            .spawn();
-    });
+    #[cfg(windows)]
+    {
+        use std::ffi::OsStr;
+        use std::os::windows::ffi::OsStrExt;
+        use windows_sys::Win32::UI::Shell::ShellExecuteW;
+        use windows_sys::Win32::UI::WindowsAndMessaging::SW_SHOWNORMAL;
+
+        let path_wide: Vec<u16> = OsStr::new(path).encode_wide().chain(Some(0)).collect();
+        let op_wide: Vec<u16> = OsStr::new("open").encode_wide().chain(Some(0)).collect();
+
+        unsafe {
+            ShellExecuteW(
+                0,
+                op_wide.as_ptr(),
+                path_wide.as_ptr(),
+                std::ptr::null(),
+                std::ptr::null(),
+                SW_SHOWNORMAL,
+            );
+        }
+    }
+
+    #[cfg(not(windows))]
+    {
+        let _ = open::that(path);
+    }
 }
 
 /// 打开添加文件/文件夹的对话框
@@ -35,9 +55,15 @@ pub fn open_add_dialog(this_entity: WeakEntity<FencesWidget>, target_cat: usize,
              if($f.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK){ Write-Output $f.FileName }"
         };
 
-        let output = std::process::Command::new("powershell")
-            .args(["-NoProfile", "-Command", script])
-            .output();
+        let mut cmd = std::process::Command::new("powershell");
+        #[cfg(windows)]
+        {
+            use std::os::windows::process::CommandExt;
+            cmd.creation_flags(0x08000000); // CREATE_NO_WINDOW，杜绝黑框终端窗口
+        }
+        cmd.args(["-NoProfile", "-Command", script]);
+
+        let output = cmd.output();
 
         if let Ok(out) = output {
             let path_str = String::from_utf8_lossy(&out.stdout).trim().to_string();
