@@ -158,6 +158,67 @@ pub struct TodoData {
     pub items: Vec<TodoItem>,
 }
 
+impl TodoData {
+    /// 新增分类标签，返回新标签 ID
+    pub fn add_tag(&mut self, name: String, gantt_color: usize) -> String {
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_secs();
+        let new_id = format!("tag-{}", now);
+        self.tags.push(TodoTag {
+            id: new_id.clone(),
+            name,
+            gantt_color,
+        });
+        new_id
+    }
+
+    /// 更新分类标签名称与颜色
+    pub fn update_tag(&mut self, tag_id: &str, name: String, gantt_color: usize) -> bool {
+        if let Some(tag) = self.tags.iter_mut().find(|t| t.id == tag_id) {
+            tag.name = name;
+            tag.gantt_color = gantt_color;
+            true
+        } else {
+            false
+        }
+    }
+
+    /// 安全删除分类标签，并将该标签下的任务迁移到首个可用标签
+    pub fn delete_tag_and_migrate(&mut self, tag_id: &str) -> bool {
+        if self.tags.len() <= 1 {
+            return false;
+        }
+
+        if let Some(pos) = self.tags.iter().position(|t| t.id == tag_id) {
+            self.tags.remove(pos);
+
+            let fallback_tag_id = self
+                .tags
+                .first()
+                .map(|t| t.id.clone())
+                .unwrap_or_else(|| "work".to_string());
+
+            // 迁移该分类下的条目
+            for item in &mut self.items {
+                if item.tag_id == tag_id {
+                    item.tag_id = fallback_tag_id.clone();
+                }
+            }
+
+            // 若当前处于被删除分类的视图下，重置为全部
+            if self.active_tag_id == tag_id {
+                self.active_tag_id = "all".to_string();
+            }
+
+            true
+        } else {
+            false
+        }
+    }
+}
+
 impl Default for TodoData {
     fn default() -> Self {
         Self {
@@ -200,9 +261,10 @@ impl TodoModel {
             }
             // 尝试迁移旧版 Vec<TodoItem>
             if let Some(old_items) = cfg.get_plugin_data::<Vec<TodoItem>>("todo_widget") {
-                let mut data = TodoData::default();
-                data.items = old_items;
-                return data;
+                return TodoData {
+                    items: old_items,
+                    ..Default::default()
+                };
             }
         }
         TodoData::default()
