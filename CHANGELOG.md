@@ -6,6 +6,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+## [0.6.0](https://github.com/tierlabx/widget-rs/releases/tag/v0.6.0) - 2026-08-31
+
+### Added
+
+- 优化多屏显示准确度、无缝边缘吸附与网格相同高度自动对齐
+- 支持卡片拖拽排序、紧凑化布局及悬停显示关闭按钮
+- 添加分类标签编辑与删除功能并完成模块化重构
+
+### Fixed
+
+- 修复多屏DPI副屏窗口反复放大Bug并实现Stretchly展开高度自适应
+- 修复系统托盘切换控制面板失效问题并支持双击与状态动态同步
+- fences 高度适应修复
+- 在 release 发布流程中自动刷新 Cargo.lock 并纳入版本提交，杜绝遗漏
+
 ## [0.5.0](https://github.com/tierlabx/widget-rs/releases/tag/v0.5.0) - 2026-08-28
 
 ### Added
