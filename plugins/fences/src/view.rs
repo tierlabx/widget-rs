@@ -2,7 +2,7 @@ use gpui::*;
 use gpui_component::{Icon, IconName};
 
 use crate::dialog::open_add_dialog;
-use crate::item_card::render_item_card;
+use crate::item_card::{render_item_card, DraggedFenceItem};
 use crate::model::{FenceItem, FencesData, FencesModel};
 
 pub struct FencesWidget {
@@ -91,8 +91,8 @@ impl Render for FencesWidget {
                     .flex_1()
                     .min_h_0()
                     .size_full()
-                    .p(px(8.0))
-                    .gap(px(8.0))
+                    .p(px(6.0))
+                    .gap(px(6.0))
                     .flex()
                     .flex_col()
                     .overflow_hidden()
@@ -136,8 +136,8 @@ impl Render for FencesWidget {
                                     .items_center()
                                     .justify_between()
                                     .w_full()
-                                    .px(px(10.0))
-                                    .py(px(6.0))
+                                    .px(px(8.0))
+                                    .py(px(5.0))
                                     .cursor_pointer()
                                     .bg(rgba(0x00000035))
                                     .hover(|s| s.bg(rgba(0x38bdf815)))
@@ -154,7 +154,7 @@ impl Render for FencesWidget {
                                         div()
                                             .flex()
                                             .items_center()
-                                            .gap(px(6.0))
+                                            .gap(px(5.0))
                                             .child(
                                                 div().text_color(rgba(0xffffff70)).child(
                                                     Icon::new(if is_collapsed {
@@ -168,7 +168,7 @@ impl Render for FencesWidget {
                                             .child(
                                                 div()
                                                     .text_color(section_accent)
-                                                    .child(Icon::new(section_icon).size(px(14.0))),
+                                                    .child(Icon::new(section_icon).size(px(13.0))),
                                             )
                                             .child(
                                                 div()
@@ -223,8 +223,30 @@ impl Render for FencesWidget {
                                 .flex_1()
                                 .min_h_0()
                                 .w_full()
-                                .p(px(8.0))
-                                .overflow_y_scroll();
+                                .p(px(6.0))
+                                .overflow_y_scroll()
+                                .drag_over::<DraggedFenceItem>(|s, _drag, _window, _cx| {
+                                    s.bg(rgba(0x38bdf812))
+                                })
+                                .on_drop(cx.listener(
+                                    move |this, drag: &DraggedFenceItem, _, cx| {
+                                        if let Some(src_cat) =
+                                            this.data.categories.get_mut(drag.cat_idx)
+                                        {
+                                            if drag.item_idx < src_cat.items.len() {
+                                                let moved_item =
+                                                    src_cat.items.remove(drag.item_idx);
+                                                if let Some(dst_cat) =
+                                                    this.data.categories.get_mut(cat_idx)
+                                                {
+                                                    dst_cat.items.push(moved_item);
+                                                    FencesModel::save(&this.data, cx);
+                                                    cx.notify();
+                                                }
+                                            }
+                                        }
+                                    },
+                                ));
 
                             if cat_items.is_empty() {
                                 content_div = content_div.child(
@@ -233,7 +255,7 @@ impl Render for FencesWidget {
                                         .flex()
                                         .items_center()
                                         .justify_center()
-                                        .py(px(14.0))
+                                        .py(px(10.0))
                                         .child(div().text_xs().text_color(rgba(0xffffff38)).child(
                                             match cat_idx {
                                                 0 => "拖拽应用程序或快捷方式到此处",
@@ -244,7 +266,7 @@ impl Render for FencesWidget {
                                 );
                             } else {
                                 content_div = content_div.child(
-                                    div().w_full().flex().flex_wrap().gap(px(8.0)).children(
+                                    div().w_full().flex().flex_wrap().gap(px(6.0)).children(
                                         cat_items.iter().enumerate().map(|(item_idx, item)| {
                                             render_item_card(item, cat_idx, item_idx, cx)
                                         }),
