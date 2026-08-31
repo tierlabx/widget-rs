@@ -9,11 +9,48 @@ pub fn spawn_hwnd_polling_task(cx: &mut App, store: Arc<Store>) {
     let store_for_hwnd = store;
     cx.spawn(async move |cx| {
         let mut id_hwnd: Vec<(String, isize)> = Vec::new();
+        let mut captured_main_hwnd = 0isize;
+
         for _ in 0..50 {
             cx.background_executor()
                 .timer(std::time::Duration::from_millis(100))
                 .await;
 
+            // 1. 尝试提取主窗口 HWND
+            if captured_main_hwnd == 0 {
+                captured_main_hwnd = cx
+                    .update(|cx| {
+                        let main_handle = cx
+                            .try_global::<WindowManager>()
+                            .and_then(|wm| wm.main_window);
+                        if let Some(h) = main_handle {
+                            h.update(cx, |_, win, _| {
+                                use raw_window_handle::HasWindowHandle;
+                                if let Ok(wh) = win.window_handle() {
+                                    if let raw_window_handle::RawWindowHandle::Win32(h) =
+                                        wh.as_raw()
+                                    {
+                                        return h.hwnd.get();
+                                    }
+                                }
+                                0isize
+                            })
+                            .unwrap_or(0)
+                        } else {
+                            0isize
+                        }
+                    })
+                    .unwrap_or(0);
+
+                if captured_main_hwnd != 0 {
+                    let _ = cx.update_global::<WindowManager, _>(|wm, _| {
+                        wm.main_hwnd = captured_main_hwnd;
+                    });
+                    println!("[main] 主窗口 HWND = {}", captured_main_hwnd);
+                }
+            }
+
+            // 2. 尝试提取所有插件窗口 HWND
             let plugin_handles: Vec<(String, AnyWindowHandle)> = match cx
                 .update_global::<WindowManager, _>(|wm, _| {
                     wm.widget_windows
@@ -25,7 +62,7 @@ pub fn spawn_hwnd_polling_task(cx: &mut App, store: Arc<Store>) {
                 Err(_) => return,
             };
 
-            let mut all_ready = true;
+            let mut all_ready = captured_main_hwnd != 0;
             id_hwnd.clear();
 
             for (id, h) in &plugin_handles {
@@ -51,7 +88,7 @@ pub fn spawn_hwnd_polling_task(cx: &mut App, store: Arc<Store>) {
                 }
             }
 
-            if all_ready && !id_hwnd.is_empty() {
+            if all_ready && (!plugin_handles.is_empty() || captured_main_hwnd != 0) {
                 break;
             }
         }
@@ -114,25 +151,32 @@ pub fn spawn_hwnd_polling_task(cx: &mut App, store: Arc<Store>) {
 
 pub fn spawn_tray_polling_task(
     cx: &mut App,
-    tray_icon: tray_icon::TrayIcon,
-    toggle_id: tray_icon::menu::MenuId,
-    quit_id: tray_icon::menu::MenuId,
+    tray_handles: crate::tray::TrayHandles,
     store: Arc<Store>,
 ) {
     let store_for_tray = store;
     cx.spawn(async move |cx| {
-        let _tray = tray_icon;
-        loop {
-            if let Ok(event) = MenuEvent::receiver().try_recv() {
-                if event.id == toggle_id {
-                    let next_visible = cx
-                        .update_global::<WindowManager, _>(|wm, _| wm.toggle_main_window_win32())
-                        .unwrap_or(true);
+        let _tray = tray_handles.tray_icon;
+        let toggle_item = tray_handles.toggle_item;
+        let toggle_id = tray_handles.toggle_id;
+        let quit_id = tray_handles.quit_id;
 
-                    let _ = cx.update_global::<widget_core::UIState, _>(|s, _| {
-                        s.is_visible = next_visible;
+        let mut last_click_time = std::time::Instant::now()
+            .checked_sub(std::time::Duration::from_secs(10))
+            .unwrap_or_else(std::time::Instant::now);
+        let mut last_visible = true;
+
+        loop {
+            // 1. 处理右键菜单事件
+            while let Ok(event) = MenuEvent::receiver().try_recv() {
+                if event.id == toggle_id {
+                    let next_visible = toggle_main_panel(&cx);
+                    last_visible = next_visible;
+                    toggle_item.set_text(if next_visible {
+                        "隐藏控制面板"
+                    } else {
+                        "显示控制面板"
                     });
-                    let _ = cx.update(|cx| cx.refresh_windows());
                 } else if event.id == quit_id {
                     let store_quit = Arc::clone(&store_for_tray);
                     let _ = cx.update_global::<WindowManager, _>(|wm, cx| {
@@ -148,27 +192,59 @@ pub fn spawn_tray_polling_task(
                     });
                     drop(_tray);
                     let _ = cx.update(|cx| cx.quit());
-                    break;
+                    return;
                 }
             }
 
-            if let Ok(tray_icon::TrayIconEvent::Click {
-                button,
-                button_state,
-                ..
-            }) = tray_icon::TrayIconEvent::receiver().try_recv()
-            {
-                if button == tray_icon::MouseButton::Left
-                    && button_state == tray_icon::MouseButtonState::Up
-                {
-                    let next_visible = cx
-                        .update_global::<WindowManager, _>(|wm, _| wm.toggle_main_window_win32())
-                        .unwrap_or(true);
+            // 2. 处理托盘图标点击事件（支持左键单击/双击切换）
+            while let Ok(tray_event) = tray_icon::TrayIconEvent::receiver().try_recv() {
+                match tray_event {
+                    tray_icon::TrayIconEvent::Click {
+                        button: tray_icon::MouseButton::Left,
+                        button_state: tray_icon::MouseButtonState::Up,
+                        ..
+                    } => {
+                        let now = std::time::Instant::now();
+                        if now.duration_since(last_click_time)
+                            > std::time::Duration::from_millis(250)
+                        {
+                            last_click_time = now;
+                            let next_visible = toggle_main_panel(&cx);
+                            last_visible = next_visible;
+                            toggle_item.set_text(if next_visible {
+                                "隐藏控制面板"
+                            } else {
+                                "显示控制面板"
+                            });
+                        }
+                    }
+                    _ => {}
+                }
+            }
 
+            // 3. 动态检测主窗口实际状态并同步菜单文字与全局状态（例如被用户点击关闭按钮隐藏时）
+            let (main_hwnd, is_wm_visible) = cx
+                .update_global::<WindowManager, _>(|wm, _| (wm.main_hwnd, wm.is_visible))
+                .unwrap_or((0, true));
+
+            if main_hwnd != 0 {
+                let actual_visible = unsafe {
+                    windows_sys::Win32::UI::WindowsAndMessaging::IsWindowVisible(main_hwnd) != 0
+                        && windows_sys::Win32::UI::WindowsAndMessaging::IsIconic(main_hwnd) == 0
+                };
+                if actual_visible != last_visible || actual_visible != is_wm_visible {
+                    last_visible = actual_visible;
                     let _ = cx.update_global::<widget_core::UIState, _>(|s, _| {
-                        s.is_visible = next_visible;
+                        s.is_visible = actual_visible;
                     });
-                    let _ = cx.update(|cx| cx.refresh_windows());
+                    let _ = cx.update_global::<WindowManager, _>(|wm, _| {
+                        wm.is_visible = actual_visible;
+                    });
+                    toggle_item.set_text(if actual_visible {
+                        "隐藏控制面板"
+                    } else {
+                        "显示控制面板"
+                    });
                 }
             }
 
@@ -178,4 +254,47 @@ pub fn spawn_tray_polling_task(
         }
     })
     .detach();
+}
+
+/// 辅助函数：切换主控制面板窗口显示/隐藏状态
+fn toggle_main_panel(cx: &AsyncApp) -> bool {
+    // 确保 main_hwnd 存在；若为 0 尝试即时从 main_window 句柄获取
+    let _ = cx.update(|cx| {
+        let (main_hwnd, main_handle) = cx
+            .try_global::<WindowManager>()
+            .map(|wm| (wm.main_hwnd, wm.main_window))
+            .unwrap_or((0, None));
+
+        if main_hwnd == 0 {
+            if let Some(h) = main_handle {
+                let extracted = h
+                    .update(cx, |_, win, _| {
+                        use raw_window_handle::HasWindowHandle;
+                        if let Ok(wh) = win.window_handle() {
+                            if let raw_window_handle::RawWindowHandle::Win32(hw) = wh.as_raw() {
+                                return hw.hwnd.get();
+                            }
+                        }
+                        0isize
+                    })
+                    .unwrap_or(0);
+                if extracted != 0 {
+                    cx.update_global::<WindowManager, _>(|wm, _| {
+                        wm.main_hwnd = extracted;
+                    });
+                }
+            }
+        }
+    });
+
+    let next_visible = cx
+        .update_global::<WindowManager, _>(|wm, _| wm.toggle_main_window_win32())
+        .unwrap_or(true);
+
+    let _ = cx.update_global::<widget_core::UIState, _>(|s, _| {
+        s.is_visible = next_visible;
+    });
+    let _ = cx.update(|cx| cx.refresh_windows());
+
+    next_visible
 }
