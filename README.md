@@ -6,6 +6,10 @@
 
 基于 **Rust + GPUI** 构建的轻量级、高性能桌面小部件系统，支持始终置顶、鼠标穿透、原生边缘磁吸、系统托盘驱动，以及完善的插件化扩展能力。
 
+<p align="center">
+  <img src="assets/screenshot.png" alt="Widget-RS Preview" width="100%">
+</p>
+
 ---
 
 ## 🌟 特性 (Features)
@@ -87,7 +91,7 @@ fn spawn_window(&self, cx: &mut App) -> AnyWindowHandle {
 ```
 6. 使用 CLI 将其添加到主程序中编译运行！
 
-> 详细的 API 说明和完整示例请参考 [插件开发指南](docs/PLUGIN_DEVELOPMENT.md)。
+> 详细的 API 说明和完整示例请参考 [插件开发指南](docs/插件开发指南.md)。
 
 ---
 
