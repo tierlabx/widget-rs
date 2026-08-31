@@ -1,3 +1,5 @@
+mod dialog;
+mod item_card;
 mod model;
 mod view;
 
