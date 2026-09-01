@@ -11,6 +11,9 @@ use gpui::*;
 
 pub fn render_settings_page(
     settings_tab: SettingsTab,
+    search_input: &Option<Entity<gpui_component::input::InputState>>,
+    collapsed_groups: [bool; 3],
+    anim_tokens: [u32; 3],
     cx: &mut Context<crate::main_window::MainWindow>,
 ) -> impl IntoElement {
     let right_content = match settings_tab {
@@ -38,7 +41,13 @@ pub fn render_settings_page(
         .flex_1()
         .size_full()
         .overflow_hidden()
-        .child(menu::render_settings_menu(settings_tab, cx))
+        .child(menu::render_settings_menu(
+            settings_tab,
+            search_input,
+            collapsed_groups,
+            anim_tokens,
+            cx,
+        ))
         .child(
             div()
                 .id("settings-page-scroll")

@@ -10,6 +10,8 @@ use crate::pages::widgets::render_widgets_content;
 use crate::sidebar::render_sidebar;
 use crate::titlebar::render_titlebar;
 
+use gpui_component::input::{InputEvent, InputState};
+
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub enum NavPage {
     Dashboard,
@@ -21,6 +23,9 @@ pub struct MainWindow {
     pub is_maximized: bool,
     pub nav_page: NavPage,
     pub settings_tab: SettingsTab,
+    pub settings_search_input: Option<Entity<InputState>>,
+    pub settings_collapsed_groups: [bool; 3],
+    pub settings_anim_tokens: [u32; 3],
 }
 
 impl Default for MainWindow {
@@ -35,12 +40,28 @@ impl MainWindow {
             is_maximized: false,
             nav_page: NavPage::Dashboard,
             settings_tab: SettingsTab::About,
+            settings_search_input: None,
+            settings_collapsed_groups: [false; 3],
+            settings_anim_tokens: [0; 3],
         }
     }
 }
 
 impl Render for MainWindow {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        if self.settings_search_input.is_none() {
+            let input = cx.new(|cx| InputState::new(window, cx).placeholder("搜索设置..."));
+            cx.subscribe(
+                &input,
+                |_this: &mut Self, _input: Entity<InputState>, event: &InputEvent, cx| {
+                    if let InputEvent::Change = event {
+                        cx.notify();
+                    }
+                },
+            )
+            .detach();
+            self.settings_search_input = Some(input);
+        }
         let is_visible = cx
             .try_global::<widget_core::UIState>()
             .is_none_or(|s| s.is_visible);
@@ -109,9 +130,14 @@ impl Render for MainWindow {
                             .gap(px(20.0))
                             .children(render_widgets_content(cx))
                             .into_any_element(),
-                        NavPage::Settings => {
-                            render_settings_page(settings_tab, cx).into_any_element()
-                        }
+                        NavPage::Settings => render_settings_page(
+                            settings_tab,
+                            &self.settings_search_input,
+                            self.settings_collapsed_groups,
+                            self.settings_anim_tokens,
+                            cx,
+                        )
+                        .into_any_element(),
                     }),
             );
 
