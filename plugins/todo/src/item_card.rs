@@ -149,11 +149,18 @@ pub fn render_todo_item<V: 'static>(
                     .px(px(8.0))
                     .py(px(7.0))
                     .gap(px(6.0))
-                    .child(div().w(px(3.0)).h(px(20.0)).rounded_full().bg(if done {
-                        rgba(0xffffff30)
-                    } else {
-                        rgb(gantt.hex)
-                    }))
+                    .child(
+                        div()
+                            .w(px(3.0))
+                            .h(px(20.0))
+                            .flex_shrink_0()
+                            .rounded_full()
+                            .bg(if done {
+                                rgba(0xffffff30)
+                            } else {
+                                rgb(gantt.hex)
+                            }),
+                    )
                     .child(
                         div()
                             .w(px(16.0))
@@ -191,9 +198,11 @@ pub fn render_todo_item<V: 'static>(
                     .child(
                         div()
                             .flex_1()
+                            .min_w_0()
                             .flex()
                             .flex_col()
                             .gap(px(1.5))
+                            .overflow_hidden()
                             .child(
                                 div()
                                     .text_xs()
@@ -203,6 +212,7 @@ pub fn render_todo_item<V: 'static>(
                                     } else {
                                         rgb(0xf8fafc)
                                     })
+                                    .truncate()
                                     .when(done, |d: Div| d.line_through())
                                     .child(text),
                             )
@@ -210,13 +220,15 @@ pub fn render_todo_item<V: 'static>(
                                 reminder_text.is_some()
                                     || (item_tag.is_some() && active_tag_id == "all"),
                                 |d| {
-                                    let mut row = div().flex().items_center().gap(px(4.0));
+                                    let mut row =
+                                        div().flex().flex_wrap().items_center().gap(px(4.0));
                                     if active_tag_id == "all" {
                                         if let Some(tag) = &item_tag {
                                             let tag_color =
                                                 &GANTT_COLORS[tag.gantt_color % GANTT_COLORS.len()];
                                             row = row.child(
                                                 div()
+                                                    .flex_shrink_0()
                                                     .px(px(4.0))
                                                     .py(px(0.5))
                                                     .rounded(px(3.0))
@@ -233,6 +245,7 @@ pub fn render_todo_item<V: 'static>(
                                     if let Some(r_text) = reminder_text {
                                         row = row.child(
                                             div()
+                                                .flex_shrink_0()
                                                 .flex()
                                                 .items_center()
                                                 .gap(px(2.0))
@@ -251,6 +264,7 @@ pub fn render_todo_item<V: 'static>(
                     )
                     .child(
                         div()
+                            .flex_shrink_0()
                             .flex()
                             .items_center()
                             .gap(px(2.0))
@@ -258,6 +272,7 @@ pub fn render_todo_item<V: 'static>(
                                 div()
                                     .w(px(18.0))
                                     .h(px(18.0))
+                                    .flex_shrink_0()
                                     .flex()
                                     .justify_center()
                                     .items_center()
@@ -286,6 +301,7 @@ pub fn render_todo_item<V: 'static>(
                                 div()
                                     .w(px(18.0))
                                     .h(px(18.0))
+                                    .flex_shrink_0()
                                     .flex()
                                     .justify_center()
                                     .items_center()
@@ -303,6 +319,7 @@ pub fn render_todo_item<V: 'static>(
                                 div()
                                     .w(px(18.0))
                                     .h(px(18.0))
+                                    .flex_shrink_0()
                                     .flex()
                                     .justify_center()
                                     .items_center()
