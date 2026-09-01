@@ -5,6 +5,7 @@ use gpui_component::IconName;
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum SettingsTab {
     General,
+    Logs,
     Shortcuts,
     About,
     Update,
@@ -61,6 +62,13 @@ pub fn render_settings_menu(
                             "启动与常规",
                             "settings-menu-general",
                             SettingsTab::General,
+                            current_tab,
+                            cx,
+                        ))
+                        .child(menu_sub_item(
+                            "运行日志",
+                            "settings-menu-logs",
+                            SettingsTab::Logs,
                             current_tab,
                             cx,
                         )),

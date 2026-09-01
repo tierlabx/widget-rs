@@ -1,10 +1,12 @@
 pub mod monitor;
+pub mod paths;
 mod widget_window;
 
 pub use monitor::{
     clamp_to_work_area, enumerate_monitors, find_best_monitor, get_saved_physical_bounds,
     resolve_plugin_bounds, MonitorInfo, Rect,
 };
+pub use paths::{get_data_dir, get_log_dir, get_project_dirs};
 pub use widget_window::{
     default_widget_window_options, default_widget_window_options_blurred, WidgetContent,
     WidgetWindow,

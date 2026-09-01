@@ -1,5 +1,5 @@
 use std::backtrace::Backtrace;
-use std::fs::{self, OpenOptions};
+use std::fs::OpenOptions;
 use std::io::Write;
 use std::path::PathBuf;
 
@@ -144,21 +144,7 @@ unsafe extern "system" fn unhandled_exception_filter(
 
 /// 获取崩溃日志主存储目录
 pub fn get_crash_log_dir() -> PathBuf {
-    if let Some(proj_dirs) = directories::ProjectDirs::from("com", "tierlabx", "widget-rs") {
-        let log_dir = proj_dirs.data_local_dir().join("logs");
-        if !log_dir.exists() {
-            let _ = fs::create_dir_all(&log_dir);
-        }
-        log_dir
-    } else {
-        let mut fallback = std::env::current_exe().unwrap_or_else(|_| PathBuf::from("."));
-        fallback.pop();
-        let log_dir = fallback.join("logs");
-        if !log_dir.exists() {
-            let _ = fs::create_dir_all(&log_dir);
-        }
-        log_dir
-    }
+    widget_core::get_log_dir()
 }
 
 /// 将崩溃报告写入本地日志文件，同时写入最新日志与带时间戳的历史归档

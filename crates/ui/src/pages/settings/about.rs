@@ -1,10 +1,9 @@
-use super::update_card::render_update_section;
 use crate::layout::{page_header, settings_card};
 use gpui::*;
 use gpui_component::IconName;
 
 pub fn render_about_settings(
-    cx: &mut Context<crate::main_window::MainWindow>,
+    _cx: &mut Context<crate::main_window::MainWindow>,
     include_header: bool,
 ) -> Vec<gpui::AnyElement> {
     let mut elements = Vec::new();
@@ -167,9 +166,6 @@ pub fn render_about_settings(
             )
             .into_any_element(),
     );
-
-    // 更新卡片
-    elements.push(render_update_section(cx).into_any_element());
 
     elements
 }

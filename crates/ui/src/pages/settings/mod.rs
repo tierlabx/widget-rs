@@ -1,5 +1,6 @@
 pub mod about;
 pub mod general;
+pub mod logs;
 pub mod menu;
 pub mod shortcuts;
 pub mod update_card;
@@ -14,6 +15,7 @@ pub fn render_settings_page(
 ) -> impl IntoElement {
     let right_content = match settings_tab {
         SettingsTab::General => general::render_general_settings(cx),
+        SettingsTab::Logs => logs::render_logs_settings(cx),
         SettingsTab::Shortcuts => shortcuts::render_shortcuts_settings(),
         SettingsTab::About => about::render_about_settings(cx, true),
         SettingsTab::Update => vec![
