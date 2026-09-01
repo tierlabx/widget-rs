@@ -11,7 +11,7 @@ mod system;
 mod tray;
 mod window;
 
-use config::store::Store;
+use config::Store;
 use gpui::*;
 use plugin::manager::PluginManager;
 use std::sync::Arc;

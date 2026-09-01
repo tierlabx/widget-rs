@@ -60,7 +60,7 @@ pub struct PluginConfig {
 }
 
 /// 应用全局配置（可被序列化存储）
-#[derive(Serialize, Deserialize, Debug, Clone, Default)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct AppConfig {
     #[serde(default)]
     pub auto_start: bool,
@@ -68,10 +68,22 @@ pub struct AppConfig {
     #[serde(default = "default_true")]
     pub auto_check_update: bool,
     /// 各插件位置，键为插件 ID，例如 "sticky_widget"
+    #[serde(default)]
     pub plugins: HashMap<String, PluginConfig>,
     /// 插件自定义数据
     #[serde(default)]
     pub plugin_data: HashMap<String, serde_json::Value>,
+}
+
+impl Default for AppConfig {
+    fn default() -> Self {
+        Self {
+            auto_start: false,
+            auto_check_update: true,
+            plugins: HashMap::new(),
+            plugin_data: HashMap::new(),
+        }
+    }
 }
 
 impl AppConfig {
