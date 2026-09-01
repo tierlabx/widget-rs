@@ -6,6 +6,26 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+## [0.7.2](https://github.com/tierlabx/widget-rs/releases/tag/v0.7.2) - 2026-09-01
+
+### Added
+
+- 程序栏目添加文件对话框默认定位到开始菜单目录
+- 增加静默启动设置功能并优化启动无闪烁隐藏逻辑
+- 设置菜单支持实时栏目搜索与平滑折叠展开动画
+- 控制面板新增运行日志栏目支持快速打开并清理关于页面冗余更新卡片
+- 增加崩溃日志捕获与本地持久化记录机制
+
+### Fixed
+
+- 修复待办项内容过多时右侧操作按钮被挤出的布局问题
+- 优化 fences 文件名悬浮完整显示与 todo 标签对比度颜色
+- 修复点击打开文件夹或程序导致的应用崩溃
+
+### Changed
+
+- 将配置持久化从 JSON 文件迁移至 SQLite 数据库
+
 ## [0.7.1](https://github.com/tierlabx/widget-rs/releases/tag/v0.7.1) - 2026-08-31
 
 ### Added
