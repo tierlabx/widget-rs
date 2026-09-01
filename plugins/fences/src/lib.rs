@@ -2,6 +2,8 @@ mod dialog;
 pub mod icon_extractor;
 mod item_card;
 mod model;
+#[cfg(test)]
+mod model_tests;
 mod section;
 mod view;
 

@@ -244,3 +244,72 @@ fn test_migrate_from_legacy_json() {
 
     let _ = fs::remove_dir_all(&temp_dir);
 }
+
+#[test]
+fn bench_sqlite_bulk_config_io() {
+    let temp_dir = create_test_dir();
+    let db_path = temp_dir.join("bench_config.db");
+    let store = Store::with_path(db_path);
+
+    let mut config = AppConfig::default();
+    for i in 0..20 {
+        config.plugins.insert(
+            format!("plugin_{i}"),
+            PluginConfig {
+                x: i as f32 * 10.0,
+                y: i as f32 * 10.0,
+                width: 300.0,
+                height: 400.0,
+                scale: 1.0,
+                phys_x: i as i32 * 10,
+                phys_y: i as i32 * 10,
+                phys_w: 300,
+                phys_h: 400,
+                always_on_top: true,
+                mouse_passthrough: false,
+                pinned_to_desktop: false,
+                loaded: true,
+                enabled: true,
+            },
+        );
+        config.plugin_data.insert(
+            format!("plugin_{i}"),
+            json!({
+                "key": format!("value_{i}"),
+                "numbers": [1, 2, 3, 4, 5],
+            }),
+        );
+    }
+
+    let iterations = 100;
+    let start_save = std::time::Instant::now();
+    for _ in 0..iterations {
+        store.save_config(&config);
+    }
+    let save_duration = start_save.elapsed();
+    println!(
+        "[性能测试] SQLite 连续保存 {iterations} 次多插件配置耗时: {:?}",
+        save_duration
+    );
+
+    let start_load = std::time::Instant::now();
+    for _ in 0..iterations {
+        let _ = store.load_config();
+    }
+    let load_duration = start_load.elapsed();
+    println!(
+        "[性能测试] SQLite 连续读取 {iterations} 次多插件配置耗时: {:?}",
+        load_duration
+    );
+
+    assert!(
+        save_duration.as_secs() < 5,
+        "100次批量写入应在合理时间内完成"
+    );
+    assert!(
+        load_duration.as_secs() < 2,
+        "100次批量读取应在合理时间内完成"
+    );
+
+    let _ = fs::remove_dir_all(&temp_dir);
+}

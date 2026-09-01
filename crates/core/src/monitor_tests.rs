@@ -85,4 +85,38 @@ mod tests {
         assert_eq!(clamped_y.0, 100);
         assert_eq!(clamped_y.1, 840); // 1040 - 200
     }
+
+    #[test]
+    fn bench_monitor_calculations() {
+        let monitor = MonitorInfo {
+            rc_monitor: Rect {
+                left: 0,
+                top: 0,
+                right: 3840,
+                bottom: 2160,
+            },
+            rc_work: Rect {
+                left: 0,
+                top: 0,
+                right: 3840,
+                bottom: 2100,
+            },
+            dpi_x: 192,
+            dpi_y: 192,
+            scale_factor: 2.0,
+            is_primary: true,
+        };
+
+        let iterations = 50_000;
+        let start = std::time::Instant::now();
+        for i in 0..iterations {
+            let _ = clamp_to_work_area(&monitor, i % 4000, (i * 2) % 2500, 400, 300);
+        }
+        let duration = start.elapsed();
+        println!(
+            "[性能测试] {iterations} 次高 DPI 屏幕边界限制计算耗时: {:?}",
+            duration
+        );
+        assert!(duration.as_millis() < 50, "50000次边界计算应在50ms内完成");
+    }
 }

@@ -1,4 +1,6 @@
 mod model;
+#[cfg(test)]
+mod model_tests;
 mod view;
 
 use gpui::*;

@@ -2,6 +2,8 @@ mod content_panel;
 mod item_card;
 mod item_detail;
 mod model;
+#[cfg(test)]
+mod model_tests;
 mod sidebar;
 mod tag_modal;
 mod timer;
