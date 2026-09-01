@@ -1,12 +1,14 @@
 use gpui::*;
 
-use crate::model::{ReminderRule, TodoItem, TodoTag, GANTT_COLORS};
+use crate::model::{ReminderPreset, ReminderRule, TodoItem, TodoTag, GANTT_COLORS};
 
 /// 渲染待办条目的展开详情设置面板
+#[allow(clippy::too_many_arguments)]
 pub fn render_item_detail<V: 'static>(
     idx: usize,
     item: &TodoItem,
     all_tags: &[TodoTag],
+    reminder_presets: &[ReminderPreset],
     on_change_tag: impl Fn(&mut V, &mut Window, &mut Context<V>, usize, String) + 'static + Clone,
     on_set_reminder: impl Fn(&mut V, &mut Window, &mut Context<V>, usize, Option<ReminderRule>)
         + 'static
@@ -117,110 +119,36 @@ pub fn render_item_detail<V: 'static>(
                                 }))
                                 .child("无")
                         })
-                        .child({
+                        .children(reminder_presets.iter().enumerate().map(|(p_idx, preset)| {
                             let on_rem = on_set_reminder.clone();
-                            let now = std::time::SystemTime::now()
-                                .duration_since(std::time::UNIX_EPOCH)
-                                .unwrap_or_default()
-                                .as_secs();
+                            let preset_clone = preset.clone();
+                            let preset_id = preset.id.clone();
+                            let label = preset.label.clone();
+                            let color_hex = match p_idx % 4 {
+                                0 => (0x38bdf8, 0x38bdf818, 0x38bdf835),
+                                1 => (0x34d399, 0x34d39918, 0x34d39935),
+                                2 => (0xa78bfa, 0xa78bfa18, 0xa78bfa35),
+                                _ => (0xfb923c, 0xfb923c20, 0xfb923c40),
+                            };
+
                             div()
                                 .px(px(5.0))
                                 .py(px(1.5))
                                 .rounded(px(3.0))
                                 .cursor_pointer()
                                 .text_xs()
-                                .text_color(rgb(0x38bdf8))
-                                .bg(rgba(0x38bdf818))
-                                .hover(|s| s.bg(rgba(0x38bdf835)))
-                                .id(ElementId::Name(format!("todo-rem-30m-{idx}").into()))
+                                .text_color(rgb(color_hex.0))
+                                .bg(rgba(color_hex.1))
+                                .hover(move |s| s.bg(rgba(color_hex.2)))
+                                .id(ElementId::Name(
+                                    format!("todo-rem-{preset_id}-{idx}").into(),
+                                ))
                                 .on_click(cx.listener(move |this, _, window, cx| {
-                                    on_rem(
-                                        this,
-                                        window,
-                                        cx,
-                                        idx,
-                                        Some(ReminderRule::Once {
-                                            target_time_secs: now + 30 * 60,
-                                        }),
-                                    );
+                                    let rule = preset_clone.to_rule();
+                                    on_rem(this, window, cx, idx, Some(rule));
                                 }))
-                                .child("30分钟后")
-                        })
-                        .child({
-                            let on_rem = on_set_reminder.clone();
-                            div()
-                                .px(px(5.0))
-                                .py(px(1.5))
-                                .rounded(px(3.0))
-                                .cursor_pointer()
-                                .text_xs()
-                                .text_color(rgb(0x34d399))
-                                .bg(rgba(0x34d39918))
-                                .hover(|s| s.bg(rgba(0x34d39935)))
-                                .id(ElementId::Name(format!("todo-rem-daily-{idx}").into()))
-                                .on_click(cx.listener(move |this, _, window, cx| {
-                                    on_rem(
-                                        this,
-                                        window,
-                                        cx,
-                                        idx,
-                                        Some(ReminderRule::Daily {
-                                            minute_of_day: 18 * 60,
-                                        }),
-                                    );
-                                }))
-                                .child("每天 18:00")
-                        })
-                        .child({
-                            let on_rem = on_set_reminder.clone();
-                            div()
-                                .px(px(5.0))
-                                .py(px(1.5))
-                                .rounded(px(3.0))
-                                .cursor_pointer()
-                                .text_xs()
-                                .text_color(rgb(0xa78bfa))
-                                .bg(rgba(0xa78bfa18))
-                                .hover(|s| s.bg(rgba(0xa78bfa35)))
-                                .id(ElementId::Name(format!("todo-rem-weekly-{idx}").into()))
-                                .on_click(cx.listener(move |this, _, window, cx| {
-                                    on_rem(
-                                        this,
-                                        window,
-                                        cx,
-                                        idx,
-                                        Some(ReminderRule::Weekly {
-                                            weekday: 5,
-                                            minute_of_day: 17 * 60,
-                                        }),
-                                    );
-                                }))
-                                .child("周五 17:00")
-                        })
-                        .child({
-                            let on_rem = on_set_reminder.clone();
-                            div()
-                                .px(px(5.0))
-                                .py(px(1.5))
-                                .rounded(px(3.0))
-                                .cursor_pointer()
-                                .text_xs()
-                                .font_weight(FontWeight::MEDIUM)
-                                .text_color(rgb(0xfb923c))
-                                .bg(rgba(0xfb923c20))
-                                .hover(|s| s.bg(rgba(0xfb923c40)))
-                                .id(ElementId::Name(format!("todo-rem-loop30-{idx}").into()))
-                                .on_click(cx.listener(move |this, _, window, cx| {
-                                    on_rem(
-                                        this,
-                                        window,
-                                        cx,
-                                        idx,
-                                        Some(ReminderRule::Interval { interval_mins: 30 }),
-                                    );
-                                }))
-                                .child("每30分催办")
-                        }),
+                                .child(label)
+                        })),
                 ),
         )
         // 3. 甘特色系选择与创建时间

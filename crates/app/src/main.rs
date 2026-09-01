@@ -60,6 +60,7 @@ fn main() {
                 version: p.version(),
                 author: p.author(),
                 estimated_memory: p.estimated_memory(),
+                has_settings: p.has_settings(),
             })
             .collect::<Vec<_>>();
         cx.set_global(widget_core::PluginList(metadata_list));
@@ -182,6 +183,9 @@ fn main() {
                                 });
                             }
                             plugin.on_unload(cx);
+                            cx.defer(|_| {
+                                widget_core::trim_process_memory();
+                            });
                         }
                     }
                 }

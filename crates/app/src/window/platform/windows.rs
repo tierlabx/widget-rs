@@ -156,22 +156,11 @@ pub fn apply_always_on_top(
     widget_windows: &std::collections::HashMap<&'static str, (gpui::AnyWindowHandle, isize, isize)>,
     always_on_top: bool,
 ) {
-    use windows_sys::Win32::UI::WindowsAndMessaging::{
-        SetWindowPos, HWND_BOTTOM, HWND_TOPMOST, SWP_NOMOVE, SWP_NOSIZE,
-    };
     for (id, (_, hwnd, _)) in widget_windows {
-        if *hwnd == 0 {
-            continue;
+        if *hwnd != 0 {
+            widget_core::set_window_always_on_top(*hwnd, always_on_top);
+            println!("[WindowManager] 插件 {} 置顶: {}", id, always_on_top);
         }
-        unsafe {
-            let insert_after = if always_on_top {
-                HWND_TOPMOST
-            } else {
-                HWND_BOTTOM
-            };
-            SetWindowPos(*hwnd, insert_after, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE);
-        }
-        println!("[WindowManager] 插件 {} 置顶: {}", id, always_on_top);
     }
 }
 

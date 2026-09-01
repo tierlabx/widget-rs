@@ -37,6 +37,7 @@ pub fn spawn_todo_timer(
                 let local_secs = (now + 28800) % 86400;
                 let curr_minute_of_day = (local_secs / 60) as u32;
 
+                let tags = this.data().tags.clone();
                 let mut needs_save = false;
                 for item in &mut this.data_mut().items {
                     if item.done {
@@ -77,6 +78,19 @@ pub fn spawn_todo_timer(
                         if should_remind {
                             item.last_reminded_at = Some(now);
                             needs_save = true;
+
+                            let tag_name = tags
+                                .iter()
+                                .find(|t| t.id == item.tag_id)
+                                .map(|t| t.name.as_str());
+
+                            let title = if let Some(tag) = tag_name {
+                                format!("待办事项提醒 · {tag}")
+                            } else {
+                                "待办事项提醒".to_string()
+                            };
+                            let body = item.text.clone();
+                            crate::notification::send_todo_notification(&title, &body);
                         }
                     }
                 }

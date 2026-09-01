@@ -4,13 +4,14 @@ use gpui_component::input::{Input, InputState};
 use gpui_component::{Icon, IconName};
 
 use crate::item_detail::render_item_detail;
-use crate::model::{ReminderRule, TodoItem, TodoTag, GANTT_COLORS};
+use crate::model::{ReminderPreset, ReminderRule, TodoItem, TodoTag, GANTT_COLORS};
 
 /// 单条待办项的渲染参数
 pub struct ItemCardProps<'a> {
     pub idx: usize,
     pub item: &'a TodoItem,
     pub tags: &'a [TodoTag],
+    pub reminder_presets: &'a [ReminderPreset],
     pub active_tag_id: &'a str,
     pub is_editing: bool,
     pub is_expanded: bool,
@@ -344,6 +345,7 @@ pub fn render_todo_item<V: 'static>(
                     idx,
                     props.item,
                     &all_tags,
+                    props.reminder_presets,
                     move |this, window, cx, idx, tag_id| {
                         on_tag(this, window, cx, idx, tag_id);
                     },

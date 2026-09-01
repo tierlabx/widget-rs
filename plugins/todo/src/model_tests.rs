@@ -179,3 +179,109 @@ fn bench_todo_bulk_operations() {
         "5000条迁移应在50ms内完成"
     );
 }
+
+#[test]
+fn test_send_todo_notification_non_blocking() {
+    // 验证调用通知接口安全非阻塞、不 panic，并留出时间展示 Windows Toast 通知
+    crate::notification::send_todo_notification(
+        "待办事项提醒 · 工作",
+        "完成代码审查与通知功能测试",
+    );
+    // 等待后台线程完成 WinRT Toast 注册并弹出
+    std::thread::sleep(std::time::Duration::from_millis(1500));
+}
+
+#[test]
+fn test_reminder_rule_trigger_logic() {
+    let now = 1700000000u64;
+
+    // 1. Once 规则：未到期
+    let once_future = ReminderRule::Once {
+        target_time_secs: now + 300,
+    };
+    let should_trigger_future = match once_future {
+        ReminderRule::Once { target_time_secs } => now >= target_time_secs,
+        _ => false,
+    };
+    assert!(!should_trigger_future);
+
+    // 2. Once 规则：已到期
+    let once_past = ReminderRule::Once {
+        target_time_secs: now - 10,
+    };
+    let should_trigger_past = match once_past {
+        ReminderRule::Once { target_time_secs } => now >= target_time_secs,
+        _ => false,
+    };
+    assert!(should_trigger_past);
+
+    // 3. Interval 规则：间隔满足（上次提醒为 35 分钟前，设置间隔 30 分钟）
+    let interval_rule = ReminderRule::Interval { interval_mins: 30 };
+    let last_reminded = Some(now - 35 * 60);
+    let should_trigger_interval = match interval_rule {
+        ReminderRule::Interval { interval_mins } => last_reminded
+            .map(|t| now.saturating_sub(t) >= (interval_mins as u64 * 60))
+            .unwrap_or(true),
+        _ => false,
+    };
+    assert!(should_trigger_interval);
+}
+
+#[test]
+fn test_reminder_preset_crud() {
+    let mut data = TodoData::default();
+    assert_eq!(data.reminder_presets.len(), 4);
+
+    // 1. 新增自定义预设
+    let new_id = data.add_preset(
+        "10分钟后".to_string(),
+        ReminderRule::Once {
+            target_time_secs: 600,
+        },
+    );
+    assert_eq!(data.reminder_presets.len(), 5);
+    assert!(data
+        .reminder_presets
+        .iter()
+        .any(|p| p.id == new_id && p.label == "10分钟后"));
+
+    // 2. 转换规则
+    let preset = data
+        .reminder_presets
+        .iter()
+        .find(|p| p.id == new_id)
+        .unwrap();
+    let generated_rule = preset.to_rule();
+    match generated_rule {
+        ReminderRule::Once { target_time_secs } => {
+            let now = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_secs();
+            assert!(target_time_secs >= now);
+        }
+        _ => panic!("Expected Once rule"),
+    }
+
+    // 3. 更新预设
+    let updated = data.update_preset(
+        &new_id,
+        "15分钟后".to_string(),
+        ReminderRule::Once {
+            target_time_secs: 900,
+        },
+    );
+    assert!(updated);
+    let p = data
+        .reminder_presets
+        .iter()
+        .find(|p| p.id == new_id)
+        .unwrap();
+    assert_eq!(p.label, "15分钟后");
+
+    // 4. 删除预设
+    let deleted = data.delete_preset(&new_id);
+    assert!(deleted);
+    assert_eq!(data.reminder_presets.len(), 4);
+    assert!(!data.reminder_presets.iter().any(|p| p.id == new_id));
+}

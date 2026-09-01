@@ -1,7 +1,7 @@
 use crate::model::{StretchlyConfig, StretchlyStats};
 use gpui::prelude::FluentBuilder;
 use gpui::*;
-use raw_window_handle::{HasWindowHandle, RawWindowHandle};
+use raw_window_handle::HasWindowHandle;
 use widget_core::AppConfig;
 
 /// 设置页读取统计数据所用的全局信号
@@ -251,353 +251,309 @@ impl Render for StretchlySettingsView {
         }
         let stats = self.stats.clone();
 
-        div()
+        let content = div()
             .flex()
             .flex_col()
-            .size_full()
-            .bg(rgb(0x0d1117))
-            .border_1()
-            .border_color(rgb(0x30363d))
-            // ── 标题栏 ───────────────────────────────────────────────────────
+            .p(px(16.0))
+            .gap(px(6.0))
+            // ── 今日统计（置顶）──────────────────────────────
+            .child(Self::section_header("今日统计"))
             .child(
                 div()
-                    .flex()
-                    .justify_between()
-                    .items_center()
                     .w_full()
-                    .h(px(46.0))
-                    .flex_shrink_0()
-                    .bg(rgb(0x161b22))
-                    .border_b_1()
-                    .border_color(rgb(0x30363d))
+                    .p(px(12.0))
+                    .rounded(px(8.0))
+                    .bg(rgba(0xffffff05u32))
+                    .flex()
+                    .flex_col()
+                    .gap(px(8.0))
                     .child(
                         div()
                             .flex()
-                            .flex_1()
+                            .justify_between()
                             .items_center()
-                            .h_full()
-                            .pl(px(16.0))
-                            .id("titlebar-drag")
-                            .on_mouse_down(MouseButton::Left, |_, win, _| {
-                                if let Ok(h) = win.window_handle() {
-                                    if let RawWindowHandle::Win32(h) = h.as_raw() {
-                                        unsafe {
-                                            windows_sys::Win32::UI::Input::KeyboardAndMouse::ReleaseCapture();
-                                            windows_sys::Win32::UI::WindowsAndMessaging::PostMessageW(
-                                                h.hwnd.get(),
-                                                windows_sys::Win32::UI::WindowsAndMessaging::WM_NCLBUTTONDOWN,
-                                                windows_sys::Win32::UI::WindowsAndMessaging::HTCAPTION
-                                                    as usize,
-                                                0,
-                                            );
-                                        }
-                                    }
-                                }
-                            })
                             .child(
                                 div()
-                                    .text_sm()
-                                    .font_weight(FontWeight::BOLD)
-                                    .text_color(rgb(0xe6edf3))
-                                    .child("休息提醒 - 设置"),
+                                    .flex()
+                                    .gap(px(16.0))
+                                    .child(Self::stat_chip(
+                                        "微休",
+                                        stats.mini_breaks_done,
+                                        rgb(0x00d992),
+                                    ))
+                                    .child(Self::stat_chip(
+                                        "长休",
+                                        stats.long_breaks_done,
+                                        rgb(0x38bdf8),
+                                    ))
+                                    .child(Self::stat_chip(
+                                        "跳过",
+                                        stats.breaks_skipped,
+                                        rgb(0xf87171),
+                                    ))
+                                    .child(Self::stat_chip(
+                                        "推迟",
+                                        stats.breaks_postponed,
+                                        rgb(0xfbbf24),
+                                    )),
+                            )
+                            .child(
+                                div()
+                                    .flex()
+                                    .flex_col()
+                                    .items_end()
+                                    .child(
+                                        div()
+                                            .text_xs()
+                                            .font_weight(FontWeight::BOLD)
+                                            .text_color(rgb(0x00d992))
+                                            .child(format!("{} 分钟", stats.focus_minutes)),
+                                    )
+                                    .child(
+                                        div()
+                                            .text_xs()
+                                            .text_color(rgba(0x94a3b870u32))
+                                            .child("专注时长"),
+                                    ),
                             ),
                     )
                     .child(
                         div()
                             .flex()
+                            .justify_between()
                             .items_center()
-                            .justify_center()
-                            .w(px(46.0))
-                            .h_full()
-                            .hover(|s| s.bg(rgb(0xe81123)).text_color(rgb(0xffffff)))
-                            .text_color(rgb(0x8b949e))
-                            .cursor_pointer()
-                            .id("close-btn")
-                            .on_click(|_, win, _| {
-                                if let Ok(_h) = win.window_handle() {
-                                    win.remove_window();
-                                }
-                            })
-                            .child(gpui_component::Icon::new(gpui_component::IconName::Close)),
-                    ),
-            )
-            // ── 内容区（可滚动，确保按钮始终可见）──────────────────────────
-            .child(
-                div()
-                    .id("settings-scroll")
-                    .flex_1()
-                    .overflow_y_scroll()
-                    .child(
-                        div()
-                            .flex()
-                            .flex_col()
-                            .p(px(16.0))
-                            .gap(px(6.0))
-                            // ── 今日统计（置顶）──────────────────────────────
-                            .child(Self::section_header("今日统计"))
+                            .child(div().text_xs().text_color(rgba(0x94a3b850u32)).child(
+                                if stats.date.is_empty() {
+                                    "今天".to_string()
+                                } else {
+                                    stats.date.clone()
+                                },
+                            ))
                             .child(
                                 div()
-                                    .w_full()
-                                    .p(px(12.0))
-                                    .rounded(px(8.0))
-                                    .bg(rgba(0xffffff05u32))
-                                    .flex()
-                                    .flex_col()
-                                    .gap(px(8.0))
-                                    .child(
-                                        div()
-                                            .flex()
-                                            .justify_between()
-                                            .items_center()
-                                            .child(
-                                                div()
-                                                    .flex()
-                                                    .gap(px(16.0))
-                                                    .child(Self::stat_chip("微休", stats.mini_breaks_done, rgb(0x00d992)))
-                                                    .child(Self::stat_chip("长休", stats.long_breaks_done, rgb(0x38bdf8)))
-                                                    .child(Self::stat_chip("跳过", stats.breaks_skipped, rgb(0xf87171)))
-                                                    .child(Self::stat_chip("推迟", stats.breaks_postponed, rgb(0xfbbf24))),
-                                            )
-                                            .child(
-                                                div()
-                                                    .flex()
-                                                    .flex_col()
-                                                    .items_end()
-                                                    .child(
-                                                        div()
-                                                            .text_xs()
-                                                            .font_weight(FontWeight::BOLD)
-                                                            .text_color(rgb(0x00d992))
-                                                            .child(format!("{} 分钟", stats.focus_minutes)),
-                                                    )
-                                                    .child(
-                                                        div()
-                                                            .text_xs()
-                                                            .text_color(rgba(0x94a3b870u32))
-                                                            .child("专注时长"),
-                                                    ),
-                                            ),
-                                    )
-                                    .child(
-                                        div()
-                                            .flex()
-                                            .justify_between()
-                                            .items_center()
-                                            .child(
-                                                div()
-                                                    .text_xs()
-                                                    .text_color(rgba(0x94a3b850u32))
-                                                    .child(if stats.date.is_empty() {
-                                                        "今天".to_string()
-                                                    } else {
-                                                        stats.date.clone()
-                                                    }),
-                                            )
-                                            .child(
-                                                div()
-                                                    .id("reset-stats-btn")
-                                                    .px(px(10.0))
-                                                    .py(px(3.0))
-                                                    .rounded(px(4.0))
-                                                    .border_1()
-                                                    .border_color(rgba(0xffffff15u32))
-                                                    .bg(rgba(0xffffff08u32))
-                                                    .hover(|s| s.bg(rgba(0xf8717130u32)))
-                                                    .cursor_pointer()
-                                                    .text_xs()
-                                                    .text_color(rgba(0xf8717180u32))
-                                                    .child("重置")
-                                                    .on_click(cx.listener(|_this, _, _, cx| {
-                                                        cx.set_global(StretchlyLiveStats(
-                                                            StretchlyStats::default(),
-                                                        ));
-                                                        cx.notify();
-                                                    })),
-                                            ),
-                                    ),
-                            )
-                            // ── 工作节奏 ──────────────────────────────────────
-                            .child(Self::section_header("工作节奏"))
-                            .child(self.render_number_input(
-                                "mini-int",
-                                "微休间隔",
-                                "分钟",
-                                mini_break_interval,
-                                60,
-                                1, 60, 1,
-                                cx,
-                                |this, val, cx| {
-                                    this.config.mini_break_interval = val;
-                                    cx.notify();
-                                },
-                            ))
-                            .child(self.render_number_input(
-                                "mini-dur",
-                                "微休时长",
-                                "秒",
-                                mini_break_duration,
-                                1,
-                                5, 120, 5,
-                                cx,
-                                |this, val, cx| {
-                                    this.config.mini_break_duration = val;
-                                    cx.notify();
-                                },
-                            ))
-                            .child(self.render_number_input(
-                                "long-int",
-                                "长休间隔",
-                                "分钟",
-                                long_break_interval,
-                                60,
-                                10, 240, 10,
-                                cx,
-                                |this, val, cx| {
-                                    this.config.long_break_interval = val;
-                                    cx.notify();
-                                },
-                            ))
-                            .child(self.render_number_input(
-                                "long-dur",
-                                "长休时长",
-                                "分钟",
-                                long_break_duration,
-                                60,
-                                1, 60, 1,
-                                cx,
-                                |this, val, cx| {
-                                    this.config.long_break_duration = val;
-                                    cx.notify();
-                                },
-                            ))
-                            // ── 交互行为 ──────────────────────────────────────
-                            .child(Self::section_header("交互行为"))
-                            .child(self.render_number_input(
-                                "warning",
-                                "预警时间",
-                                "秒（休息前多少秒显示预警）",
-                                warning_seconds,
-                                1,
-                                0, 120, 10,
-                                cx,
-                                |this, val, cx| {
-                                    this.config.warning_seconds = val;
-                                    cx.notify();
-                                },
-                            ))
-                            .child(self.render_number_input(
-                                "skip-delay",
-                                "跳过保护",
-                                "秒（休息开始后多少秒内禁止跳过）",
-                                skip_delay_seconds,
-                                1,
-                                0, 30, 1,
-                                cx,
-                                |this, val, cx| {
-                                    this.config.skip_delay_seconds = val;
-                                    cx.notify();
-                                },
-                            ))
-                            .child(self.render_number_input(
-                                "postpone",
-                                "推迟时长",
-                                "分钟（点击推迟后延后多久）",
-                                postpone_minutes,
-                                1,
-                                1, 30, 1,
-                                cx,
-                                |this, val, cx| {
-                                    this.config.postpone_minutes = val;
-                                    cx.notify();
-                                },
-                            ))
-                            .child(self.render_toggle(
-                                "allow-skip",
-                                "允许跳过",
-                                "是否允许手动跳过当前休息",
-                                allow_skip,
-                                cx,
-                                |this, val, cx| {
-                                    this.config.allow_skip = val;
-                                    cx.notify();
-                                }
-                            ))
-                            .child(self.render_toggle(
-                                "allow-postpone",
-                                "允许推迟",
-                                "是否允许推迟即将到来的休息",
-                                allow_postpone,
-                                cx,
-                                |this, val, cx| {
-                                    this.config.allow_postpone = val;
-                                    cx.notify();
-                                }
-                            ))
-                            // ── 按钮区 ────────────────────────────────────────
-                            .child(
-                                div()
-                                    .mt(px(14.0))
-                                    .pt(px(14.0))
-                                    .border_t_1()
-                                    .border_color(rgb(0x21262d))
-                                    .flex()
-                                    .flex_col()
-                                    .gap(px(8.0))
-                                    .child(
-                                        div()
-                                            .id("save-btn")
-                                            .w_full()
-                                            .py(px(10.0))
-                                            .flex()
-                                            .justify_center()
-                                            .rounded(px(7.0))
-                                            .bg(rgb(0x00d992))
-                                            .hover(|s| s.bg(rgba(0x00d992ccu32)))
-                                            .cursor_pointer()
-                                            .on_click(cx.listener(|this, _, win, cx| {
-                                                this.save(cx);
-                                                if let Ok(_h) = win.window_handle() {
-                                                    win.remove_window();
-                                                }
-                                            }))
-                                            .child(
-                                                div()
-                                                    .text_sm()
-                                                    .font_weight(FontWeight::BOLD)
-                                                    .text_color(rgb(0x050507))
-                                                    .child("保存并关闭"),
-                                            ),
-                                    )
-                                    .child(
-                                        div()
-                                            .id("apply-now-btn")
-                                            .w_full()
-                                            .py(px(9.0))
-                                            .flex()
-                                            .justify_center()
-                                            .rounded(px(7.0))
-                                            .border_1()
-                                            .border_color(rgba(0xf59e0b60u32))
-                                            .bg(rgba(0xf59e0b0du32))
-                                            .hover(|s| s.bg(rgba(0xf59e0b20u32)))
-                                            .cursor_pointer()
-                                            .on_click(cx.listener(|this, _, win, cx| {
-                                                this.save(cx);
-                                                cx.set_global(crate::StretchlyApplyNow(true));
-                                                if let Ok(_h) = win.window_handle() {
-                                                    win.remove_window();
-                                                }
-                                            }))
-                                            .child(
-                                                div()
-                                                    .text_sm()
-                                                    .font_weight(FontWeight::MEDIUM)
-                                                    .text_color(rgb(0xf59e0b))
-                                                    .child("立即生效（重置计时器）"),
-                                            ),
-                                    ),
+                                    .id("reset-stats-btn")
+                                    .px(px(10.0))
+                                    .py(px(3.0))
+                                    .rounded(px(4.0))
+                                    .border_1()
+                                    .border_color(rgba(0xffffff15u32))
+                                    .bg(rgba(0xffffff08u32))
+                                    .hover(|s| s.bg(rgba(0xf8717130u32)))
+                                    .cursor_pointer()
+                                    .text_xs()
+                                    .text_color(rgba(0xf8717180u32))
+                                    .child("重置")
+                                    .on_click(cx.listener(|_this, _, _, cx| {
+                                        cx.set_global(
+                                            StretchlyLiveStats(StretchlyStats::default()),
+                                        );
+                                        cx.notify();
+                                    })),
                             ),
                     ),
             )
+            // ── 工作节奏 ──────────────────────────────────────
+            .child(Self::section_header("工作节奏"))
+            .child(self.render_number_input(
+                "mini-int",
+                "微休间隔",
+                "分钟",
+                mini_break_interval,
+                60,
+                1,
+                60,
+                1,
+                cx,
+                |this, val, cx| {
+                    this.config.mini_break_interval = val;
+                    cx.notify();
+                },
+            ))
+            .child(self.render_number_input(
+                "mini-dur",
+                "微休时长",
+                "秒",
+                mini_break_duration,
+                1,
+                5,
+                120,
+                5,
+                cx,
+                |this, val, cx| {
+                    this.config.mini_break_duration = val;
+                    cx.notify();
+                },
+            ))
+            .child(self.render_number_input(
+                "long-int",
+                "长休间隔",
+                "分钟",
+                long_break_interval,
+                60,
+                10,
+                240,
+                10,
+                cx,
+                |this, val, cx| {
+                    this.config.long_break_interval = val;
+                    cx.notify();
+                },
+            ))
+            .child(self.render_number_input(
+                "long-dur",
+                "长休时长",
+                "分钟",
+                long_break_duration,
+                60,
+                1,
+                60,
+                1,
+                cx,
+                |this, val, cx| {
+                    this.config.long_break_duration = val;
+                    cx.notify();
+                },
+            ))
+            // ── 交互行为 ──────────────────────────────────────
+            .child(Self::section_header("交互行为"))
+            .child(self.render_number_input(
+                "warning",
+                "预警时间",
+                "秒（休息前多少秒显示预警）",
+                warning_seconds,
+                1,
+                0,
+                120,
+                10,
+                cx,
+                |this, val, cx| {
+                    this.config.warning_seconds = val;
+                    cx.notify();
+                },
+            ))
+            .child(self.render_number_input(
+                "skip-delay",
+                "跳过保护",
+                "秒（休息开始后多少秒内禁止跳过）",
+                skip_delay_seconds,
+                1,
+                0,
+                30,
+                1,
+                cx,
+                |this, val, cx| {
+                    this.config.skip_delay_seconds = val;
+                    cx.notify();
+                },
+            ))
+            .child(self.render_number_input(
+                "postpone",
+                "推迟时长",
+                "分钟（点击推迟后延后多久）",
+                postpone_minutes,
+                1,
+                1,
+                30,
+                1,
+                cx,
+                |this, val, cx| {
+                    this.config.postpone_minutes = val;
+                    cx.notify();
+                },
+            ))
+            .child(self.render_toggle(
+                "allow-skip",
+                "允许跳过",
+                "是否允许手动跳过当前休息",
+                allow_skip,
+                cx,
+                |this, val, cx| {
+                    this.config.allow_skip = val;
+                    cx.notify();
+                },
+            ))
+            .child(self.render_toggle(
+                "allow-postpone",
+                "允许推迟",
+                "是否允许推迟即将到来的休息",
+                allow_postpone,
+                cx,
+                |this, val, cx| {
+                    this.config.allow_postpone = val;
+                    cx.notify();
+                },
+            ))
+            // ── 按钮区 ────────────────────────────────────────
+            .child(
+                div()
+                    .mt(px(14.0))
+                    .pt(px(14.0))
+                    .border_t_1()
+                    .border_color(rgb(0x21262d))
+                    .flex()
+                    .flex_col()
+                    .gap(px(8.0))
+                    .child(
+                        div()
+                            .id("save-btn")
+                            .w_full()
+                            .py(px(10.0))
+                            .flex()
+                            .justify_center()
+                            .rounded(px(7.0))
+                            .bg(rgb(0x00d992))
+                            .hover(|s| s.bg(rgba(0x00d992ccu32)))
+                            .cursor_pointer()
+                            .on_click(cx.listener(|this, _, win, cx| {
+                                this.save(cx);
+                                if let Ok(_h) = win.window_handle() {
+                                    win.remove_window();
+                                }
+                                cx.defer(|_| {
+                                    widget_core::trim_process_memory();
+                                });
+                            }))
+                            .child(
+                                div()
+                                    .text_sm()
+                                    .font_weight(FontWeight::BOLD)
+                                    .text_color(rgb(0x050507))
+                                    .child("保存并关闭"),
+                            ),
+                    )
+                    .child(
+                        div()
+                            .id("apply-now-btn")
+                            .w_full()
+                            .py(px(9.0))
+                            .flex()
+                            .justify_center()
+                            .rounded(px(7.0))
+                            .border_1()
+                            .border_color(rgba(0xf59e0b60u32))
+                            .bg(rgba(0xf59e0b0du32))
+                            .hover(|s| s.bg(rgba(0xf59e0b20u32)))
+                            .cursor_pointer()
+                            .on_click(cx.listener(|this, _, win, cx| {
+                                this.save(cx);
+                                cx.set_global(crate::StretchlyApplyNow(true));
+                                if let Ok(_h) = win.window_handle() {
+                                    win.remove_window();
+                                }
+                                cx.defer(|_| {
+                                    widget_core::trim_process_memory();
+                                });
+                            }))
+                            .child(
+                                div()
+                                    .text_sm()
+                                    .font_weight(FontWeight::MEDIUM)
+                                    .text_color(rgb(0xf59e0b))
+                                    .child("立即生效（重置计时器）"),
+                            ),
+                    ),
+            );
+
+        widget_core::render_settings_shell("休息提醒 - 设置", content)
     }
 }

@@ -14,6 +14,7 @@ pub fn render_widget_card(
     is_enabled: bool,
     always_on_top: bool,
     mouse_passthrough: bool,
+    has_settings: bool,
     kind: u8,
     estimated_memory: usize,
 ) -> impl IntoElement {
@@ -263,19 +264,11 @@ pub fn render_widget_card(
                                         p.always_on_top = !always_on_top;
                                     });
                                     let hwnd = widget_core::get_plugin_hwnd(plugin_id);
-                                    if hwnd != 0 {
-                                        unsafe {
-                                            use windows_sys::Win32::UI::WindowsAndMessaging::{
-                                                SetWindowPos, HWND_BOTTOM, HWND_TOPMOST, SWP_NOMOVE, SWP_NOSIZE,
-                                            };
-                                            let insert_after = if !always_on_top { HWND_TOPMOST } else { HWND_BOTTOM };
-                                            SetWindowPos(hwnd, insert_after, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE);
-                                        }
-                                    }
+                                    widget_core::set_window_always_on_top(hwnd, !always_on_top);
                                     widget_core::save_config_now(cx);
                                     cx.refresh_windows();
                                 })
-                                .child(div().text_sm().font_weight(FontWeight::MEDIUM).child("📌 置顶"))
+                                .child(div().text_sm().font_weight(FontWeight::MEDIUM).child("置顶"))
                         )
                         .child(
                             div()
@@ -317,14 +310,14 @@ pub fn render_widget_card(
                                     widget_core::save_config_now(cx);
                                     cx.refresh_windows();
                                 })
-                                .child(div().text_sm().font_weight(FontWeight::MEDIUM).child("👻 穿透"))
+                                .child(div().text_sm().font_weight(FontWeight::MEDIUM).child("穿透"))
                         )
                 )
                 .child(
                     div()
                         .flex()
                         .gap(px(8.0))
-                        .child(
+                        .children(has_settings.then(|| {
                             Button::new(("btn-settings", kind as usize), "")
                                 .variant(ButtonVariant::Ghost)
                                 .icon(gpui_component::IconName::Settings)
@@ -333,8 +326,8 @@ pub fn render_widget_card(
                                     if let Some(cb) = cb {
                                         cb.0(cx, plugin_id);
                                     }
-                                }),
-                        )
+                                })
+                        }))
                         .child(
                             Button::new(("btn-load", kind as usize), load_label)
                                 .variant(ButtonVariant::Outline)

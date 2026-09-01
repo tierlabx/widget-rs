@@ -81,20 +81,32 @@ impl ReminderRule {
     pub fn display_text(&self) -> String {
         match self {
             Self::Once { target_time_secs } => {
-                let now = std::time::SystemTime::now()
-                    .duration_since(std::time::UNIX_EPOCH)
-                    .unwrap_or_default()
-                    .as_secs();
-                if *target_time_secs <= now {
-                    "已到期".to_string()
-                } else {
-                    let diff_mins = (*target_time_secs - now) / 60;
+                // 如果 target_time_secs 是相对时长偏移（小于1年），显示为相对时长
+                if *target_time_secs < 86400 * 365 {
+                    let diff_mins = target_time_secs / 60;
                     if diff_mins < 60 {
                         format!("{} 分钟后", diff_mins.max(1))
                     } else {
                         let hours = diff_mins / 60;
                         let mins = diff_mins % 60;
                         format!("{}时{}分后", hours, mins)
+                    }
+                } else {
+                    let now = std::time::SystemTime::now()
+                        .duration_since(std::time::UNIX_EPOCH)
+                        .unwrap_or_default()
+                        .as_secs();
+                    if *target_time_secs <= now {
+                        "已到期".to_string()
+                    } else {
+                        let diff_mins = (*target_time_secs - now) / 60;
+                        if diff_mins < 60 {
+                            format!("{} 分钟后", diff_mins.max(1))
+                        } else {
+                            let hours = diff_mins / 60;
+                            let mins = diff_mins % 60;
+                            format!("{}时{}分后", hours, mins)
+                        }
                     }
                 }
             }
@@ -165,12 +177,77 @@ pub struct TodoItem {
     pub created_at: Option<String>,
 }
 
-/// 待办数据总集（包含任务与分类标签）
+/// 预设提醒规则
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+pub struct ReminderPreset {
+    pub id: String,
+    pub label: String,
+    pub rule: ReminderRule,
+}
+
+impl ReminderPreset {
+    pub fn to_rule(&self) -> ReminderRule {
+        match &self.rule {
+            ReminderRule::Once { target_time_secs } => {
+                let now = std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .unwrap_or_default()
+                    .as_secs();
+                if *target_time_secs < 86400 * 365 {
+                    ReminderRule::Once {
+                        target_time_secs: now + target_time_secs,
+                    }
+                } else {
+                    ReminderRule::Once {
+                        target_time_secs: *target_time_secs,
+                    }
+                }
+            }
+            other => other.clone(),
+        }
+    }
+}
+
+pub fn default_reminder_presets() -> Vec<ReminderPreset> {
+    vec![
+        ReminderPreset {
+            id: "preset-30m".to_string(),
+            label: "30分钟后".to_string(),
+            rule: ReminderRule::Once {
+                target_time_secs: 30 * 60,
+            },
+        },
+        ReminderPreset {
+            id: "preset-daily-18".to_string(),
+            label: "每天 18:00".to_string(),
+            rule: ReminderRule::Daily {
+                minute_of_day: 18 * 60,
+            },
+        },
+        ReminderPreset {
+            id: "preset-weekly-fri".to_string(),
+            label: "周五 17:00".to_string(),
+            rule: ReminderRule::Weekly {
+                weekday: 5,
+                minute_of_day: 17 * 60,
+            },
+        },
+        ReminderPreset {
+            id: "preset-interval-30".to_string(),
+            label: "每30分催办".to_string(),
+            rule: ReminderRule::Interval { interval_mins: 30 },
+        },
+    ]
+}
+
+/// 待办数据总集（包含任务、分类标签与提醒预设）
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct TodoData {
     pub active_tag_id: String,
     pub tags: Vec<TodoTag>,
     pub items: Vec<TodoItem>,
+    #[serde(default = "default_reminder_presets")]
+    pub reminder_presets: Vec<ReminderPreset>,
 }
 
 impl TodoData {
@@ -232,6 +309,43 @@ impl TodoData {
             false
         }
     }
+
+    /// 新增提醒预设
+    pub fn add_preset(&mut self, label: String, rule: ReminderRule) -> String {
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_secs();
+        let new_id = format!("preset-{}", now);
+        self.reminder_presets.push(ReminderPreset {
+            id: new_id.clone(),
+            label,
+            rule,
+        });
+        new_id
+    }
+
+    /// 更新提醒预设
+    #[allow(dead_code)]
+    pub fn update_preset(&mut self, preset_id: &str, label: String, rule: ReminderRule) -> bool {
+        if let Some(p) = self.reminder_presets.iter_mut().find(|p| p.id == preset_id) {
+            p.label = label;
+            p.rule = rule;
+            true
+        } else {
+            false
+        }
+    }
+
+    /// 删除提醒预设
+    pub fn delete_preset(&mut self, preset_id: &str) -> bool {
+        if let Some(pos) = self.reminder_presets.iter().position(|p| p.id == preset_id) {
+            self.reminder_presets.remove(pos);
+            true
+        } else {
+            false
+        }
+    }
 }
 
 impl Default for TodoData {
@@ -261,6 +375,7 @@ impl Default for TodoData {
                 },
             ],
             items: vec![],
+            reminder_presets: default_reminder_presets(),
         }
     }
 }

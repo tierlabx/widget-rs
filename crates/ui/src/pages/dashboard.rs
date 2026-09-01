@@ -177,7 +177,15 @@ pub fn render_dashboard_content(
                     |(i, (meta, loaded, enabled, top, pass, mem))| {
                         loaded.then(|| {
                             render_widget_card(
-                                meta.name, meta.id, meta.icon, loaded, enabled, top, pass, i as u8,
+                                meta.name,
+                                meta.id,
+                                meta.icon,
+                                loaded,
+                                enabled,
+                                top,
+                                pass,
+                                meta.has_settings,
+                                i as u8,
                                 mem,
                             )
                         })

@@ -4,6 +4,8 @@ mod item_detail;
 mod model;
 #[cfg(test)]
 mod model_tests;
+mod notification;
+mod settings_view;
 mod sidebar;
 mod tag_modal;
 mod timer;
@@ -12,6 +14,7 @@ mod view;
 use gpui::*;
 use widget_core::Plugin;
 
+use settings_view::TodoSettingsView;
 use view::TodoWidget;
 
 pub struct TodoWidgetPlugin;
@@ -52,6 +55,20 @@ impl Plugin for TodoWidgetPlugin {
         })
         .unwrap()
         .into()
+    }
+
+    fn build_settings_window(&self, cx: &mut App) {
+        let options = widget_core::default_settings_window_options(cx, (420.0, 560.0));
+
+        cx.open_window(options, |window, cx| {
+            let view = cx.new(|cx| TodoSettingsView::new(window, cx));
+            cx.new(|cx| gpui_component::Root::new(view, window, cx))
+        })
+        .unwrap();
+    }
+
+    fn has_settings(&self) -> bool {
+        true
     }
 }
 

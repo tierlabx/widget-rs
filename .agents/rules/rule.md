@@ -21,6 +21,10 @@ trigger: always_on
   - 插件的 UI 结构体必须实现 `widget_core::WidgetContent` trait（提供 `plugin_id()` 和 `drag_label()`）。
   - `spawn_window` 必须使用 `widget_core::default_widget_window_options()` 创建窗口选项，并通过 `WidgetWindow::new(content)` 包装内容。
   - 如有特殊需求（如条件隐藏拖拽条），通过覆盖 `show_drag_handle()` 方法实现，不要自行渲染拖拽条。
+- **插件设置弹窗规范**：
+  - 所有带有独立设置弹窗的插件，必须在 `Plugin::build_settings_window` 中使用 `widget_core::default_settings_window_options(cx, initial_size)` 创建窗口。
+  - 设置页面**必须**使用 `widget_core::render_settings_shell(title, content)` 统一包装，禁止在插件内手写标题栏拖拽逻辑、关闭按钮或外层滚动容器。
+  - 设置页内的区块标题与卡片**必须**使用 `widget_core::settings_section_header()` 和 `widget_core::settings_card()`，确保全局设置弹窗视觉风格与交互行为 100% 一致。
 
 ## 3. 控制面板 UI 开发规范
 - **模块化文件结构**（`crates/ui/src/`）：
@@ -57,3 +61,13 @@ trigger: always_on
 - **开发前防重复分析机制**：
   - 在开发或设计新功能前，**必须**先对代码库进行充分的搜索与分析，确认是否已经存在相似的模块或机制（如项目中的 `widget-cli` 已实现插件自动注册逻辑，`WidgetWindow` 已封装窗口通用行为）。
   - **严禁重复造轮子**。必须优先复用和增强已有机制，绝对不能忽视代码库中已经存在的解决方案而自行重新设计。
+
+## 5. 核心窗口能力保护规范 (Core Window Behaviors)
+- **Win+D 桌面常驻特性**：
+  - 桌面小组件的核心定位是“融入桌面”，用户按 `Win+D`（显示桌面）时，普通小组件**必须始终与桌面一同保留**，绝不能随普通应用程序被最小化或隐藏。
+  - 实现机制：必须在 `apply_plugin_window_styles` 中通过 `GWLP_HWNDPARENT` 将小组件挂载到系统 `Progman`（桌面窗口）。**严禁**在后续重构或修改中漏掉或移除此桌面绑定逻辑。
+- **置顶与取消置顶标准**：
+  - 置顶必须使用 `HWND_TOPMOST`（`-1`），取消置顶**必须**使用 `HWND_NOTOPMOST`（`-2`），**严禁**误用 `HWND_BOTTOM`（`1`）。
+  - 所有置顶/取消置顶操作必须统一调用 `widget_core::set_window_always_on_top(hwnd, is_top)`，避免重复手写 Win32 常量。
+- **透明/磨砂直通桌面通道**：
+  - 必须保留 `DwmExtendFrameIntoClientArea` 与 `SetWindowCompositionAttribute`，确保 DirectComposition 渲染管线透明通道直通壁纸，无原生白边与闪烁。

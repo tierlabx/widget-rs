@@ -38,7 +38,8 @@ pub fn apply_plugin_window_styles(hwnd: isize, id: &str, config: Option<&AppConf
                 & !(WS_EX_WINDOWEDGE as i32),
         );
 
-        // 3. 将 DWM 客户区玻璃拓展到全窗口（消除默认白色客户区，使 DirectComposition Alpha 直通桌面壁纸）
+        // 3. 【核心能力】将 DWM 客户区玻璃拓展到全窗口
+        // 消除默认白色客户区，使 DirectComposition Alpha 直通桌面壁纸，避免启动闪白与背景断层
         #[allow(non_camel_case_types)]
         #[repr(C)]
         struct MARGINS {
@@ -59,7 +60,8 @@ pub fn apply_plugin_window_styles(hwnd: isize, id: &str, config: Option<&AppConf
             &margins as *const _ as *const _,
         );
 
-        // 4. 彻底覆盖并清除 GPUI 注入的 ACCENT_ENABLE_TRANSPARENTGRADIENT
+        // 4. 【核心能力】彻底覆盖并清除 GPUI Windows 平台默认注入的 ACCENT_ENABLE_TRANSPARENTGRADIENT
+        // 确保插件自定义主题、便签多主题色卡与毛玻璃半透明背景 100% 准确呈现
         #[repr(C)]
         struct AccentPolicy {
             accent_state: u32,
@@ -113,27 +115,33 @@ pub fn apply_plugin_window_styles(hwnd: isize, id: &str, config: Option<&AppConf
             SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_FRAMECHANGED,
         );
 
-        // 5. 注入自定义窗口过程
+        // 5. 【核心能力 - 严禁删除/修改】将小部件挂载到系统 Progman 桌面窗口
+        // ─────────────────────────────────────────────────────────────────────────────
+        // 核心机制：小组件作为桌面部件，必须作为桌面窗口（Progman）的 Owned 窗口存在。
+        // 当用户按下 Win+D（显示桌面 / ToggleDesktop）时，系统会最小化所有普通应用程序并拉起桌面。
+        // 通过 GWLP_HWNDPARENT 将小部件绑定到 Progman 后，小部件会随桌面一同保留在屏幕上，
+        // 绝不会随普通软件被最小化隐藏。任何后续重构严禁移除此逻辑！
+        // ─────────────────────────────────────────────────────────────────────────────
+        let progman = windows_sys::Win32::UI::WindowsAndMessaging::FindWindowW(
+            windows_sys::core::w!("Progman"),
+            std::ptr::null(),
+        );
+        if progman != 0 {
+            use windows_sys::Win32::UI::WindowsAndMessaging::GWLP_HWNDPARENT;
+            SetWindowLongPtrW(hwnd, GWLP_HWNDPARENT, progman);
+        }
+
+        // 6. 注入自定义窗口过程
         let old_proc = SetWindowLongPtrW(hwnd, GWLP_WNDPROC, plugin_wnd_proc as *const () as isize);
         if old_proc != 0 {
             let procs = WND_PROCS.get_or_init(|| Mutex::new(std::collections::HashMap::new()));
             procs.lock().unwrap().insert(hwnd, old_proc);
         }
-    }
 
-    // 6. 恢复独立设置（置顶和鼠标穿透）
-    if let Some(cfg) = config {
-        if let Some(plugin_cfg) = cfg.plugins.get(id) {
-            unsafe {
-                use windows_sys::Win32::UI::WindowsAndMessaging::{
-                    SetWindowPos, HWND_BOTTOM, HWND_TOPMOST, SWP_NOMOVE, SWP_NOSIZE,
-                };
-                let insert_after = if plugin_cfg.always_on_top {
-                    HWND_TOPMOST
-                } else {
-                    HWND_BOTTOM
-                };
-                SetWindowPos(hwnd, insert_after, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE);
+        // 7. 【核心能力】恢复独立设置（置顶使用 HWND_TOPMOST/HWND_NOTOPMOST，鼠标穿透使用 WS_EX_TRANSPARENT）
+        if let Some(cfg) = config {
+            if let Some(plugin_cfg) = cfg.plugins.get(id) {
+                widget_core::set_window_always_on_top(hwnd, plugin_cfg.always_on_top);
 
                 if plugin_cfg.mouse_passthrough {
                     use windows_sys::Win32::UI::WindowsAndMessaging::{
@@ -149,9 +157,9 @@ pub fn apply_plugin_window_styles(hwnd: isize, id: &str, config: Option<&AppConf
                 }
             }
         }
-    }
 
-    0
+        progman
+    }
 }
 
 /// 移除小组件窗口的自定义样式，还原原生的窗口回调过程。

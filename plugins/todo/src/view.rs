@@ -241,6 +241,7 @@ impl Render for TodoWidget {
                     idx,
                     item,
                     tags: &tags,
+                    reminder_presets: &self.data.reminder_presets,
                     active_tag_id: &active_tag_id,
                     is_editing: editing_idx == Some(idx),
                     is_expanded: expanded_idx == Some(idx),

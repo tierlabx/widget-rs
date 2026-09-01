@@ -101,23 +101,17 @@ impl Plugin for StretchlyWidgetPlugin {
     }
 
     fn build_settings_window(&self, cx: &mut App) {
-        let options = WindowOptions {
-            titlebar: None,
-            window_background: WindowBackgroundAppearance::Opaque,
-            kind: WindowKind::PopUp,
-            is_resizable: true,
-            window_bounds: Some(WindowBounds::Windowed(Bounds::new(
-                Point::new(px(200.0), px(200.0)),
-                size(px(420.0), px(740.0)),
-            ))),
-            ..Default::default()
-        };
+        let options = widget_core::default_settings_window_options(cx, (420.0, 740.0));
 
         cx.open_window(options, |window, cx| {
             let view = cx.new(|cx| StretchlySettingsView::new(window, cx));
             cx.new(|cx| gpui_component::Root::new(view, window, cx))
         })
         .unwrap();
+    }
+
+    fn has_settings(&self) -> bool {
+        true
     }
 }
 

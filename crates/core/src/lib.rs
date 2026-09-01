@@ -1,5 +1,6 @@
 pub mod monitor;
 pub mod paths;
+mod settings_window;
 mod widget_window;
 
 pub use monitor::{
@@ -7,6 +8,10 @@ pub use monitor::{
     resolve_plugin_bounds, MonitorInfo, Rect,
 };
 pub use paths::{get_data_dir, get_log_dir, get_project_dirs};
+pub use settings_window::{
+    default_settings_window_options, render_settings_shell, render_settings_titlebar,
+    settings_card, settings_section_header,
+};
 pub use widget_window::{
     default_widget_window_options, default_widget_window_options_blurred, WidgetContent,
     WidgetWindow,
@@ -216,6 +221,11 @@ pub trait Plugin: Send + Sync {
 
     #[allow(unused_variables)]
     fn build_settings_window(&self, cx: &mut App) {}
+
+    /// 插件是否拥有独立的设置弹窗，默认为 false
+    fn has_settings(&self) -> bool {
+        false
+    }
 }
 
 #[derive(Clone)]
@@ -227,6 +237,7 @@ pub struct PluginMetadata {
     pub version: &'static str,
     pub author: &'static str,
     pub estimated_memory: usize,
+    pub has_settings: bool,
 }
 
 pub struct PluginList(pub Vec<PluginMetadata>);
@@ -330,5 +341,47 @@ pub fn update_window_edit_mode(window: &mut Window, is_edit_mode: bool) {
                 }
             }
         }
+    }
+}
+
+/// 主动触发系统级工作集内存修剪与物理内存归还
+///
+/// 在弹窗关闭、插件卸载或大资源释放后调用，
+/// 促使 Windows 页面管理器清空并回收进程中未使用的 Working Set 物理内存页。
+pub fn trim_process_memory() {
+    #[cfg(target_os = "windows")]
+    unsafe {
+        use windows_sys::Win32::System::ProcessStatus::EmptyWorkingSet;
+        use windows_sys::Win32::System::Threading::GetCurrentProcess;
+        EmptyWorkingSet(GetCurrentProcess());
+    }
+}
+
+/// 设置或取消窗口的系统级置顶状态（Always on Top）
+///
+/// 正确使用 Win32 API 的 `HWND_TOPMOST` 和 `HWND_NOTOPMOST`
+pub fn set_window_always_on_top(hwnd: isize, always_on_top: bool) {
+    if hwnd == 0 {
+        return;
+    }
+    #[cfg(target_os = "windows")]
+    unsafe {
+        use windows_sys::Win32::UI::WindowsAndMessaging::{
+            SetWindowPos, HWND_NOTOPMOST, HWND_TOPMOST, SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOSIZE,
+        };
+        let insert_after = if always_on_top {
+            HWND_TOPMOST
+        } else {
+            HWND_NOTOPMOST
+        };
+        SetWindowPos(
+            hwnd,
+            insert_after,
+            0,
+            0,
+            0,
+            0,
+            SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE,
+        );
     }
 }
