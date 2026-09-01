@@ -2,6 +2,7 @@ use std::sync::Arc;
 
 use gpui::prelude::FluentBuilder;
 use gpui::*;
+use gpui_component::tooltip::Tooltip;
 use gpui_component::{Icon, IconName};
 
 use crate::dialog::launch_item;
@@ -223,6 +224,8 @@ pub fn render_item_card(
     let preview_icon_color = visual.icon_color;
     let preview_native_icon = native_icon.clone();
 
+    let full_name = item.name.clone();
+
     div()
         .id(ElementId::Name(
             format!("fence-card-{cat_idx}-{item_idx}").into(),
@@ -235,6 +238,7 @@ pub fn render_item_card(
         .bg(visual.bg_color)
         .border_1()
         .border_color(rgba(0x38bdf825))
+        .tooltip(move |_window, cx| cx.new(|_cx| Tooltip::new(full_name.clone())).into())
         .hover(|s| s.bg(rgba(0x0f172ae8)).border_color(rgba(0x38bdf880)))
         .drag_over::<DraggedFenceItem>(|s, _drag, _window, _cx| {
             s.border_color(rgb(0x38bdf8)).bg(rgba(0x38bdf840))

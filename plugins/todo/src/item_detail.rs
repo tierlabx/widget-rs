@@ -50,17 +50,24 @@ pub fn render_item_detail<V: 'static>(
                         .rounded(px(3.0))
                         .cursor_pointer()
                         .text_xs()
+                        .font_weight(FontWeight::MEDIUM)
                         .text_color(if is_curr {
-                            rgb(0xffffff)
+                            tag_color.contrast_text()
                         } else {
-                            rgb(tag_color.hex)
+                            rgb(tag_color.hex).into()
                         })
                         .bg(if is_curr {
                             rgb(tag_color.hex)
                         } else {
                             rgba(tag_color.bg_alpha_hex)
                         })
-                        .hover(|s| s.opacity(0.8))
+                        .border_1()
+                        .border_color(if is_curr {
+                            rgb(tag_color.hex)
+                        } else {
+                            rgba(tag_color.hex | 0x45)
+                        })
+                        .hover(|s| s.opacity(0.85))
                         .id(ElementId::Name(format!("todo-tag-{idx}-{}", tag.id).into()))
                         .on_click(cx.listener(move |this, _, window, cx| {
                             on_tag(this, window, cx, idx, tag_id_clone.clone());

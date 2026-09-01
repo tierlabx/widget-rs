@@ -42,9 +42,9 @@ pub fn render_sidebar<V: 'static>(
                     FontWeight::NORMAL
                 })
                 .text_color(if is_active {
-                    rgb(0xffffff)
+                    rgb(0x0f172a)
                 } else {
-                    rgba(0xffffff80)
+                    rgba(0xffffffcc)
                 })
                 .bg(if is_active {
                     rgb(0x38bdf8)
@@ -53,7 +53,7 @@ pub fn render_sidebar<V: 'static>(
                 })
                 .border_1()
                 .border_color(if is_active {
-                    rgb(0x7dd3fc)
+                    rgb(0xbae6fd)
                 } else {
                     rgba(0xffffff15)
                 })
@@ -78,6 +78,7 @@ pub fn render_sidebar<V: 'static>(
             let tag_color = &GANTT_COLORS[tag.gantt_color % GANTT_COLORS.len()];
             let on_select = on_select_tag.clone();
             let on_edit = on_edit_tag.clone();
+            let contrast_text = tag_color.contrast_text();
 
             div()
                 .relative()
@@ -92,12 +93,12 @@ pub fn render_sidebar<V: 'static>(
                 .font_weight(if is_active {
                     FontWeight::BOLD
                 } else {
-                    FontWeight::NORMAL
+                    FontWeight::MEDIUM
                 })
                 .text_color(if is_active {
-                    rgb(0xffffff)
+                    contrast_text
                 } else {
-                    rgba(0xffffff85)
+                    rgba(0xffffffcc).into()
                 })
                 .bg(if is_active {
                     rgb(tag_color.hex)
@@ -137,9 +138,9 @@ pub fn render_sidebar<V: 'static>(
                         .h(px(4.0))
                         .rounded_full()
                         .bg(if is_active {
-                            rgb(0xffffff)
+                            contrast_text
                         } else {
-                            rgb(tag_color.hex)
+                            rgb(tag_color.hex).into()
                         }),
                 )
                 .child(tag.name.clone())

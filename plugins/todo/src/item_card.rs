@@ -221,8 +221,11 @@ pub fn render_todo_item<V: 'static>(
                                                     .py(px(0.5))
                                                     .rounded(px(3.0))
                                                     .text_xs()
+                                                    .font_weight(FontWeight::MEDIUM)
                                                     .text_color(rgb(tag_color.hex))
                                                     .bg(rgba(tag_color.bg_alpha_hex))
+                                                    .border_1()
+                                                    .border_color(rgba(tag_color.hex | 0x45))
                                                     .child(tag.name.clone()),
                                             );
                                         }

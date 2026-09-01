@@ -237,7 +237,7 @@ pub fn render_tag_modal<V: 'static>(
                                                     d.child(
                                                         Icon::new(IconName::Check)
                                                             .size(px(11.0))
-                                                            .text_color(rgb(0xffffff)),
+                                                            .text_color(c_obj.contrast_text()),
                                                     )
                                                 }),
                                         )

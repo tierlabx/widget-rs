@@ -11,36 +11,51 @@ pub struct GanttColor {
     pub bg_alpha_hex: u32,
 }
 
+impl GanttColor {
+    /// 计算以该色为纯色背景时的最佳文本前景色（浅底配深字，深底配白字）
+    pub fn contrast_text(&self) -> Hsla {
+        let r = ((self.hex >> 16) & 0xff) as f32;
+        let g = ((self.hex >> 8) & 0xff) as f32;
+        let b = (self.hex & 0xff) as f32;
+        let luminance = 0.299 * r + 0.587 * g + 0.114 * b;
+        if luminance > 150.0 {
+            rgb(0x0f172a).into()
+        } else {
+            rgb(0xffffff).into()
+        }
+    }
+}
+
 pub const GANTT_COLORS: &[GanttColor] = &[
     GanttColor {
         name: "标准蓝",
         hex: 0x38bdf8,
-        bg_alpha_hex: 0x38bdf825,
+        bg_alpha_hex: 0x38bdf830,
     }, // 天空蓝
     GanttColor {
         name: "进行绿",
         hex: 0x34d399,
-        bg_alpha_hex: 0x34d39925,
+        bg_alpha_hex: 0x34d39930,
     }, // 翡翠绿
     GanttColor {
         name: "核心紫",
         hex: 0xa78bfa,
-        bg_alpha_hex: 0xa78bfa25,
+        bg_alpha_hex: 0xa78bfa30,
     }, // 薰衣紫
     GanttColor {
         name: "关注橙",
         hex: 0xfb923c,
-        bg_alpha_hex: 0xfb923c25,
+        bg_alpha_hex: 0xfb923c30,
     }, // 活力橙
     GanttColor {
         name: "紧急红",
         hex: 0xf87171,
-        bg_alpha_hex: 0xf8717125,
+        bg_alpha_hex: 0xf8717130,
     }, // 珊瑚红
     GanttColor {
         name: "规划金",
         hex: 0xfacc15,
-        bg_alpha_hex: 0xfacc1525,
+        bg_alpha_hex: 0xfacc1530,
     }, // 日光金
 ];
 
