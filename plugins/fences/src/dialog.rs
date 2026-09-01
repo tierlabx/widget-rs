@@ -64,6 +64,9 @@ pub fn open_add_dialog(this_entity: WeakEntity<FencesWidget>, target_cat: usize,
              $f = New-Object System.Windows.Forms.OpenFileDialog; \
              $f.Title = '选择要收纳的程序或快捷方式'; \
              $f.Filter = '应用程序 (*.exe;*.lnk)|*.exe;*.lnk|所有文件 (*.*)|*.*'; \
+             $p = [Environment]::GetFolderPath('CommonPrograms'); \
+             if (-not (Test-Path $p)) { $p = [Environment]::GetFolderPath('Programs') }; \
+             $f.InitialDirectory = $p; \
              if($f.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK){ Write-Output $f.FileName }"
         } else {
             "[System.Reflection.Assembly]::LoadWithPartialName('System.Windows.Forms') | Out-Null; \
