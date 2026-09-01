@@ -3,34 +3,52 @@ use gpui::*;
 use crate::model::{FenceItem, FencesModel};
 use crate::view::FencesWidget;
 
-/// 打开选中的文件或文件夹（使用原生 ShellExecute API，杜绝控制台终端闪烁）
+/// 异步打开选中的文件或文件夹（在独立工作线程调用原生 ShellExecute API，杜绝主 UI 线程消息重入与控制台黑框）
 pub fn launch_item(path: &str) {
-    #[cfg(windows)]
-    {
-        use std::ffi::OsStr;
-        use std::os::windows::ffi::OsStrExt;
-        use windows_sys::Win32::UI::Shell::ShellExecuteW;
-        use windows_sys::Win32::UI::WindowsAndMessaging::SW_SHOWNORMAL;
+    if path.trim().is_empty() {
+        return;
+    }
+    let path = path.to_string();
+    std::thread::spawn(move || {
+        #[cfg(windows)]
+        {
+            use std::ffi::OsStr;
+            use std::os::windows::ffi::OsStrExt;
+            use windows_sys::Win32::System::Com::{
+                CoInitializeEx, CoUninitialize, COINIT_APARTMENTTHREADED, COINIT_DISABLE_OLE1DDE,
+            };
+            use windows_sys::Win32::UI::Shell::ShellExecuteW;
+            use windows_sys::Win32::UI::WindowsAndMessaging::SW_SHOWNORMAL;
 
-        let path_wide: Vec<u16> = OsStr::new(path).encode_wide().chain(Some(0)).collect();
-        let op_wide: Vec<u16> = OsStr::new("open").encode_wide().chain(Some(0)).collect();
+            // 针对 ShellExecute 线程初始化 STA COM 环境
+            let _ = unsafe {
+                CoInitializeEx(
+                    std::ptr::null_mut(),
+                    (COINIT_APARTMENTTHREADED | COINIT_DISABLE_OLE1DDE) as u32,
+                )
+            };
 
-        unsafe {
-            ShellExecuteW(
-                0,
-                op_wide.as_ptr(),
-                path_wide.as_ptr(),
-                std::ptr::null(),
-                std::ptr::null(),
-                SW_SHOWNORMAL,
-            );
+            let path_wide: Vec<u16> = OsStr::new(&path).encode_wide().chain(Some(0)).collect();
+            let op_wide: Vec<u16> = OsStr::new("open").encode_wide().chain(Some(0)).collect();
+
+            unsafe {
+                ShellExecuteW(
+                    0,
+                    op_wide.as_ptr(),
+                    path_wide.as_ptr(),
+                    std::ptr::null(),
+                    std::ptr::null(),
+                    SW_SHOWNORMAL,
+                );
+                CoUninitialize();
+            }
         }
-    }
 
-    #[cfg(not(windows))]
-    {
-        let _ = open::that(path);
-    }
+        #[cfg(not(windows))]
+        {
+            let _ = open::that(&path);
+        }
+    });
 }
 
 /// 打开添加文件/文件夹的对话框

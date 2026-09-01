@@ -2,6 +2,7 @@ mod dialog;
 pub mod icon_extractor;
 mod item_card;
 mod model;
+mod section;
 mod view;
 
 use gpui::*;
