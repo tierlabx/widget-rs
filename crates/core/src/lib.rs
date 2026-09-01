@@ -66,6 +66,9 @@ pub struct PluginConfig {
 pub struct AppConfig {
     #[serde(default)]
     pub auto_start: bool,
+    /// 启动时静默运行（不自动弹出控制面板）
+    #[serde(default)]
+    pub silent_start: bool,
     /// 应用启动时自动检查新版本
     #[serde(default = "default_true")]
     pub auto_check_update: bool,
@@ -81,6 +84,7 @@ impl Default for AppConfig {
     fn default() -> Self {
         Self {
             auto_start: false,
+            silent_start: false,
             auto_check_update: true,
             plugins: HashMap::new(),
             plugin_data: HashMap::new(),

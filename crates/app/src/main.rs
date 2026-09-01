@@ -33,7 +33,7 @@ fn main() {
     plugin::registry::register_all_plugins(&mut pm);
 
     // 3. 初始化系统托盘（包括托盘图标和菜单）
-    let tray_handles = tray::setup_tray().expect("系统托盘初始化失败");
+    let tray_handles = tray::setup_tray(app_config.silent_start).expect("系统托盘初始化失败");
 
     let app = Application::new().with_assets(assets::AppAssets);
     let store_for_app = Arc::clone(&store);

@@ -29,11 +29,16 @@ pub struct TrayHandles {
 ///
 /// # 返回值
 /// 成功时返回包含托盘句柄与菜单项引用的 `TrayHandles` 结构体。
-pub fn setup_tray() -> Result<TrayHandles, Box<dyn std::error::Error>> {
+pub fn setup_tray(silent_start: bool) -> Result<TrayHandles, Box<dyn std::error::Error>> {
     let tray_menu = Menu::new();
 
-    // 默认应用启动时主控制面板是可见的，因此初始文案为“隐藏控制面板”
-    let toggle_i = MenuItem::new("隐藏控制面板", true, None);
+    // 根据启动模式设定初始文案（静默启动时主面板隐藏，文案为“显示控制面板”）
+    let initial_toggle_text = if silent_start {
+        "显示控制面板"
+    } else {
+        "隐藏控制面板"
+    };
+    let toggle_i = MenuItem::new(initial_toggle_text, true, None);
     let quit_i = MenuItem::new("退出 Widget RS", true, None);
 
     let toggle_id = toggle_i.id().clone();

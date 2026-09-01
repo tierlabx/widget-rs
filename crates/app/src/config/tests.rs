@@ -24,6 +24,7 @@ fn test_default_config_loading() {
 
     let config = store.load_config();
     assert!(!config.auto_start);
+    assert!(!config.silent_start);
     assert!(config.auto_check_update);
     assert!(config.plugins.is_empty());
     assert!(config.plugin_data.is_empty());
@@ -37,9 +38,12 @@ fn test_sqlite_store_roundtrip() {
     let db_path = temp_dir.join("config.db");
     let store = Store::with_path(db_path.clone());
 
-    let mut initial_config = AppConfig::default();
-    initial_config.auto_start = true;
-    initial_config.auto_check_update = false;
+    let mut initial_config = AppConfig {
+        auto_start: true,
+        silent_start: true,
+        auto_check_update: false,
+        ..Default::default()
+    };
 
     let plugin_cfg = PluginConfig {
         x: 120.5,
@@ -75,6 +79,7 @@ fn test_sqlite_store_roundtrip() {
     // 2. 重新加载并校验
     let loaded = store.load_config();
     assert!(loaded.auto_start);
+    assert!(loaded.silent_start);
     assert!(!loaded.auto_check_update);
     let p = loaded.plugins.get("test_plugin").unwrap();
     assert_eq!(p.x, 120.5);

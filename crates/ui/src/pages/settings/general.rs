@@ -8,6 +8,9 @@ pub fn render_general_settings(
     let auto_start = cx
         .try_global::<widget_core::AppConfig>()
         .is_some_and(|c| c.auto_start);
+    let silent_start = cx
+        .try_global::<widget_core::AppConfig>()
+        .is_some_and(|c| c.silent_start);
 
     vec![
         div()
@@ -19,7 +22,7 @@ pub fn render_general_settings(
             .into_any_element(),
         settings_card()
             .child(
-                settings_row(false)
+                settings_row(true)
                     .child(
                         div()
                             .flex()
@@ -62,6 +65,38 @@ pub fn render_general_settings(
                         }
                         widget_core::save_config_now(cx);
                     })),
+            )
+            .child(
+                settings_row(false)
+                    .child(
+                        div()
+                            .flex()
+                            .flex_col()
+                            .gap(px(4.0))
+                            .child(
+                                div()
+                                    .text_base()
+                                    .font_weight(FontWeight::SEMIBOLD)
+                                    .text_color(rgb(0xf2f2f2))
+                                    .child("静默启动"),
+                            )
+                            .child(
+                                div()
+                                    .text_sm()
+                                    .text_color(rgb(0x8b949e))
+                                    .child("应用启动时在后台静默运行，不主动打开控制面板"),
+                            ),
+                    )
+                    .child(toggle_switch(
+                        "silent-start",
+                        silent_start,
+                        move |val, cx| {
+                            cx.update_global::<widget_core::AppConfig, _>(|c, _| {
+                                c.silent_start = val;
+                            });
+                            widget_core::save_config_now(cx);
+                        },
+                    )),
             )
             .into_any_element(),
     ]

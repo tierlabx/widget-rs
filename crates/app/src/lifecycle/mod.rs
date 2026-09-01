@@ -43,8 +43,18 @@ pub fn spawn_hwnd_polling_task(cx: &mut App, store: Arc<Store>) {
                     .unwrap_or(0);
 
                 if captured_main_hwnd != 0 {
-                    let _ = cx.update_global::<WindowManager, _>(|wm, _| {
+                    let _ = cx.update_global::<WindowManager, _>(|wm, cx| {
                         wm.main_hwnd = captured_main_hwnd;
+                        let config = cx.try_global::<widget_core::AppConfig>();
+                        if config.map(|c| c.silent_start).unwrap_or(false) {
+                            unsafe {
+                                windows_sys::Win32::UI::WindowsAndMessaging::ShowWindow(
+                                    captured_main_hwnd,
+                                    windows_sys::Win32::UI::WindowsAndMessaging::SW_HIDE,
+                                );
+                            }
+                            wm.is_visible = false;
+                        }
                     });
                     println!("[main] 主窗口 HWND = {}", captured_main_hwnd);
                 }
@@ -161,16 +171,24 @@ pub fn spawn_tray_polling_task(
         let toggle_id = tray_handles.toggle_id;
         let quit_id = tray_handles.quit_id;
 
+        let silent_start = cx
+            .update(|cx| {
+                cx.try_global::<widget_core::AppConfig>()
+                    .map(|c| c.silent_start)
+                    .unwrap_or(false)
+            })
+            .unwrap_or(false);
+
         let mut last_click_time = std::time::Instant::now()
             .checked_sub(std::time::Duration::from_secs(10))
             .unwrap_or_else(std::time::Instant::now);
-        let mut last_visible = true;
+        let mut last_visible = !silent_start;
 
         loop {
             // 1. 处理右键菜单事件
             while let Ok(event) = MenuEvent::receiver().try_recv() {
                 if event.id == toggle_id {
-                    let next_visible = toggle_main_panel(&cx);
+                    let next_visible = toggle_main_panel(cx);
                     last_visible = next_visible;
                     toggle_item.set_text(if next_visible {
                         "隐藏控制面板"
@@ -198,27 +216,23 @@ pub fn spawn_tray_polling_task(
 
             // 2. 处理托盘图标点击事件（支持左键单击/双击切换）
             while let Ok(tray_event) = tray_icon::TrayIconEvent::receiver().try_recv() {
-                match tray_event {
-                    tray_icon::TrayIconEvent::Click {
-                        button: tray_icon::MouseButton::Left,
-                        button_state: tray_icon::MouseButtonState::Up,
-                        ..
-                    } => {
-                        let now = std::time::Instant::now();
-                        if now.duration_since(last_click_time)
-                            > std::time::Duration::from_millis(250)
-                        {
-                            last_click_time = now;
-                            let next_visible = toggle_main_panel(&cx);
-                            last_visible = next_visible;
-                            toggle_item.set_text(if next_visible {
-                                "隐藏控制面板"
-                            } else {
-                                "显示控制面板"
-                            });
-                        }
+                if let tray_icon::TrayIconEvent::Click {
+                    button: tray_icon::MouseButton::Left,
+                    button_state: tray_icon::MouseButtonState::Up,
+                    ..
+                } = tray_event
+                {
+                    let now = std::time::Instant::now();
+                    if now.duration_since(last_click_time) > std::time::Duration::from_millis(250) {
+                        last_click_time = now;
+                        let next_visible = toggle_main_panel(cx);
+                        last_visible = next_visible;
+                        toggle_item.set_text(if next_visible {
+                            "隐藏控制面板"
+                        } else {
+                            "显示控制面板"
+                        });
                     }
-                    _ => {}
                 }
             }
 

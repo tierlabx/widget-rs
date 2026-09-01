@@ -142,6 +142,7 @@ impl Store {
                 for item in rows.flatten() {
                     match item.0.as_str() {
                         "auto_start" => config.auto_start = item.1.parse().unwrap_or(false),
+                        "silent_start" => config.silent_start = item.1.parse().unwrap_or(false),
                         "auto_check_update" => {
                             config.auto_check_update = item.1.parse().unwrap_or(true)
                         }
@@ -221,6 +222,10 @@ impl Store {
             stmt.execute(rusqlite::params![
                 "auto_start",
                 config.auto_start.to_string()
+            ])?;
+            stmt.execute(rusqlite::params![
+                "silent_start",
+                config.silent_start.to_string()
             ])?;
             stmt.execute(rusqlite::params![
                 "auto_check_update",

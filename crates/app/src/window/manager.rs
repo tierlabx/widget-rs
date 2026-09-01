@@ -38,8 +38,13 @@ impl WindowManager {
             }
         }
 
+        let silent_start = cx
+            .try_global::<AppConfig>()
+            .map(|c| c.silent_start)
+            .unwrap_or(false);
+
         cx.set_global(widget_core::UIState {
-            is_visible: true,
+            is_visible: !silent_start,
             is_edit_mode: false,
             plugin_loaded,
             plugin_enabled,
@@ -48,7 +53,7 @@ impl WindowManager {
             main_window: None,
             main_hwnd: 0,
             widget_windows: HashMap::new(),
-            is_visible: true,
+            is_visible: !silent_start,
         });
 
         let options = WindowOptions {
@@ -68,13 +73,46 @@ impl WindowManager {
 
         let window = cx
             .open_window(options, |window, cx| {
+                if silent_start {
+                    use raw_window_handle::HasWindowHandle;
+                    if let Ok(wh) = window.window_handle() {
+                        if let raw_window_handle::RawWindowHandle::Win32(h) = wh.as_raw() {
+                            unsafe {
+                                windows_sys::Win32::UI::WindowsAndMessaging::ShowWindow(
+                                    h.hwnd.get(),
+                                    windows_sys::Win32::UI::WindowsAndMessaging::SW_HIDE,
+                                );
+                            }
+                        }
+                    }
+                }
                 let view = cx.new(|_| MainWindow::new());
                 cx.new(|cx| gpui_component::Root::new(view, window, cx))
             })
             .unwrap();
 
+        let mut main_hwnd = 0isize;
+        let _ = window.update(cx, |_, win, _| {
+            use raw_window_handle::HasWindowHandle;
+            if let Ok(wh) = win.window_handle() {
+                if let raw_window_handle::RawWindowHandle::Win32(h) = wh.as_raw() {
+                    main_hwnd = h.hwnd.get();
+                }
+            }
+        });
+
+        if silent_start && main_hwnd != 0 {
+            unsafe {
+                windows_sys::Win32::UI::WindowsAndMessaging::ShowWindow(
+                    main_hwnd,
+                    windows_sys::Win32::UI::WindowsAndMessaging::SW_HIDE,
+                );
+            }
+        }
+
         cx.update_global::<Self, _>(|wm, _cx| {
             wm.main_window = Some(window);
+            wm.main_hwnd = main_hwnd;
         });
     }
 
