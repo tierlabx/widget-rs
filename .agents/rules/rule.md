@@ -71,3 +71,5 @@ trigger: always_on
   - 所有置顶/取消置顶操作必须统一调用 `widget_core::set_window_always_on_top(hwnd, is_top)`，避免重复手写 Win32 常量。
 - **透明/磨砂直通桌面通道**：
   - 必须保留 `DwmExtendFrameIntoClientArea` 与 `SetWindowCompositionAttribute`，确保 DirectComposition 渲染管线透明通道直通壁纸，无原生白边与闪烁。
+
+## 注意：我没有确保功能正常实现之前，不要提交git

@@ -5,6 +5,7 @@ mod model;
 #[cfg(test)]
 mod model_tests;
 mod notification;
+mod preset_editor;
 mod settings_view;
 mod sidebar;
 mod tag_modal;
