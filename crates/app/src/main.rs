@@ -20,6 +20,8 @@ use window::manager::WindowManager;
 fn main() {
     // 0. 初始化崩溃日志捕获机制（确保启动阶段及后续运行期的任何 panic/崩溃均能记录到本地文件）
     system::crash_handler::init_crash_handler();
+    // 0.1 注册 Windows 原生 AUMID（确保系统通知与任务栏识别为 "桌面小部件 (widget-rs)"）
+    system::aumid::init_app_user_model_id();
 
     // 1. 初始化存储和加载配置
     let store = Arc::new(Store::new());

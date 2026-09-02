@@ -10,17 +10,15 @@ pub fn send_todo_notification(title: &str, body: &str) {
     std::thread::spawn(move || {
         let mut notification = Notification::new();
         notification
-            .appname("widget-rs")
+            .appname("桌面小部件 (widget-rs)")
             .summary(&title_owned)
             .body(&body_owned)
             .sound_name("Default");
 
         #[cfg(target_os = "windows")]
         {
-            // Windows 系统需要已注册的 AUMID，使用系统通用 AUMID 确保 Toast 弹窗正常展示
-            notification.app_id(
-                "{1AC14E77-02E7-4E5D-B744-2EB1AE5198B7}\\WindowsPowerShell\\v1.0\\powershell.exe",
-            );
+            // Windows 系统使用已注册的 AUMID，确保 Toast 弹窗正常展示应用名称
+            notification.app_id("tierlabx.widget-rs");
         }
 
         if let Err(_err) = notification.show() {
@@ -57,7 +55,7 @@ fn send_windows_toast_fallback(title: &str, body: &str) {
          $xml = New-Object Windows.Data.Xml.Dom.XmlDocument;\
          $xml.LoadXml('<toast><visual><binding template=\"ToastGeneric\"><text>{safe_title}</text><text>{safe_body}</text></binding></visual><audio src=\"ms-winsoundevent:Notification.Default\"/></toast>');\
          $toast = [Windows.UI.Notifications.ToastNotification]::new($xml);\
-         [Windows.UI.Notifications.ToastNotificationManager]::CreateToastNotifier('{{1AC14E77-02E7-4E5D-B744-2EB1AE5198B7}}\\WindowsPowerShell\\v1.0\\powershell.exe').Show($toast);"
+         [Windows.UI.Notifications.ToastNotificationManager]::CreateToastNotifier('tierlabx.widget-rs').Show($toast);"
     );
 
     const CREATE_NO_WINDOW: u32 = 0x08000000;
