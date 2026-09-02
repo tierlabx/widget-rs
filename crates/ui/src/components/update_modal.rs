@@ -1,5 +1,8 @@
 use crate::components::button::{Button, ButtonVariant};
-use crate::update::{dismiss_update_modal, download_update, MainWindowUpdateBridge, UpdateStatus};
+use crate::update::{
+    apply_update_and_restart, dismiss_update_modal, download_update, MainWindowUpdateBridge,
+    UpdateStatus,
+};
 use gpui::*;
 use gpui_component::scroll::ScrollableElement;
 use gpui_component::IconName;
@@ -16,10 +19,12 @@ pub fn render_update_modal(cx: &mut App) -> Option<AnyElement> {
             version,
             download_url,
             release_notes,
+            is_installer,
         } => {
             let version_str = version.clone();
             let url = download_url.clone();
             let notes = release_notes.clone();
+            let installer_flag = *is_installer;
 
             Some(
                 div()
@@ -133,7 +138,7 @@ pub fn render_update_modal(cx: &mut App) -> Option<AnyElement> {
                                             .variant(ButtonVariant::Default)
                                             .icon(IconName::ArrowDown)
                                             .on_click(move |_, _, cx| {
-                                                download_update(url.clone(), cx);
+                                                download_update(url.clone(), installer_flag, cx);
                                             }),
                                     ),
                             ),
@@ -208,7 +213,7 @@ pub fn render_update_modal(cx: &mut App) -> Option<AnyElement> {
                                         div()
                                             .text_xs()
                                             .text_color(rgb(0x8b949e))
-                                            .child("请稍候，下载完成后将提示安装"),
+                                            .child("请稍候，下载完成后可直接重启完成更新"),
                                     )
                                     .child(
                                         Button::new("update-modal-hide", "后台下载")
@@ -222,8 +227,12 @@ pub fn render_update_modal(cx: &mut App) -> Option<AnyElement> {
                     .into_any_element(),
             )
         }
-        UpdateStatus::ReadyToInstall(path) => {
-            let path_clone = path.clone();
+        UpdateStatus::ReadyToRestart {
+            new_exe_path,
+            is_installer,
+        } => {
+            let path_clone = new_exe_path.clone();
+            let installer_flag = *is_installer;
             Some(
                 div()
                     .absolute()
@@ -249,13 +258,12 @@ pub fn render_update_modal(cx: &mut App) -> Option<AnyElement> {
                                     .text_lg()
                                     .font_weight(FontWeight::BOLD)
                                     .text_color(rgb(0xf2f2f2))
-                                    .child("安装包准备就绪"),
+                                    .child("新版本准备就绪"),
                             )
                             .child(
-                                div()
-                                    .text_sm()
-                                    .text_color(rgb(0x8b949e))
-                                    .child("新版本已下载完毕，点击下方按钮立即安装并重启应用。"),
+                                div().text_sm().text_color(rgb(0x8b949e)).child(
+                                    "新版本已准备完毕，点击下方按钮将自动安全更新并重启应用。",
+                                ),
                             )
                             .child(
                                 div()
@@ -265,20 +273,22 @@ pub fn render_update_modal(cx: &mut App) -> Option<AnyElement> {
                                     .gap(px(12.0))
                                     .pt(px(8.0))
                                     .child(
-                                        Button::new("update-modal-install-later", "稍后安装")
+                                        Button::new("update-modal-install-later", "稍后重启")
                                             .variant(ButtonVariant::Ghost)
                                             .on_click(|_, _, cx| {
                                                 dismiss_update_modal(cx);
                                             }),
                                     )
                                     .child(
-                                        Button::new("update-modal-install-now", "立即安装")
+                                        Button::new("update-modal-install-now", "重启并更新")
                                             .variant(ButtonVariant::Default)
                                             .icon(IconName::ArrowRight)
                                             .on_click(move |_, _, cx| {
-                                                let _ =
-                                                    std::process::Command::new(&path_clone).spawn();
-                                                cx.quit();
+                                                apply_update_and_restart(
+                                                    &path_clone,
+                                                    installer_flag,
+                                                    cx,
+                                                );
                                             }),
                                     ),
                             ),

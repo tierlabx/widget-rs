@@ -50,6 +50,7 @@ windows-sys = {
   ]
 }
 winres = "0.1"
+zip = { version = "2.2", default-features = false, features = ["deflate"] }
 
 [workspace.lints.clippy]
 too_many_arguments = "allow"

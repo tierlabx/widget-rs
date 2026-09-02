@@ -9,6 +9,7 @@ mod lifecycle;
 mod plugin;
 mod system;
 mod tray;
+mod updater;
 mod window;
 
 use config::Store;
@@ -18,6 +19,12 @@ use std::sync::Arc;
 use widget_core::AppConfig;
 use window::manager::WindowManager;
 fn main() {
+    let args: Vec<String> = std::env::args().collect();
+    if args.iter().any(|arg| arg == "--update-helper") {
+        updater::run_helper(&args);
+        return;
+    }
+
     // 0. 初始化崩溃日志捕获机制（确保启动阶段及后续运行期的任何 panic/崩溃均能记录到本地文件）
     system::crash_handler::init_crash_handler();
     // 0.1 注册 Windows 原生 AUMID（确保系统通知与任务栏识别为 "桌面小部件 (widget-rs)"）

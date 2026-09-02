@@ -1,6 +1,9 @@
 use crate::components::toggle::toggle_switch;
 use crate::layout::{section_title, settings_card, settings_row};
-use crate::update::{check_for_update, download_update, MainWindowUpdateBridge, UpdateStatus};
+use crate::update::{
+    apply_update_and_restart, check_for_update, download_update, MainWindowUpdateBridge,
+    UpdateStatus,
+};
 use gpui::*;
 use gpui_component::IconName;
 
@@ -39,17 +42,17 @@ pub fn render_update_section(cx: &mut Context<crate::main_window::MainWindow>) -
                                     div()
                                         .text_sm()
                                         .text_color(rgb(0x8b949e))
-                                        .child("应用启动时自动检查新版本"),
+                                        .child("启动时自动联网检查是否有新版本可用"),
                                 ),
                         )
                         .child(toggle_switch(
                             "auto-check-update",
                             auto_check_update,
-                            move |val, cx| {
+                            |val, cx| {
                                 cx.update_global::<widget_core::AppConfig, _>(|c, _| {
                                     c.auto_check_update = val;
                                 });
-                                widget_core::save_config_now(cx);
+                                cx.refresh_windows();
                             },
                         )),
                 )
@@ -67,30 +70,7 @@ pub fn render_update_section(cx: &mut Context<crate::main_window::MainWindow>) -
                                         .text_color(rgb(0xf2f2f2))
                                         .child("检查更新"),
                                 )
-                                .child(match update_status {
-                                    UpdateStatus::Idle
-                                    | UpdateStatus::Checking
-                                    | UpdateStatus::Downloading(_) => div()
-                                        .text_sm()
-                                        .text_color(rgb(0x8b949e))
-                                        .child("立即手动检查"),
-                                    UpdateStatus::Available { version, .. } => div()
-                                        .text_sm()
-                                        .text_color(rgb(0x00d992))
-                                        .child(format!("发现新版本: v{}", version)),
-                                    UpdateStatus::ReadyToInstall(_) => div()
-                                        .text_sm()
-                                        .text_color(rgb(0x00d992))
-                                        .child("下载完成，等待安装"),
-                                    UpdateStatus::UpToDate => div()
-                                        .text_sm()
-                                        .text_color(rgb(0x8b949e))
-                                        .child("已是最新版本"),
-                                    UpdateStatus::Error(e) => div()
-                                        .text_sm()
-                                        .text_color(rgb(0xe81123))
-                                        .child(format!("检查失败: {}", e)),
-                                }),
+                                .child(rarest_status_label(update_status)),
                         )
                         .child(match update_status {
                             UpdateStatus::Idle
@@ -116,7 +96,7 @@ pub fn render_update_section(cx: &mut Context<crate::main_window::MainWindow>) -
                                         .text_color(rgb(0x8b949e))
                                         .child(gpui_component::Icon::new(IconName::LoaderCircle)),
                                 )
-                                .child(div().text_sm().text_color(rgb(0xf2f2f2)).child("检查更新"))
+                                .child(mention_button_label("检查更新"))
                                 .into_any_element(),
                             UpdateStatus::Checking => div()
                                 .flex()
@@ -135,8 +115,13 @@ pub fn render_update_section(cx: &mut Context<crate::main_window::MainWindow>) -
                                 )
                                 .child(div().text_sm().text_color(rgb(0x8b949e)).child("检查中..."))
                                 .into_any_element(),
-                            UpdateStatus::Available { download_url, .. } => {
+                            UpdateStatus::Available {
+                                download_url,
+                                is_installer,
+                                ..
+                            } => {
                                 let url = download_url.clone();
+                                let installer_flag = *is_installer;
                                 div()
                                     .id("download-update-btn")
                                     .flex()
@@ -151,7 +136,7 @@ pub fn render_update_section(cx: &mut Context<crate::main_window::MainWindow>) -
                                     .cursor_pointer()
                                     .hover(|s| s.bg(rgba(0x00d99230)))
                                     .on_click(move |_, _, cx| {
-                                        download_update(url.clone(), cx);
+                                        download_update(url.clone(), installer_flag, cx);
                                     })
                                     .child(
                                         div()
@@ -190,8 +175,12 @@ pub fn render_update_section(cx: &mut Context<crate::main_window::MainWindow>) -
                                         .child(format!("下载中 {}%", percent)),
                                 )
                                 .into_any_element(),
-                            UpdateStatus::ReadyToInstall(path) => {
-                                let path_clone = path.clone();
+                            UpdateStatus::ReadyToRestart {
+                                new_exe_path,
+                                is_installer,
+                            } => {
+                                let path_clone = new_exe_path.clone();
+                                let installer_flag = *is_installer;
                                 div()
                                     .id("install-update-btn")
                                     .flex()
@@ -206,8 +195,7 @@ pub fn render_update_section(cx: &mut Context<crate::main_window::MainWindow>) -
                                     .cursor_pointer()
                                     .hover(|s| s.bg(rgba(0x00d99230)))
                                     .on_click(move |_, _, cx| {
-                                        let _ = std::process::Command::new(&path_clone).spawn();
-                                        cx.quit();
+                                        apply_update_and_restart(&path_clone, installer_flag, cx);
                                     })
                                     .child(
                                         div()
@@ -219,11 +207,40 @@ pub fn render_update_section(cx: &mut Context<crate::main_window::MainWindow>) -
                                             .text_sm()
                                             .text_color(rgb(0x00d992))
                                             .font_weight(FontWeight::BOLD)
-                                            .child("立即安装"),
+                                            .child("重启并更新"),
                                     )
                                     .into_any_element()
                             }
                         }),
                 ),
         )
+}
+
+fn mention_button_label(text: &'static str) -> impl IntoElement {
+    div().text_sm().text_color(rgb(0xf2f2f2)).child(text)
+}
+
+fn rarest_status_label(status: &UpdateStatus) -> impl IntoElement {
+    match status {
+        UpdateStatus::Idle | UpdateStatus::Checking | UpdateStatus::Downloading(_) => div()
+            .text_sm()
+            .text_color(rgb(0x8b949e))
+            .child("立即手动检查"),
+        UpdateStatus::Available { version, .. } => div()
+            .text_sm()
+            .text_color(rgb(0x00d992))
+            .child(format!("发现新版本: v{}", version)),
+        UpdateStatus::ReadyToRestart { .. } => div()
+            .text_sm()
+            .text_color(rgb(0x00d992))
+            .child("新版本已准备就绪"),
+        UpdateStatus::UpToDate => div()
+            .text_sm()
+            .text_color(rgb(0x8b949e))
+            .child("已是最新版本"),
+        UpdateStatus::Error(e) => div()
+            .text_sm()
+            .text_color(rgb(0xe81123))
+            .child(format!("检查失败: {}", e)),
+    }
 }

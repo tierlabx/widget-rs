@@ -39,7 +39,9 @@ jobs:
           wix extension add WixToolset.Util.wixext
         
       - name: Package Application
-        run: cargo packager --release -f nsis -f wix
+        run: |
+          cargo packager --release -f nsis -f wix
+          powershell -Command "Compress-Archive -Path target/release/widget-rs.exe -DestinationPath target/release/widget-rs-windows-x86_64.zip -Force"
 
       - name: Upload Artifacts
         uses: actions/upload-artifact@v4
@@ -48,6 +50,7 @@ jobs:
           path: |
             target/release/*-setup.exe
             target/release/*.msi
+            target/release/widget-rs-windows-x86_64.zip
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
@@ -56,4 +59,5 @@ jobs:
           files: |
             target/release/*-setup.exe
             target/release/*.msi
+            target/release/widget-rs-windows-x86_64.zip
 
