@@ -1,10 +1,22 @@
 use std::path::{Path, PathBuf};
 
-/// 获取图标缓存目录
+/// 获取图标缓存目录并确保容量健康（限制最多 100 个缓存图标）
 fn get_icon_cache_dir() -> PathBuf {
     let dir = std::env::temp_dir().join("widget_rs_fences_icons");
     if !dir.exists() {
         let _ = std::fs::create_dir_all(&dir);
+    } else if let Ok(entries) = std::fs::read_dir(&dir) {
+        let mut files: Vec<_> = entries
+            .filter_map(|e| e.ok())
+            .filter(|e| e.path().extension().is_some_and(|ext| ext == "png"))
+            .collect();
+        if files.len() > 100 {
+            files.sort_by_key(|e| e.metadata().and_then(|m| m.modified()).ok());
+            // 清理最旧的 30 个图标
+            for old_file in files.iter().take(30) {
+                let _ = std::fs::remove_file(old_file.path());
+            }
+        }
     }
     dir
 }

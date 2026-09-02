@@ -58,7 +58,10 @@ impl Store {
         conn.execute_batch(
             "PRAGMA journal_mode = WAL;
              PRAGMA synchronous = NORMAL;
-             PRAGMA foreign_keys = ON;",
+             PRAGMA foreign_keys = ON;
+             PRAGMA cache_size = -500;
+             PRAGMA temp_store = MEMORY;
+             PRAGMA mmap_size = 0;",
         )?;
         Ok(conn)
     }
