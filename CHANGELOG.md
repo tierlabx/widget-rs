@@ -6,6 +6,20 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+## [0.7.4](https://github.com/tierlabx/widget-rs/releases/tag/v0.7.4) - 2026-09-02
+
+### Added
+
+- 实现独立 Updater Helper 架构与免安装无缝重启更新
+- 待办事项设置面板增加保存并关闭按钮与发送测试通知功能
+
+### Fixed
+
+- 系统通知支持应用Logo与待办设置修改实时同步至桌面组件
+- 注册 Windows 原生 AUMID 消除系统通知显示为 PowerShell 的问题
+- 精简 SQLite 缓存参数与优化桌面整理图标容量管理
+- 修复内存剧烈抖动与小部件库无法获取安装的缺陷
+
 ## [0.7.3](https://github.com/tierlabx/widget-rs/releases/tag/v0.7.3) - 2026-09-01
 
 ### Added
