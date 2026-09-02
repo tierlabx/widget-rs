@@ -307,6 +307,9 @@ impl WindowManager {
             self.is_visible,
         );
         self.is_visible = next_visible;
+        if !next_visible {
+            widget_core::trim_process_memory();
+        }
         next_visible
     }
 

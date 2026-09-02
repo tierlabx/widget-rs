@@ -344,16 +344,18 @@ pub fn update_window_edit_mode(window: &mut Window, is_edit_mode: bool) {
     }
 }
 
-/// 主动触发系统级工作集内存修剪与物理内存归还
+extern "C" {
+    fn mi_collect(force: bool);
+}
+
+/// 主动触发进程闲置堆内存归还给操作系统内核
 ///
-/// 在弹窗关闭、插件卸载或大资源释放后调用，
-/// 促使 Windows 页面管理器清空并回收进程中未使用的 Working Set 物理内存页。
+/// 通过 mimalloc 的 `mi_collect(true)` 将已释放但缓存在内存池中的空闲页安全归还给 OS，
+/// 真实减少进程占用的物理工作集，同时避免了 Win32 `EmptyWorkingSet` 导致的剧烈缺页抖动。
 pub fn trim_process_memory() {
     #[cfg(target_os = "windows")]
     unsafe {
-        use windows_sys::Win32::System::ProcessStatus::EmptyWorkingSet;
-        use windows_sys::Win32::System::Threading::GetCurrentProcess;
-        EmptyWorkingSet(GetCurrentProcess());
+        mi_collect(true);
     }
 }
 

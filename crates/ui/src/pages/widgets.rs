@@ -121,8 +121,50 @@ fn market_plugin_card(
                     } else {
                         ButtonVariant::Default
                     })
-                    .on_click(|_, _, _| {
-                        // TODO: 实现安装逻辑
+                    .on_click(move |_, _, cx| {
+                        if is_loaded {
+                            return;
+                        }
+                        cx.update_global::<widget_core::UIState, _>(|s, _| {
+                            s.plugin_loaded.insert(id_str.to_string(), true);
+                            s.plugin_enabled.insert(id_str.to_string(), true);
+                        });
+
+                        cx.update_global::<widget_core::AppConfig, _>(|c, _| {
+                            let cfg = c.plugins.entry(id_str.to_string()).or_insert_with(|| {
+                                widget_core::PluginConfig {
+                                    x: 0.0,
+                                    y: 0.0,
+                                    width: 0.0,
+                                    height: 0.0,
+                                    scale: 1.0,
+                                    phys_x: 0,
+                                    phys_y: 0,
+                                    phys_w: 0,
+                                    phys_h: 0,
+                                    always_on_top: false,
+                                    mouse_passthrough: false,
+                                    pinned_to_desktop: false,
+                                    loaded: true,
+                                    enabled: true,
+                                }
+                            });
+                            cfg.loaded = true;
+                            cfg.enabled = true;
+                        });
+                        widget_core::save_config_now(cx);
+
+                        let plugin_id_string = id_str.to_string();
+                        if let Some(cb) = cx
+                            .try_global::<widget_core::TogglePluginCallback>()
+                            .cloned()
+                        {
+                            cx.defer(move |cx| {
+                                (cb.0)(cx, &plugin_id_string, true);
+                            });
+                        }
+
+                        cx.refresh_windows();
                     }),
             ),
         )
