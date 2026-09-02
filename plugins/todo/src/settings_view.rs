@@ -29,7 +29,9 @@ impl TodoSettingsView {
 
     pub fn save(&mut self, cx: &mut Context<Self>) {
         TodoModel::save(&self.data, cx);
+        cx.set_global(crate::TodoDataReloadTrigger(true));
         cx.notify();
+        cx.refresh_windows();
     }
 
     pub fn add_current_preset(&mut self, cx: &mut Context<Self>) {

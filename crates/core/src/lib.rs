@@ -7,7 +7,7 @@ pub use monitor::{
     clamp_to_work_area, enumerate_monitors, find_best_monitor, get_saved_physical_bounds,
     resolve_plugin_bounds, MonitorInfo, Rect,
 };
-pub use paths::{get_data_dir, get_log_dir, get_project_dirs};
+pub use paths::{get_app_icon_path, get_data_dir, get_log_dir, get_project_dirs};
 pub use settings_window::{
     default_settings_window_options, render_settings_shell, render_settings_titlebar,
     settings_card, settings_section_header,

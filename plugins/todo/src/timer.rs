@@ -33,6 +33,19 @@ pub fn spawn_todo_timer(
 
         let res = async_cx.update(|cx| {
             let _ = this_weak.update(cx, |this, cx| {
+                // 检测设置面板是否修改并保存了预设/标签数据
+                let should_reload = cx
+                    .try_global::<crate::TodoDataReloadTrigger>()
+                    .map(|t| t.0)
+                    .unwrap_or(false);
+                if should_reload {
+                    cx.set_global(crate::TodoDataReloadTrigger(false));
+                    let latest_data = TodoModel::load(cx);
+                    this.data_mut().reminder_presets = latest_data.reminder_presets;
+                    this.data_mut().tags = latest_data.tags;
+                    cx.notify();
+                }
+
                 let now = get_now_secs();
                 let local_secs = (now + 28800) % 86400;
                 let curr_minute_of_day = (local_secs / 60) as u32;

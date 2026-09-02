@@ -18,6 +18,9 @@ use widget_core::Plugin;
 use settings_view::TodoSettingsView;
 use view::TodoWidget;
 
+pub struct TodoDataReloadTrigger(pub bool);
+impl Global for TodoDataReloadTrigger {}
+
 pub struct TodoWidgetPlugin;
 
 impl Plugin for TodoWidgetPlugin {

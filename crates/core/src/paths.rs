@@ -39,3 +39,13 @@ pub fn get_data_dir() -> PathBuf {
         fallback
     }
 }
+
+/// 获取并确保应用高清图标文件存在（返回绝对路径）
+pub fn get_app_icon_path() -> PathBuf {
+    let icon_path = get_data_dir().join("app_icon.png");
+    if !icon_path.exists() {
+        const ICON_BYTES: &[u8] = include_bytes!("../../../assets/logos/icon.png");
+        let _ = fs::write(&icon_path, ICON_BYTES);
+    }
+    icon_path
+}

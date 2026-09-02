@@ -24,11 +24,9 @@ pub fn init_app_user_model_id() {
         if let Ok((key, _)) =
             hkcu.create_subkey("Software\\Classes\\AppUserModelId\\tierlabx.widget-rs")
         {
-            let _ = key.set_value("DisplayName", &"桌面小部件 (widget-rs)");
-            if let Ok(exe_path) = std::env::current_exe() {
-                let _ = key.set_value("IconUri", &exe_path.to_string_lossy().to_string());
-                let _ = key.set_value("IconBackgroundColor", &"0");
-            }
+            let icon_path = widget_core::get_app_icon_path();
+            let _ = key.set_value("IconUri", &icon_path.to_string_lossy().to_string());
+            let _ = key.set_value("IconBackgroundColor", &"0");
         }
     }
 }

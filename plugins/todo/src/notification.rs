@@ -8,11 +8,15 @@ pub fn send_todo_notification(title: &str, body: &str) {
     let body_owned = body.to_string();
 
     std::thread::spawn(move || {
+        let icon_path = widget_core::get_app_icon_path();
+        let icon_str = icon_path.to_string_lossy().to_string();
+
         let mut notification = Notification::new();
         notification
             .appname("桌面小部件 (widget-rs)")
             .summary(&title_owned)
             .body(&body_owned)
+            .icon(&icon_str)
             .sound_name("Default");
 
         #[cfg(target_os = "windows")]
@@ -24,7 +28,7 @@ pub fn send_todo_notification(title: &str, body: &str) {
         if let Err(_err) = notification.show() {
             #[cfg(target_os = "windows")]
             {
-                send_windows_toast_fallback(&title_owned, &body_owned);
+                send_windows_toast_fallback(&title_owned, &body_owned, &icon_str);
             }
             #[cfg(not(target_os = "windows"))]
             {
@@ -35,7 +39,7 @@ pub fn send_todo_notification(title: &str, body: &str) {
 }
 
 #[cfg(target_os = "windows")]
-fn send_windows_toast_fallback(title: &str, body: &str) {
+fn send_windows_toast_fallback(title: &str, body: &str, icon_path: &str) {
     use std::os::windows::process::CommandExt;
     use std::process::Command;
 
@@ -48,12 +52,16 @@ fn send_windows_toast_fallback(title: &str, body: &str) {
         .replace('&', "&amp;")
         .replace('<', "&lt;")
         .replace('>', "&gt;");
+    let safe_icon = icon_path
+        .replace('&', "&amp;")
+        .replace('<', "&lt;")
+        .replace('>', "&gt;");
 
     let script = format!(
         "[Windows.UI.Notifications.ToastNotificationManager, Windows.UI.Notifications, ContentType = WindowsRuntime] | Out-Null;\
          [Windows.Data.Xml.Dom.XmlDocument, Windows.Data.Xml.Dom.XmlDocument, ContentType = WindowsRuntime] | Out-Null;\
          $xml = New-Object Windows.Data.Xml.Dom.XmlDocument;\
-         $xml.LoadXml('<toast><visual><binding template=\"ToastGeneric\"><text>{safe_title}</text><text>{safe_body}</text></binding></visual><audio src=\"ms-winsoundevent:Notification.Default\"/></toast>');\
+         $xml.LoadXml('<toast><visual><binding template=\"ToastGeneric\"><image placement=\"appLogoOverride\" hint-crop=\"circle\" src=\"{safe_icon}\"/><text>{safe_title}</text><text>{safe_body}</text></binding></visual><audio src=\"ms-winsoundevent:Notification.Default\"/></toast>');\
          $toast = [Windows.UI.Notifications.ToastNotification]::new($xml);\
          [Windows.UI.Notifications.ToastNotificationManager]::CreateToastNotifier('tierlabx.widget-rs').Show($toast);"
     );
