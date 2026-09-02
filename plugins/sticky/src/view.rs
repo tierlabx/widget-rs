@@ -61,11 +61,12 @@ impl widget_core::WidgetContent for StickyWidget {
 
 impl Render for StickyWidget {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        // 确保在便签窗口中，Theme 文本颜色为深炭黑墨水色
-        gpui_component::Theme::global_mut(cx).colors.foreground = gpui::hsla(0.0, 0.0, 0.12, 1.0);
-        gpui_component::Theme::global_mut(cx)
-            .colors
-            .muted_foreground = gpui::hsla(0.0, 0.0, 0.40, 1.0);
+        // 确保在便签窗口中，Theme 文本、光标与选区颜色为深炭黑墨水色（防止深色主题下的白色光标在浅色便签上隐形）
+        let theme_mut = gpui_component::Theme::global_mut(cx);
+        theme_mut.colors.foreground = gpui::hsla(0.0, 0.0, 0.12, 1.0);
+        theme_mut.colors.muted_foreground = gpui::hsla(0.0, 0.0, 0.40, 1.0);
+        theme_mut.colors.caret = gpui::hsla(0.0, 0.0, 0.10, 1.0);
+        theme_mut.colors.selection = gpui::hsla(0.0, 0.0, 0.0, 0.15);
 
         if self.pending_input_reset {
             self.pending_input_reset = false;
@@ -358,11 +359,16 @@ impl Render for StickyWidget {
                 div()
                     .flex_1()
                     .w_full()
-                    .p(px(8.0))
+                    .min_h_0()
                     .overflow_hidden()
                     .text_sm()
                     .text_color(text_color)
-                    .child(Input::new(&new_input).appearance(false).bordered(false)),
+                    .child(
+                        Input::new(&new_input)
+                            .appearance(false)
+                            .bordered(false)
+                            .size_full(),
+                    ),
             )
     }
 }
