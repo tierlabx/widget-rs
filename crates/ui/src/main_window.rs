@@ -26,6 +26,8 @@ pub struct MainWindow {
     pub settings_search_input: Option<Entity<InputState>>,
     pub settings_collapsed_groups: [bool; 3],
     pub settings_anim_tokens: [u32; 3],
+    pub widgets_filter: crate::pages::widgets::WidgetsFilter,
+    pub widgets_anim_token: u32,
 }
 
 impl Default for MainWindow {
@@ -43,6 +45,8 @@ impl MainWindow {
             settings_search_input: None,
             settings_collapsed_groups: [false; 3],
             settings_anim_tokens: [0; 3],
+            widgets_filter: crate::pages::widgets::WidgetsFilter::All,
+            widgets_anim_token: 0,
         }
     }
 }
@@ -128,7 +132,11 @@ impl Render for MainWindow {
                             .flex_col()
                             .p(px(24.0))
                             .gap(px(20.0))
-                            .children(render_widgets_content(cx))
+                            .children(render_widgets_content(
+                                self.widgets_filter,
+                                self.widgets_anim_token,
+                                cx,
+                            ))
                             .into_any_element(),
                         NavPage::Settings => render_settings_page(
                             settings_tab,
