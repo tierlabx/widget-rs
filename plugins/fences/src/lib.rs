@@ -1,16 +1,11 @@
-mod dialog;
-pub mod icon_extractor;
-mod item_card;
-mod model;
-#[cfg(test)]
-mod model_tests;
-mod section;
-mod view;
+pub mod model;
+pub mod system;
+pub mod ui;
 
 use gpui::*;
 use widget_core::Plugin;
 
-use view::FencesWidget;
+pub use ui::FencesWidget;
 
 pub struct FencesWidgetPlugin;
 

@@ -1,9 +1,10 @@
 use gpui::*;
 
-use crate::model::{FenceItem, FencesModel};
-use crate::view::FencesWidget;
+use crate::model::FenceItem;
+use crate::model::FencesModel;
+use crate::ui::FencesWidget;
 
-/// 异步打开选中的文件或文件夹（在独立工作线程调用原生 ShellExecute API，杜绝主 UI 线程消息重入与控制台黑框）
+/// 异步打开选中的文件、文件夹或网址
 pub fn launch_item(path: &str) {
     if path.trim().is_empty() {
         return;
@@ -51,7 +52,7 @@ pub fn launch_item(path: &str) {
     });
 }
 
-/// 打开添加文件/文件夹的对话框
+/// 打开添加文件/文件夹的原生对话框（仅限本地程序与文件，网址通过 GPUI 原生弹窗输入）
 pub fn open_add_dialog(this_entity: WeakEntity<FencesWidget>, target_cat: usize, cx: &mut App) {
     cx.spawn(async move |async_cx| {
         let script = if target_cat == 1 {
@@ -100,7 +101,6 @@ pub fn open_add_dialog(this_entity: WeakEntity<FencesWidget>, target_cat: usize,
                     raw_name
                 };
                 let is_dir = path.is_dir();
-
                 let is_file = !is_dir;
                 let added_path = path_str.clone();
                 let _ = async_cx.update(|cx| {
@@ -122,7 +122,7 @@ pub fn open_add_dialog(this_entity: WeakEntity<FencesWidget>, target_cat: usize,
                 });
 
                 if is_file {
-                    let _ = crate::icon_extractor::get_or_extract_icon(&added_path);
+                    let _ = crate::system::icon::get_or_extract_icon(&added_path);
                     let _ = async_cx.update(|cx| {
                         let _ = this_entity.update(cx, |_, cx| {
                             cx.notify();

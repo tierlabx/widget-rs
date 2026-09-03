@@ -1,10 +1,11 @@
 use gpui::*;
 use gpui_component::{Icon, IconName};
 
-use crate::dialog::open_add_dialog;
-use crate::item_card::{render_item_card, DraggedFenceItem};
 use crate::model::{FenceCategory, FencesModel};
-use crate::view::FencesWidget;
+use crate::system::dialog::open_add_dialog;
+use crate::ui::item_card::render_item_card;
+use crate::ui::view::FencesWidget;
+use crate::ui::visual::DraggedFenceItem;
 
 /// 渲染桌面收纳单个手风琴分类栏目
 pub fn render_category_section(
@@ -21,10 +22,82 @@ pub fn render_category_section(
     let cat_items = cat.items.clone();
 
     let (section_icon, section_accent) = match cat_idx {
-        0 => (IconName::WindowMaximize, rgb(0x38bdf8)), // 程序：天蓝
+        0 => (IconName::WindowMaximize, rgb(0x38bdf8)), // 程序与网址：天蓝
         1 => (IconName::Folder, rgb(0xfbbf24)),         // 文件夹：琥珀金
         _ => (IconName::File, rgb(0x86efac)),           // 文件与文档：清新浅绿
     };
+
+    let weak_for_add = weak_this.clone();
+    let weak_for_url = weak_this.clone();
+
+    let mut actions_div = div().flex().items_center().gap(px(4.0));
+
+    if cat_idx == 0 {
+        actions_div = actions_div
+            .child(
+                div()
+                    .px(px(6.0))
+                    .py(px(1.5))
+                    .rounded(px(4.0))
+                    .cursor_pointer()
+                    .text_xs()
+                    .text_color(rgb(0xc084fc))
+                    .bg(rgba(0xa855f720))
+                    .border_1()
+                    .border_color(rgba(0xa855f735))
+                    .hover(|s| s.bg(rgba(0xa855f740)).border_color(rgba(0xa855f770)))
+                    .id("fence-sec-add-url")
+                    .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
+                    .on_click(move |_, window, cx| {
+                        cx.stop_propagation();
+                        let _ = weak_for_url.update(cx, |this, cx| {
+                            this.open_add_url_modal(window, cx);
+                        });
+                    })
+                    .child("+ 网址"),
+            )
+            .child(
+                div()
+                    .px(px(6.0))
+                    .py(px(1.5))
+                    .rounded(px(4.0))
+                    .cursor_pointer()
+                    .text_xs()
+                    .text_color(rgb(0x7dd3fc))
+                    .bg(rgba(0x38bdf820))
+                    .border_1()
+                    .border_color(rgba(0x38bdf830))
+                    .hover(|s| s.bg(rgba(0x38bdf840)).border_color(rgba(0x38bdf870)))
+                    .id("fence-sec-add-prog")
+                    .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
+                    .on_click(move |_, _, cx| {
+                        cx.stop_propagation();
+                        open_add_dialog(weak_for_add.clone(), 0, cx);
+                    })
+                    .child("+ 程序"),
+            );
+    } else {
+        actions_div = actions_div.child(
+            div()
+                .px(px(6.0))
+                .py(px(1.5))
+                .rounded(px(4.0))
+                .cursor_pointer()
+                .text_xs()
+                .text_color(rgb(0x7dd3fc))
+                .bg(rgba(0x38bdf820))
+                .border_1()
+                .border_color(rgba(0x38bdf830))
+                .hover(|s| s.bg(rgba(0x38bdf840)).border_color(rgba(0x38bdf870)))
+                .id(ElementId::Name(format!("fence-sec-add-{cat_idx}").into()))
+                .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
+                .on_click(move |_, _, cx| {
+                    cx.stop_propagation();
+                    open_add_dialog(weak_for_add.clone(), cat_idx, cx);
+                })
+                .child("+ 添加"),
+        );
+    }
 
     let mut section_div = div()
         .flex()
@@ -96,29 +169,8 @@ pub fn render_category_section(
                                 .child(format!("({})", items_count)),
                         ),
                 )
-                // 右：快速添加按钮
-                .child(
-                    div()
-                        .px(px(6.0))
-                        .py(px(1.5))
-                        .rounded(px(4.0))
-                        .cursor_pointer()
-                        .text_xs()
-                        .text_color(rgb(0x7dd3fc))
-                        .bg(rgba(0x38bdf820))
-                        .border_1()
-                        .border_color(rgba(0x38bdf830))
-                        .hover(|s| s.bg(rgba(0x38bdf840)).border_color(rgba(0x38bdf870)))
-                        .id(ElementId::Name(format!("fence-sec-add-{cat_idx}").into()))
-                        .on_mouse_down(MouseButton::Left, |_, _, cx| {
-                            cx.stop_propagation();
-                        })
-                        .on_click(move |_, _, cx| {
-                            cx.stop_propagation();
-                            open_add_dialog(weak_this.clone(), cat_idx, cx);
-                        })
-                        .child("+ 添加"),
-                ),
+                // 右：快速添加操作组
+                .child(actions_div),
         );
 
     // ── 内容区（根据手风琴动画进度平滑过渡展示）─────────────
@@ -168,7 +220,7 @@ pub fn render_category_section(
                             .text_xs()
                             .text_color(rgba(0xffffff38))
                             .child(match cat_idx {
-                                0 => "拖拽应用程序或快捷方式到此处",
+                                0 => "拖拽应用程序、快捷方式或点击上方 + 网址",
                                 1 => "拖拽文件夹到此处",
                                 _ => "拖拽文件或文档到此处",
                             }),
