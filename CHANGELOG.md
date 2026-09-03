@@ -6,6 +6,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+## [0.7.7](https://github.com/tierlabx/widget-rs/releases/tag/v0.7.7) - 2026-09-03
+
+### Added
+
+- 添加 Fences 插件的初始结构，包含 URL 书签模态框和系统实用工具
+
+## [0.7.6](https://github.com/tierlabx/widget-rs/releases/tag/v0.7.6) - 2026-09-03
+
+### Added
+
+- 添加 Fences 插件的初始结构，包含 URL 书签模态框和系统实用工具
+
 ## [0.7.6](https://github.com/tierlabx/widget-rs/releases/tag/v0.7.6) - 2026-09-02
 
 ### Fixed
