@@ -2,6 +2,7 @@ pub mod monitor;
 pub mod paths;
 mod settings_window;
 mod widget_window;
+mod window_ops;
 
 pub use monitor::{
     clamp_to_work_area, enumerate_monitors, find_best_monitor, get_saved_physical_bounds,
@@ -16,10 +17,10 @@ pub use widget_window::{
     default_widget_window_options, default_widget_window_options_blurred, WidgetContent,
     WidgetWindow,
 };
+pub use window_ops::*;
 
 use gpui::*;
 use serde::{Deserialize, Serialize};
-use std::cell::RefCell;
 use std::collections::HashMap;
 use std::sync::atomic::AtomicBool;
 
@@ -244,146 +245,53 @@ pub struct PluginList(pub Vec<PluginMetadata>);
 
 impl Global for PluginList {}
 
-// ─── 线程本地 HWND 存储 ───────────────────────────────────────────────────────
-// 所有操作均在主线程执行，无需跨线程同步
-// widget-ui 的 on_click 可直接读取 HWND 并调用 Win32 API，完全绕开 GPUI RefCell
+// ─── 线程安全 HWND 存储 ────────────────────────────────────────────────────────
+// 进程级安全存储，支持多线程与 GPUI 异步上下文精准访问
 
-thread_local! {
-    static PLUGIN_HWNDS: RefCell<HashMap<String, isize>> = RefCell::new(HashMap::new());
-    static ALL_PLUGIN_HWND_LIST: RefCell<Vec<isize>> = const { RefCell::new(Vec::new()) };
-}
+static PLUGIN_HWNDS: std::sync::RwLock<Option<HashMap<String, isize>>> =
+    std::sync::RwLock::new(None);
+static ALL_PLUGIN_HWND_LIST: std::sync::RwLock<Vec<isize>> = std::sync::RwLock::new(Vec::new());
 
 /// 注册插件 HWND（由 app crate 在 HWND 提取后调用）
 pub fn register_plugin_hwnd(id: &str, hwnd: isize) {
-    PLUGIN_HWNDS.with(|m| {
-        m.borrow_mut().insert(id.to_string(), hwnd);
-    });
-    ALL_PLUGIN_HWND_LIST.with(|v| {
-        let mut list = v.borrow_mut();
+    if let Ok(mut lock) = PLUGIN_HWNDS.write() {
+        lock.get_or_insert_with(HashMap::new)
+            .insert(id.to_string(), hwnd);
+    }
+    if let Ok(mut list) = ALL_PLUGIN_HWND_LIST.write() {
         if !list.contains(&hwnd) {
             list.push(hwnd);
         }
-    });
+    }
 }
 
 /// 注销插件 HWND（由 app crate 在插件卸载时调用）
 pub fn unregister_plugin_hwnd(id: &str) {
-    let old_hwnd = PLUGIN_HWNDS.with(|m| m.borrow_mut().remove(id));
+    let old_hwnd = if let Ok(mut lock) = PLUGIN_HWNDS.write() {
+        lock.as_mut().and_then(|m| m.remove(id))
+    } else {
+        None
+    };
     if let Some(hwnd) = old_hwnd {
-        ALL_PLUGIN_HWND_LIST.with(|v| {
-            v.borrow_mut().retain(|h| *h != hwnd);
-        });
+        if let Ok(mut list) = ALL_PLUGIN_HWND_LIST.write() {
+            list.retain(|h| *h != hwnd);
+        }
     }
 }
 
 /// 获取指定插件的 HWND
 pub fn get_plugin_hwnd(id: &str) -> isize {
-    PLUGIN_HWNDS.with(|m| *m.borrow().get(id).unwrap_or(&0))
+    PLUGIN_HWNDS
+        .read()
+        .ok()
+        .and_then(|lock| lock.as_ref().and_then(|m| m.get(id).copied()))
+        .unwrap_or(0)
 }
 
 /// 获取所有插件的 HWND 列表（用于批量操作）
 pub fn get_all_plugin_hwnds() -> Vec<isize> {
-    ALL_PLUGIN_HWND_LIST.with(|v| v.borrow().clone())
-}
-
-pub fn start_window_drag(window: &mut Window) {
-    use raw_window_handle::HasWindowHandle;
-    if let Ok(handle) = HasWindowHandle::window_handle(window) {
-        if let raw_window_handle::RawWindowHandle::Win32(h) = handle.as_raw() {
-            unsafe {
-                windows_sys::Win32::UI::Input::KeyboardAndMouse::ReleaseCapture();
-                windows_sys::Win32::UI::WindowsAndMessaging::PostMessageW(
-                    h.hwnd.get(),
-                    windows_sys::Win32::UI::WindowsAndMessaging::WM_NCLBUTTONDOWN,
-                    windows_sys::Win32::UI::WindowsAndMessaging::HTCAPTION as usize,
-                    0,
-                );
-            }
-        }
-    }
-}
-
-pub fn update_window_edit_mode(window: &mut Window, is_edit_mode: bool) {
-    use raw_window_handle::HasWindowHandle;
-    if let Ok(handle) = HasWindowHandle::window_handle(window) {
-        if let raw_window_handle::RawWindowHandle::Win32(h) = handle.as_raw() {
-            let hwnd = h.hwnd.get();
-            unsafe {
-                use windows_sys::Win32::UI::WindowsAndMessaging::{
-                    GetWindowLongW, SetWindowLongW, SetWindowPos, GWL_STYLE, SWP_FRAMECHANGED,
-                    SWP_NOMOVE, SWP_NOSIZE, SWP_NOZORDER, WS_THICKFRAME,
-                };
-                let style = GetWindowLongW(hwnd, GWL_STYLE);
-                if is_edit_mode {
-                    if (style & WS_THICKFRAME as i32) == 0 {
-                        SetWindowLongW(hwnd, GWL_STYLE, style | WS_THICKFRAME as i32);
-                        SetWindowPos(
-                            hwnd,
-                            0,
-                            0,
-                            0,
-                            0,
-                            0,
-                            SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_FRAMECHANGED,
-                        );
-                    }
-                } else if (style & WS_THICKFRAME as i32) != 0 {
-                    SetWindowLongW(hwnd, GWL_STYLE, style & !(WS_THICKFRAME as i32));
-                    SetWindowPos(
-                        hwnd,
-                        0,
-                        0,
-                        0,
-                        0,
-                        0,
-                        SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_FRAMECHANGED,
-                    );
-                }
-            }
-        }
-    }
-}
-
-extern "C" {
-    fn mi_collect(force: bool);
-}
-
-/// 主动触发进程闲置堆内存归还给操作系统内核
-///
-/// 通过 mimalloc 的 `mi_collect(true)` 将已释放但缓存在内存池中的空闲页安全归还给 OS，
-/// 真实减少进程占用的物理工作集，同时避免了 Win32 `EmptyWorkingSet` 导致的剧烈缺页抖动。
-pub fn trim_process_memory() {
-    #[cfg(target_os = "windows")]
-    unsafe {
-        mi_collect(true);
-    }
-}
-
-/// 设置或取消窗口的系统级置顶状态（Always on Top）
-///
-/// 正确使用 Win32 API 的 `HWND_TOPMOST` 和 `HWND_NOTOPMOST`
-pub fn set_window_always_on_top(hwnd: isize, always_on_top: bool) {
-    if hwnd == 0 {
-        return;
-    }
-    #[cfg(target_os = "windows")]
-    unsafe {
-        use windows_sys::Win32::UI::WindowsAndMessaging::{
-            SetWindowPos, HWND_NOTOPMOST, HWND_TOPMOST, SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOSIZE,
-        };
-        let insert_after = if always_on_top {
-            HWND_TOPMOST
-        } else {
-            HWND_NOTOPMOST
-        };
-        SetWindowPos(
-            hwnd,
-            insert_after,
-            0,
-            0,
-            0,
-            0,
-            SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE,
-        );
-    }
+    ALL_PLUGIN_HWND_LIST
+        .read()
+        .map(|list| list.clone())
+        .unwrap_or_default()
 }

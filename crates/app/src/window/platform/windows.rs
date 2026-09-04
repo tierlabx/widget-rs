@@ -59,13 +59,17 @@ pub unsafe extern "system" fn plugin_wnd_proc(
             {
                 use windows_sys::Win32::UI::Input::KeyboardAndMouse::GetActiveWindow;
                 use windows_sys::Win32::UI::WindowsAndMessaging::{
-                    GetForegroundWindow, HWND_NOTOPMOST, HWND_TOPMOST, SWP_NOZORDER,
+                    GetForegroundWindow, GetWindowLongW, GWL_EXSTYLE, HWND_NOTOPMOST, HWND_TOPMOST,
+                    SWP_NOZORDER, WS_EX_TOPMOST,
                 };
                 let z_change = (pos.flags & SWP_NOZORDER) == 0;
                 let topmost_op =
                     pos.hwndInsertAfter == HWND_TOPMOST || pos.hwndInsertAfter == HWND_NOTOPMOST;
+                let is_topmost = (GetWindowLongW(hwnd, GWL_EXSTYLE) & WS_EX_TOPMOST as i32) != 0;
                 let self_active = GetActiveWindow() == hwnd || GetForegroundWindow() == hwnd;
-                if z_change && !topmost_op && !self_active {
+                let explicit_allowed =
+                    widget_core::ALLOW_EXPLICIT_ZORDER.load(std::sync::atomic::Ordering::SeqCst);
+                if z_change && !topmost_op && !self_active && !is_topmost && !explicit_allowed {
                     pos.flags |= SWP_NOZORDER;
                 }
             }
