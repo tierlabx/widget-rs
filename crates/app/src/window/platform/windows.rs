@@ -42,13 +42,38 @@ pub unsafe extern "system" fn plugin_wnd_proc(
         }
     }
 
-    if msg == windows_sys::Win32::UI::WindowsAndMessaging::WM_WINDOWPOSCHANGING
-        && widget_core::NATIVE_EDIT_MODE.load(std::sync::atomic::Ordering::SeqCst)
-    {
+    if msg == windows_sys::Win32::UI::WindowsAndMessaging::WM_WINDOWPOSCHANGING {
         unsafe {
             use windows_sys::Win32::UI::WindowsAndMessaging::WINDOWPOS;
             let pos = &mut *(lparam as *mut WINDOWPOS);
-            if (pos.flags & windows_sys::Win32::UI::WindowsAndMessaging::SWP_NOMOVE) == 0 {
+
+            // 【核心修复 - 独立聚焦】阻断共享 Progman Owner 的组件间“组式 Z 序联动置前”
+            // ─────────────────────────────────────────────────────────────────────────────
+            // 根因：所有小组件都挂载到 Progman（Win+D 桌面常驻能力，见 styles.rs 第 5 步），
+            // 同 Owner 的窗口构成 Z 序联动组：激活任意一个，Windows 会把同组兄弟窗口全部
+            // 拉到前台，表现为“点击一个小组件，其他全部聚焦”。
+            // 修复：在 WM_WINDOWPOSCHANGING 中，对“非激活窗口的被动 Z 序变更”追加
+            // SWP_NOZORDER，仅放行被点击窗口自身的置前与显式置顶操作，
+            // 保持各小组件聚焦独立（已通过 .tmp-ztest/ztest.cs 复现并验证）。
+            // ─────────────────────────────────────────────────────────────────────────────
+            {
+                use windows_sys::Win32::UI::Input::KeyboardAndMouse::GetActiveWindow;
+                use windows_sys::Win32::UI::WindowsAndMessaging::{
+                    GetForegroundWindow, HWND_NOTOPMOST, HWND_TOPMOST, SWP_NOZORDER,
+                };
+                let z_change = (pos.flags & SWP_NOZORDER) == 0;
+                let topmost_op =
+                    pos.hwndInsertAfter == HWND_TOPMOST || pos.hwndInsertAfter == HWND_NOTOPMOST;
+                let self_active = GetActiveWindow() == hwnd || GetForegroundWindow() == hwnd;
+                if z_change && !topmost_op && !self_active {
+                    pos.flags |= SWP_NOZORDER;
+                }
+            }
+
+            // 编辑模式下的智能吸附（原有逻辑）
+            if widget_core::NATIVE_EDIT_MODE.load(std::sync::atomic::Ordering::SeqCst)
+                && (pos.flags & windows_sys::Win32::UI::WindowsAndMessaging::SWP_NOMOVE) == 0
+            {
                 super::snap::apply_window_snapping(hwnd, pos);
             }
         }

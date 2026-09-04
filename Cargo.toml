@@ -47,6 +47,7 @@ windows-sys = {
     "Win32_System_SystemInformation",
     "Win32_UI_WindowsAndMessaging",
     "Win32_UI_Shell",
+    "Win32_UI_Input_KeyboardAndMouse",
   ]
 }
 winres = "0.1"
