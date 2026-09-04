@@ -52,8 +52,13 @@ fn main() {
         gpui_kit::init(cx);
         // 全局启用深色主题（让所有 Input 输入框、文字、光标默认呈现纯白色）
         gpui_component::Theme::change(gpui_component::ThemeMode::Dark, None, cx);
-        // 将 gpui_component Root 默认背景色改为 100% 全透明，杜绝小组件窗口被刷上浅色主题纯白底板
-        gpui_component::Theme::global_mut(cx).colors.background = gpui::hsla(0.0, 0.0, 0.0, 0.0);
+        // 将 gpui_component Root 默认背景色改为 100% 全透明，杜绝小组件窗口被刷上底板
+        // 0.6.0 中 Root 使用 tokens.background 渲染窗口底色，两个字段都必须清零
+        {
+            let theme = gpui_component::Theme::global_mut(cx);
+            theme.colors.background = gpui::hsla(0.0, 0.0, 0.0, 0.0);
+            theme.tokens.background = gpui::hsla(0.0, 0.0, 0.0, 0.0).into();
+        }
 
         cx.set_global(app_config.clone());
 
