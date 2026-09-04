@@ -1,12 +1,12 @@
 use gpui::prelude::FluentBuilder;
 use gpui::*;
-use gpui_component::input::{Input, InputEvent, InputState};
+use gpui_component::input::{InputEvent, Textarea, TextareaState};
 use gpui_component::{Icon, IconName};
 
 use crate::model::{StickyData, StickyModel, STICKY_THEMES};
 
 pub struct StickyWidget {
-    input: Entity<InputState>,
+    input: Entity<TextareaState>,
     data: StickyData,
     show_palette: bool,
     pending_input_reset: bool,
@@ -28,17 +28,16 @@ impl StickyWidget {
         window: &mut Window,
         cx: &mut Context<Self>,
         data: &StickyData,
-    ) -> Entity<InputState> {
+    ) -> Entity<TextareaState> {
         let content = data.current().content.clone();
         let input = cx.new(|cx| {
-            InputState::new(window, cx)
-                .multi_line(true)
+            TextareaState::new(window, cx)
                 .default_value(content)
                 .placeholder("在这里记录你的想法...")
         });
         cx.subscribe(
             &input,
-            |this: &mut Self, input: Entity<InputState>, event: &InputEvent, cx| {
+            |this: &mut Self, input: Entity<TextareaState>, event: &InputEvent, cx| {
                 if let InputEvent::Change = event {
                     this.data.current_mut().content = input.read(cx).value().to_string();
                     StickyModel::save(&this.data, cx);
@@ -364,7 +363,7 @@ impl Render for StickyWidget {
                     .text_sm()
                     .text_color(text_color)
                     .child(
-                        Input::new(&new_input)
+                        Textarea::new(&new_input)
                             .appearance(false)
                             .bordered(false)
                             .size_full(),

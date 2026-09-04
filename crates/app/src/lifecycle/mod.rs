@@ -18,29 +18,25 @@ pub fn spawn_hwnd_polling_task(cx: &mut App, store: Arc<Store>) {
 
             // 1. 尝试提取主窗口 HWND
             if captured_main_hwnd == 0 {
-                captured_main_hwnd = cx
-                    .update(|cx| {
-                        let main_handle = cx
-                            .try_global::<WindowManager>()
-                            .and_then(|wm| wm.main_window);
-                        if let Some(h) = main_handle {
-                            h.update(cx, |_, win, _| {
-                                use raw_window_handle::HasWindowHandle;
-                                if let Ok(wh) = win.window_handle() {
-                                    if let raw_window_handle::RawWindowHandle::Win32(h) =
-                                        wh.as_raw()
-                                    {
-                                        return h.hwnd.get();
-                                    }
+                captured_main_hwnd = cx.update(|cx| {
+                    let main_handle = cx
+                        .try_global::<WindowManager>()
+                        .and_then(|wm| wm.main_window);
+                    if let Some(h) = main_handle {
+                        h.update(cx, |_, win, _| {
+                            use raw_window_handle::HasWindowHandle;
+                            if let Ok(wh) = win.window_handle() {
+                                if let raw_window_handle::RawWindowHandle::Win32(h) = wh.as_raw() {
+                                    return h.hwnd.get();
                                 }
-                                0isize
-                            })
-                            .unwrap_or(0)
-                        } else {
+                            }
                             0isize
-                        }
-                    })
-                    .unwrap_or(0);
+                        })
+                        .unwrap_or(0)
+                    } else {
+                        0isize
+                    }
+                });
 
                 if captured_main_hwnd != 0 {
                     let _ = cx.update_global::<WindowManager, _>(|wm, cx| {
@@ -61,35 +57,30 @@ pub fn spawn_hwnd_polling_task(cx: &mut App, store: Arc<Store>) {
             }
 
             // 2. 尝试提取所有插件窗口 HWND
-            let plugin_handles: Vec<(String, AnyWindowHandle)> = match cx
+            let plugin_handles: Vec<(String, AnyWindowHandle)> = cx
                 .update_global::<WindowManager, _>(|wm, _| {
                     wm.widget_windows
                         .iter()
                         .map(|(id, (h, _, _))| (id.to_string(), *h))
-                        .collect()
-                }) {
-                Ok(v) => v,
-                Err(_) => return,
-            };
+                        .collect::<Vec<_>>()
+                });
 
             let mut all_ready = captured_main_hwnd != 0;
             id_hwnd.clear();
 
             for (id, h) in &plugin_handles {
-                let hwnd = cx
-                    .update(|cx| {
-                        h.update(cx, |_, win, _| {
-                            use raw_window_handle::HasWindowHandle;
-                            if let Ok(wh) = win.window_handle() {
-                                if let raw_window_handle::RawWindowHandle::Win32(h) = wh.as_raw() {
-                                    return h.hwnd.get();
-                                }
+                let hwnd = cx.update(|cx| {
+                    h.update(cx, |_, win, _| {
+                        use raw_window_handle::HasWindowHandle;
+                        if let Ok(wh) = win.window_handle() {
+                            if let raw_window_handle::RawWindowHandle::Win32(h) = wh.as_raw() {
+                                return h.hwnd.get();
                             }
-                            0isize
-                        })
-                        .unwrap_or(0)
+                        }
+                        0isize
                     })
-                    .unwrap_or(0);
+                    .unwrap_or(0)
+                });
                 if hwnd == 0 {
                     all_ready = false;
                     break;
@@ -171,13 +162,11 @@ pub fn spawn_tray_polling_task(
         let toggle_id = tray_handles.toggle_id;
         let quit_id = tray_handles.quit_id;
 
-        let silent_start = cx
-            .update(|cx| {
-                cx.try_global::<widget_core::AppConfig>()
-                    .map(|c| c.silent_start)
-                    .unwrap_or(false)
-            })
-            .unwrap_or(false);
+        let silent_start = cx.update(|cx| {
+            cx.try_global::<widget_core::AppConfig>()
+                .map(|c| c.silent_start)
+                .unwrap_or(false)
+        });
 
         let mut last_click_time = std::time::Instant::now()
             .checked_sub(std::time::Duration::from_secs(10))
@@ -237,9 +226,8 @@ pub fn spawn_tray_polling_task(
             }
 
             // 3. 动态检测主窗口实际状态并同步菜单文字与全局状态（例如被用户点击关闭按钮隐藏时）
-            let (main_hwnd, is_wm_visible) = cx
-                .update_global::<WindowManager, _>(|wm, _| (wm.main_hwnd, wm.is_visible))
-                .unwrap_or((0, true));
+            let (main_hwnd, is_wm_visible) =
+                cx.update_global::<WindowManager, _>(|wm, _| (wm.main_hwnd, wm.is_visible));
 
             if main_hwnd != 0 {
                 let actual_visible = unsafe {
@@ -276,7 +264,7 @@ fn toggle_main_panel(cx: &AsyncApp) -> bool {
     let _ = cx.update(|cx| {
         let (main_hwnd, main_handle) = cx
             .try_global::<WindowManager>()
-            .map(|wm| (wm.main_hwnd, wm.main_window))
+            .map(|wm| (wm.main_hwnd, wm.main_window.clone()))
             .unwrap_or((0, None));
 
         if main_hwnd == 0 {
@@ -301,9 +289,7 @@ fn toggle_main_panel(cx: &AsyncApp) -> bool {
         }
     });
 
-    let next_visible = cx
-        .update_global::<WindowManager, _>(|wm, _| wm.toggle_main_window_win32())
-        .unwrap_or(true);
+    let next_visible = cx.update_global::<WindowManager, _>(|wm, _| wm.toggle_main_window_win32());
 
     let _ = cx.update_global::<widget_core::UIState, _>(|s, _| {
         s.is_visible = next_visible;

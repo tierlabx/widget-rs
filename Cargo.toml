@@ -14,8 +14,11 @@ license = "MIT"
 repository = "https://github.com/tierlabx/widget-rs.git"
 
 [workspace.dependencies]
-gpui = "0.2.2"
-gpui-component = "0.5.1"
+gpui = { package = "gpui-pre", version = "0.3.3" }
+gpui-kit = "0.6.0"
+gpui-component = "0.6.0"
+gpui-base = "0.6.0"
+gpui-kit-assets = "0.6.0"
 sticky_plugin = { path = "plugins/sticky", version = "0.7.8" }
 todo_plugin = { path = "plugins/todo", version = "0.7.8" }
 stretchly_plugin = { path = "plugins/stretchly", version = "0.7.8" }

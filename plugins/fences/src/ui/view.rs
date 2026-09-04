@@ -143,7 +143,7 @@ impl FencesWidget {
                     let ease_t = t * t * (3.0 - 2.0 * t);
                     let current_p = start_val + (target_val - start_val) * ease_t;
 
-                    let update_res = async_cx.update(|cx| {
+                    let is_active = async_cx.update(|cx| {
                         if let Some(entity) = entity_weak.upgrade() {
                             entity.update(cx, |this, cx| {
                                 if cat_idx < this.expand_progress.len() {
@@ -151,10 +151,13 @@ impl FencesWidget {
                                     cx.notify();
                                 }
                             });
+                            true
+                        } else {
+                            false
                         }
                     });
 
-                    if update_res.is_err() {
+                    if !is_active {
                         break;
                     }
                 }

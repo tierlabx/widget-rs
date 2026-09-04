@@ -44,12 +44,12 @@ fn main() {
     // 3. 初始化系统托盘（包括托盘图标和菜单）
     let tray_handles = tray::setup_tray(app_config.silent_start).expect("系统托盘初始化失败");
 
-    let app = Application::new().with_assets(assets::AppAssets);
+    let app = gpui_kit::application().with_assets(assets::AppAssets);
     let store_for_app = Arc::clone(&store);
 
     app.run(move |cx| {
         // 初始化全局状态和组件资产
-        gpui_component::init(cx);
+        gpui_kit::init(cx);
         // 全局启用深色主题（让所有 Input 输入框、文字、光标默认呈现纯白色）
         gpui_component::Theme::change(gpui_component::ThemeMode::Dark, None, cx);
         // 将 gpui_component Root 默认背景色改为 100% 全透明，杜绝小组件窗口被刷上浅色主题纯白底板
@@ -129,7 +129,7 @@ fn main() {
                                                 0isize
                                             }).unwrap_or(0)
                                         } else { 0 }
-                                    }).unwrap_or(0);
+                                    });
                                     if hwnd != 0 { break; }
                                 }
 

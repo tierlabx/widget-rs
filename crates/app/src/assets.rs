@@ -9,11 +9,11 @@ impl gpui::AssetSource for AppAssets {
         if let Some(file) = LocalAssets::get(path) {
             return Ok(Some(file.data));
         }
-        gpui_component_assets::Assets.load(path)
+        gpui_kit_assets::Assets.load(path)
     }
 
     fn list(&self, path: &str) -> gpui::Result<Vec<gpui::SharedString>> {
-        let mut list = gpui_component_assets::Assets.list(path).unwrap_or_default();
+        let mut list = gpui_kit_assets::Assets.list(path).unwrap_or_default();
         for file in LocalAssets::iter() {
             if file.starts_with(path) {
                 list.push(file.to_string().into());

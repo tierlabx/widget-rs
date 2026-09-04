@@ -69,21 +69,19 @@ pub fn spawn_stretchly_timer(
 
         loop {
             // 默认心跳间隔：根据当前状态动态自适应计算
-            let (is_high_freq, interval_ms) = async_cx
-                .update(|cx| {
-                    this.upgrade()
-                        .map(|entity| {
-                            let widget = entity.read(cx);
-                            let on_break = widget.model().is_on_break();
-                            let warning = widget.model().is_warning();
-                            let rem_secs = widget.model().time_remaining().as_secs();
-                            let high_freq = on_break || warning || rem_secs <= 10;
-                            let ms = if high_freq { 100 } else { 500 };
-                            (high_freq, ms)
-                        })
-                        .unwrap_or((false, 500))
-                })
-                .unwrap_or((false, 500));
+            let (is_high_freq, interval_ms) = async_cx.update(|cx| {
+                this.upgrade()
+                    .map(|entity| {
+                        let widget = entity.read(cx);
+                        let on_break = widget.model().is_on_break();
+                        let warning = widget.model().is_warning();
+                        let rem_secs = widget.model().time_remaining().as_secs();
+                        let high_freq = on_break || warning || rem_secs <= 10;
+                        let ms = if high_freq { 100 } else { 500 };
+                        (high_freq, ms)
+                    })
+                    .unwrap_or((false, 500))
+            });
 
             let _ = is_high_freq;
             async_cx
@@ -91,8 +89,8 @@ pub fn spawn_stretchly_timer(
                 .timer(Duration::from_millis(interval_ms))
                 .await;
 
-            let res = async_cx.update(|cx| {
-                let _ = this.update(cx, |this, cx| {
+            let is_active = async_cx.update(|cx| {
+                this.update(cx, |this, cx| {
                     // 1. 处理 BreakOverlay 按钮回调请求
                     if let Some(req) = cx
                         .try_global::<crate::StretchlyOverlayRequest>()
@@ -271,10 +269,11 @@ pub fn spawn_stretchly_timer(
                         last_paused = curr_paused;
                         cx.notify();
                     }
-                });
+                })
+                .is_ok()
             });
 
-            if res.is_err() {
+            if !is_active {
                 break;
             }
         }

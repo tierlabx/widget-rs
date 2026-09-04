@@ -20,6 +20,7 @@ before-packaging-command = "cargo build --release"
 
 [dependencies]
 gpui.workspace = true
+gpui-kit.workspace = true
 gpui-component.workspace = true
 mimalloc = { version = "0.1", default-features = false }
 sticky_plugin.workspace = true
@@ -31,7 +32,7 @@ widget-ui.workspace = true
 
 anyhow = "1.0"
 directories.workspace = true
-gpui-component-assets = "0.5.1"
+gpui-kit-assets.workspace = true
 image.workspace = true
 raw-window-handle.workspace = true
 rusqlite.workspace = true
