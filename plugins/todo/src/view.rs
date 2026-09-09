@@ -229,6 +229,14 @@ impl Render for TodoWidget {
                     cx.notify();
                 }
             }),
+            on_reorder_item: std::rc::Rc::new(|this: &mut Self, _, cx, src_id, dst_id| {
+                if this.data.reorder_item(&src_id, &dst_id) {
+                    this.editing_idx = None;
+                    this.expanded_idx = None;
+                    TodoModel::save(&this.data, cx);
+                    cx.notify();
+                }
+            }),
         };
 
         for (idx, item) in self.data.items.iter().enumerate() {

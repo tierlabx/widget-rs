@@ -3,6 +3,7 @@ use gpui::*;
 use gpui_component::input::{Input, InputState};
 use gpui_component::{Icon, IconName};
 
+use crate::drag::{render_drag_handle, DraggedTodoItem, TodoDragPreview};
 use crate::item_detail::render_item_detail;
 use crate::model::{ReminderPreset, ReminderRule, TodoItem, TodoTag, GANTT_COLORS};
 
@@ -33,6 +34,7 @@ pub struct ItemCardCallbacks<V: 'static> {
     pub on_set_reminder:
         Rc<dyn Fn(&mut V, &mut Window, &mut Context<V>, usize, Option<ReminderRule>)>,
     pub on_set_color: Rc<dyn Fn(&mut V, &mut Window, &mut Context<V>, usize, usize)>,
+    pub on_reorder_item: Rc<dyn Fn(&mut V, &mut Window, &mut Context<V>, String, String)>,
 }
 
 /// 渲染单条待办项（包括编辑态与正常展示态）
@@ -64,11 +66,11 @@ pub fn render_todo_item<V: 'static>(
             .flex()
             .items_center()
             .w_full()
-            .px(px(8.0))
-            .py(px(6.0))
-            .gap(px(6.0))
+            .px(px(6.0))
+            .py(px(3.5))
+            .gap(px(4.0))
             .bg(rgba(0x0f172af0))
-            .rounded(px(8.0))
+            .rounded(px(6.0))
             .border_1()
             .border_color(rgb(0x38bdf8))
             .child(
@@ -80,12 +82,12 @@ pub fn render_todo_item<V: 'static>(
             )
             .child(
                 div()
-                    .w(px(22.0))
-                    .h(px(22.0))
+                    .w(px(18.0))
+                    .h(px(18.0))
                     .flex()
                     .justify_center()
                     .items_center()
-                    .rounded(px(4.0))
+                    .rounded(px(3.0))
                     .cursor_pointer()
                     .bg(rgba(0x00d99220))
                     .text_color(rgb(0x00d992))
@@ -94,16 +96,16 @@ pub fn render_todo_item<V: 'static>(
                     .on_click(cx.listener(move |this, _, window, cx| {
                         on_confirm(this, window, cx, idx);
                     }))
-                    .child(Icon::new(IconName::Check).size(px(11.0))),
+                    .child(Icon::new(IconName::Check).size(px(9.0))),
             )
             .child(
                 div()
-                    .w(px(22.0))
-                    .h(px(22.0))
+                    .w(px(18.0))
+                    .h(px(18.0))
                     .flex()
                     .justify_center()
                     .items_center()
-                    .rounded(px(4.0))
+                    .rounded(px(3.0))
                     .cursor_pointer()
                     .bg(rgba(0xff4d4d20))
                     .text_color(rgb(0xff6b6b))
@@ -112,7 +114,7 @@ pub fn render_todo_item<V: 'static>(
                     .on_click(cx.listener(move |this, _, window, cx| {
                         on_delete(this, window, cx, idx);
                     }))
-                    .child(Icon::new(IconName::Delete).size(px(11.0))),
+                    .child(Icon::new(IconName::Delete).size(px(9.0))),
             )
             .into_any_element()
     } else {
@@ -120,6 +122,10 @@ pub fn render_todo_item<V: 'static>(
         let on_expand = callbacks.on_toggle_expand.clone();
         let on_edit = callbacks.on_start_edit.clone();
         let on_delete = callbacks.on_delete_item.clone();
+        let on_reorder = callbacks.on_reorder_item.clone();
+        let item_id = props.item.id.clone();
+        let preview_text = text.clone();
+        let preview_color = gantt.hex;
 
         div()
             .id(ElementId::Name(format!("todo-item-{idx}").into()))
@@ -131,7 +137,7 @@ pub fn render_todo_item<V: 'static>(
             } else {
                 rgba(0x0f172ad0)
             })
-            .rounded(px(8.0))
+            .rounded(px(6.0))
             .border_1()
             .border_color(if is_expanded {
                 rgb(gantt.hex)
@@ -141,19 +147,44 @@ pub fn render_todo_item<V: 'static>(
                 rgba(0xffffff18)
             })
             .hover(|s| s.bg(rgba(0x1e293be5)).border_color(rgba(0xffffff30)))
+            .drag_over::<DraggedTodoItem>(|s, _drag, _window, _cx| {
+                s.border_color(rgb(0x38bdf8)).bg(rgba(0x38bdf825))
+            })
+            .on_drag(
+                DraggedTodoItem {
+                    item_id: item_id.clone(),
+                    is_done: done,
+                },
+                move |_drag, _offset, _window, cx| {
+                    cx.new(|_| TodoDragPreview {
+                        text: preview_text.clone(),
+                        color_hex: preview_color,
+                    })
+                },
+            )
+            .on_drop(cx.listener({
+                let target_id = item_id.clone();
+                let target_done = done;
+                move |this, drag: &DraggedTodoItem, window, cx| {
+                    if drag.is_done == target_done && drag.item_id != target_id {
+                        on_reorder(this, window, cx, drag.item_id.clone(), target_id.clone());
+                    }
+                }
+            }))
             // ── 主条目栏 ─────────────────────────────────────
             .child(
                 div()
                     .flex()
                     .items_center()
                     .w_full()
-                    .px(px(8.0))
-                    .py(px(7.0))
-                    .gap(px(6.0))
+                    .px(px(6.0))
+                    .py(px(4.0))
+                    .gap(px(4.0))
+                    .child(render_drag_handle())
                     .child(
                         div()
-                            .w(px(3.0))
-                            .h(px(20.0))
+                            .w(px(2.5))
+                            .h(px(13.0))
                             .flex_shrink_0()
                             .rounded_full()
                             .bg(if done {
@@ -164,11 +195,11 @@ pub fn render_todo_item<V: 'static>(
                     )
                     .child(
                         div()
-                            .w(px(16.0))
-                            .h(px(16.0))
+                            .w(px(13.0))
+                            .h(px(13.0))
                             .flex_shrink_0()
                             .rounded_full()
-                            .border_2()
+                            .border_1()
                             .cursor_pointer()
                             .id(ElementId::Name(format!("todo-check-{idx}").into()))
                             .border_color(if done {
@@ -192,7 +223,7 @@ pub fn render_todo_item<V: 'static>(
                                 d.child(
                                     div()
                                         .text_color(rgb(0x00d992))
-                                        .child(Icon::new(IconName::Check).size(px(10.0))),
+                                        .child(Icon::new(IconName::Check).size(px(8.0))),
                                 )
                             }),
                     )
@@ -201,8 +232,9 @@ pub fn render_todo_item<V: 'static>(
                             .flex_1()
                             .min_w_0()
                             .flex()
-                            .flex_col()
-                            .gap(px(1.5))
+                            .flex_row()
+                            .items_center()
+                            .gap(px(4.0))
                             .overflow_hidden()
                             .child(
                                 div()
@@ -217,72 +249,65 @@ pub fn render_todo_item<V: 'static>(
                                     .when(done, |d: Div| d.line_through())
                                     .child(text),
                             )
-                            .when(
-                                reminder_text.is_some()
-                                    || (item_tag.is_some() && active_tag_id == "all"),
-                                |d| {
-                                    let mut row =
-                                        div().flex().flex_wrap().items_center().gap(px(4.0));
-                                    if active_tag_id == "all" {
-                                        if let Some(tag) = &item_tag {
-                                            let tag_color =
-                                                &GANTT_COLORS[tag.gantt_color % GANTT_COLORS.len()];
-                                            row = row.child(
-                                                div()
-                                                    .flex_shrink_0()
-                                                    .px(px(4.0))
-                                                    .py(px(0.5))
-                                                    .rounded(px(3.0))
-                                                    .text_xs()
-                                                    .font_weight(FontWeight::MEDIUM)
-                                                    .text_color(rgb(tag_color.hex))
-                                                    .bg(rgba(tag_color.bg_alpha_hex))
-                                                    .border_1()
-                                                    .border_color(rgba(tag_color.hex | 0x45))
-                                                    .child(tag.name.clone()),
-                                            );
-                                        }
-                                    }
-                                    if let Some(r_text) = reminder_text {
-                                        row = row.child(
-                                            div()
-                                                .flex_shrink_0()
-                                                .flex()
-                                                .items_center()
-                                                .gap(px(2.0))
-                                                .px(px(4.0))
-                                                .py(px(0.5))
-                                                .rounded(px(3.0))
-                                                .text_xs()
-                                                .text_color(rgb(0xfb923c))
-                                                .bg(rgba(0xfb923c20))
-                                                .child(r_text),
-                                        );
-                                    }
-                                    d.child(row)
-                                },
-                            ),
+                            .when(active_tag_id == "all", |d| {
+                                if let Some(tag) = &item_tag {
+                                    let tag_color =
+                                        &GANTT_COLORS[tag.gantt_color % GANTT_COLORS.len()];
+                                    d.child(
+                                        div()
+                                            .flex_shrink_0()
+                                            .px(px(3.0))
+                                            .py(px(0.5))
+                                            .rounded(px(2.5))
+                                            .text_size(px(9.5))
+                                            .font_weight(FontWeight::MEDIUM)
+                                            .text_color(rgb(tag_color.hex))
+                                            .bg(rgba(tag_color.bg_alpha_hex))
+                                            .border_1()
+                                            .border_color(rgba(tag_color.hex | 0x45))
+                                            .child(tag.name.clone()),
+                                    )
+                                } else {
+                                    d
+                                }
+                            })
+                            .when_some(reminder_text, |d, r_text| {
+                                d.child(
+                                    div()
+                                        .flex_shrink_0()
+                                        .flex()
+                                        .items_center()
+                                        .gap(px(2.0))
+                                        .px(px(3.0))
+                                        .py(px(0.5))
+                                        .rounded(px(2.5))
+                                        .text_size(px(9.5))
+                                        .text_color(rgb(0xfb923c))
+                                        .bg(rgba(0xfb923c20))
+                                        .child(r_text),
+                                )
+                            }),
                     )
                     .child(
                         div()
                             .flex_shrink_0()
                             .flex()
                             .items_center()
-                            .gap(px(2.0))
+                            .gap(px(1.5))
                             .child(
                                 div()
-                                    .w(px(18.0))
-                                    .h(px(18.0))
+                                    .w(px(16.0))
+                                    .h(px(16.0))
                                     .flex_shrink_0()
                                     .flex()
                                     .justify_center()
                                     .items_center()
-                                    .rounded(px(4.0))
+                                    .rounded(px(3.0))
                                     .cursor_pointer()
                                     .text_color(if is_expanded {
                                         rgb(gantt.hex)
                                     } else {
-                                        rgba(0xffffff60)
+                                        rgba(0xffffff50)
                                     })
                                     .hover(|s| s.bg(rgba(0xffffff15)).text_color(rgb(0xffffff)))
                                     .id(ElementId::Name(format!("todo-expand-{idx}").into()))
@@ -295,44 +320,44 @@ pub fn render_todo_item<V: 'static>(
                                         } else {
                                             IconName::ChevronDown
                                         })
-                                        .size(px(9.0)),
+                                        .size(px(8.5)),
                                     ),
                             )
                             .child(
                                 div()
-                                    .w(px(18.0))
-                                    .h(px(18.0))
+                                    .w(px(16.0))
+                                    .h(px(16.0))
                                     .flex_shrink_0()
                                     .flex()
                                     .justify_center()
                                     .items_center()
-                                    .rounded(px(4.0))
+                                    .rounded(px(3.0))
                                     .cursor_pointer()
-                                    .text_color(rgba(0xffffff60))
+                                    .text_color(rgba(0xffffff50))
                                     .hover(|s| s.bg(rgba(0xffffff15)).text_color(rgb(0x00d992)))
                                     .id(ElementId::Name(format!("todo-edit-{idx}").into()))
                                     .on_click(cx.listener(move |this, _, window, cx| {
                                         on_edit(this, window, cx, idx);
                                     }))
-                                    .child(Icon::new(IconName::Redo).size(px(9.0))),
+                                    .child(Icon::new(IconName::Redo).size(px(8.5))),
                             )
                             .child(
                                 div()
-                                    .w(px(18.0))
-                                    .h(px(18.0))
+                                    .w(px(16.0))
+                                    .h(px(16.0))
                                     .flex_shrink_0()
                                     .flex()
                                     .justify_center()
                                     .items_center()
-                                    .rounded(px(4.0))
+                                    .rounded(px(3.0))
                                     .cursor_pointer()
-                                    .text_color(rgba(0xffffff60))
+                                    .text_color(rgba(0xffffff50))
                                     .hover(|s| s.bg(rgba(0xff4d4d25)).text_color(rgb(0xff6b6b)))
                                     .id(ElementId::Name(format!("todo-del-{idx}").into()))
                                     .on_click(cx.listener(move |this, _, window, cx| {
                                         on_delete(this, window, cx, idx);
                                     }))
-                                    .child(Icon::new(IconName::Delete).size(px(9.0))),
+                                    .child(Icon::new(IconName::Delete).size(px(8.5))),
                             ),
                     ),
             )

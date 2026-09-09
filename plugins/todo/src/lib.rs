@@ -1,4 +1,5 @@
 mod content_panel;
+mod drag;
 mod item_card;
 mod item_detail;
 mod model;
@@ -6,6 +7,7 @@ mod model;
 mod model_tests;
 mod notification;
 mod preset_editor;
+mod reminder;
 mod settings_view;
 mod sidebar;
 mod tag_modal;

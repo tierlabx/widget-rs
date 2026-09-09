@@ -285,3 +285,63 @@ fn test_reminder_preset_crud() {
     assert_eq!(data.reminder_presets.len(), 4);
     assert!(!data.reminder_presets.iter().any(|p| p.id == new_id));
 }
+
+#[test]
+fn test_todo_reorder_item() {
+    let mut data = TodoData::default();
+    let make_item = |id: &str, text: &str, tag: &str| TodoItem {
+        id: id.to_string(),
+        text: text.to_string(),
+        done: false,
+        tag_id: tag.to_string(),
+        gantt_color: 0,
+        reminder: None,
+        last_reminded_at: None,
+        created_at: None,
+    };
+
+    data.items = vec![
+        make_item("1", "任务一", "work"),
+        make_item("2", "任务二", "work"),
+        make_item("3", "任务三", "work"),
+        make_item("4", "任务四", "work"),
+    ];
+
+    // 1. 同 ID 重排无动作
+    assert!(!data.reorder_item("2", "2"));
+    assert_eq!(data.items[1].id, "2");
+
+    // 2. 无效 ID
+    assert!(!data.reorder_item("non-existent", "1"));
+    assert!(!data.reorder_item("1", "non-existent"));
+
+    // 3. 向下拖拽（从前往后）：将 "1" 拖拽到 "3" 上，应插入到 "3" 之后 -> [2, 3, 1, 4]
+    assert!(data.reorder_item("1", "3"));
+    let ids: Vec<&str> = data.items.iter().map(|it| it.id.as_str()).collect();
+    assert_eq!(ids, vec!["2", "3", "1", "4"]);
+
+    // 4. 向上拖拽（从后往前）：将 "4" 拖拽到 "2" 上，应插入到 "2" 之前 -> [4, 2, 3, 1]
+    assert!(data.reorder_item("4", "2"));
+    let ids2: Vec<&str> = data.items.iter().map(|it| it.id.as_str()).collect();
+    assert_eq!(ids2, vec!["4", "2", "3", "1"]);
+
+    // 5. 跨分类混杂情况下的重排稳定性
+    data.items = vec![
+        make_item("w1", "工作1", "work"),
+        make_item("l1", "生活1", "life"),
+        make_item("w2", "工作2", "work"),
+        make_item("l2", "生活2", "life"),
+    ];
+    // 在工作视图下将 w1 拖到 w2 之后 -> [l1, w2, w1, l2]
+    assert!(data.reorder_item("w1", "w2"));
+    let ids3: Vec<&str> = data.items.iter().map(|it| it.id.as_str()).collect();
+    assert_eq!(ids3, vec!["l1", "w2", "w1", "l2"]);
+    // 生活分类的相对顺序 [l1, l2] 依然完全保持
+    let life_ids: Vec<&str> = data
+        .items
+        .iter()
+        .filter(|it| it.tag_id == "life")
+        .map(|it| it.id.as_str())
+        .collect();
+    assert_eq!(life_ids, vec!["l1", "l2"]);
+}
