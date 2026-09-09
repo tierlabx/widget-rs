@@ -63,8 +63,10 @@ fn build_settings_window(&self, cx: &mut App) -> WindowHandle<SettingsWindow> {
 ```rust
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FoliaLyricsConfig {
-    /// 舞台视觉模式: ImmersiveStage(全流光) / MinimalSingleLine(极简单行) / VinylRecord(黑胶) / DesktopPure(纯净桌面)
+    /// 舞台视觉模式: TypographyPv(文字PV全屏舞台) / FlowStage(流光悬浮) / MinimalSingleLine(极简单行) / VinylRecord(黑胶)
     pub visual_mode: VisualMode,
+    /// 是否开启文字 PV 弹性打击动效 (字词弹跳缩放 + 动态微位移)
+    pub enable_pv_animation: bool,
     /// 歌词字号大小 (px)
     pub lyric_font_size: f32,
     /// 歌词主字体名称（默认系统苹方/思源黑体/Segoe UI）
@@ -79,6 +81,8 @@ pub struct FoliaLyricsConfig {
     pub show_translation: bool,
     /// 桌面是否常驻置底 (True = 贴合桌面 Progman, False = 普通窗口浮动)
     pub pin_to_desktop: bool,
+    /// 是否处于全屏沉浸 PV 模式
+    pub fullscreen_mode: bool,
 }
 ```
 
@@ -90,20 +94,22 @@ pub struct FoliaLyricsConfig {
 
 ```text
 plugins/folia-lyrics/src/
-├── lib.rs                 # 插件生命周期入口、Plugin trait 实现（< 150 行）
-├── types.rs               # 配置结构、歌词模型与事件类型定义（< 200 行）
+├── lib.rs                 # 插件生命周期入口、Plugin trait 实现（< 160 行）
+├── types.rs               # 配置结构、歌词模型、PV 排版模式与事件定义（< 200 行）
 ├── engine/                # 后台服务子模块
 │   ├── mod.rs             # 引擎对外门面与状态分发（< 150 行）
-│   ├── smtc.rs            # Windows WinRT SMTC 会话捕获器（< 300 行）
-│   ├── parser.rs          # YRC/LRC 逐字歌词文本解析器（< 280 行）
-│   └── fetcher.rs         # 在线歌词检索与本地缓存管理（< 260 行）
+│   ├── smtc.rs            # Windows WinRT SMTC 会话捕获与时间外推器（< 300 行）
+│   ├── parser.rs          # YRC/LRC 逐字歌词文本解析器（< 260 行）
+│   ├── pv_animator.rs     # [文字PV核心] Spring 弹簧阻尼模型与字词弹性计算器（< 250 行）
+│   └── fetcher.rs         # 在线歌词检索与本地缓存管理（< 240 行）
 ├── ui/                    # 前端 GPUI 渲染子模块
-│   ├── mod.rs             # 视图装配与 WidgetContent trait 实现（< 220 行）
-│   ├── stage.rs           # 动态流光舞台背景 Canvas 绘制（< 300 行）
-│   ├── karaoke.rs         # 逐字文本度量、遮罩与平滑扫光 Element（< 350 行）
-│   └── controls.rs        # 曲目浮标与媒体控制按钮组件（< 250 行）
+│   ├── mod.rs             # 视图装配、全屏/窗口模式切换、WidgetContent 实现（< 260 行）
+│   ├── stage.rs           # 动态流光舞台背景 Canvas 绘制与色盘调和（< 280 行）
+│   ├── typography_pv.rs   # [文字PV核心] 逐字弹跳、霓虹辉光与动态镜头排版 Element（< 380 行）
+│   └── controls.rs        # 曲目浮标、全屏切换与媒体控制按钮（< 220 行）
 └── settings/              # 设置界面子模块
+    ├── mod.rs             # 模块导出（< 20 行）
     └── view.rs            # 基于 settings_shell 的标准设置界面（< 280 行）
 ```
 
-通过这一明确清晰的子模块划分，每一项业务职责完全解耦，并且每个代码文件均在 350 行以内，严格满足项目的架构和工程规范。
+通过这一明确清晰的子模块划分，文字 PV 动画算法与渲染完全解耦，并且每个代码文件均在 380 行以内，严格满足单文件不超过 400 行的项目红线。

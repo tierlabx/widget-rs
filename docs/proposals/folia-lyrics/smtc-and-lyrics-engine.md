@@ -65,7 +65,7 @@ $$\text{CurrentPosition} = T_{base} + (t_{render} - t_{sync}) \times S$$
 
 ### 3.2 统一内部歌词数据模型
 ```rust
-/// 单个字符/词的精确时间片
+/// 单个字符/词的精确时间片（支持文字 PV 弹性进场）
 #[derive(Clone, Debug, PartialEq)]
 pub struct WordTiming {
     pub text: String,
@@ -73,7 +73,7 @@ pub struct WordTiming {
     pub duration_ms: u32,
 }
 
-/// 单行歌词
+/// 单行歌词（包含排版权重与间奏标记）
 #[derive(Clone, Debug, PartialEq)]
 pub struct LyricLine {
     pub line_index: usize,
@@ -82,6 +82,8 @@ pub struct LyricLine {
     pub raw_text: String,
     pub words: Vec<WordTiming>,
     pub translation: Option<String>,
+    /// 是否为间奏前后的重音高潮句
+    pub is_highlight: bool,
 }
 
 /// 完整歌词对象
@@ -91,6 +93,8 @@ pub struct TrackLyrics {
     pub artist: String,
     pub lines: Vec<LyricLine>,
     pub is_word_by_word: bool,
+    /// 预估曲目速度 BPM（用于驱动流光与文字呼吸节奏）
+    pub estimated_bpm: u32,
 }
 ```
 
