@@ -129,6 +129,7 @@ pub fn render_todo_item<V: 'static>(
 
         div()
             .id(ElementId::Name(format!("todo-item-{idx}").into()))
+            .group("todo-row")
             .flex()
             .flex_col()
             .w_full()
@@ -233,11 +234,12 @@ pub fn render_todo_item<V: 'static>(
                             .min_w_0()
                             .flex()
                             .flex_row()
+                            .flex_wrap()
                             .items_center()
                             .gap(px(4.0))
-                            .overflow_hidden()
                             .child(
                                 div()
+                                    .w_full()
                                     .text_xs()
                                     .font_weight(FontWeight::NORMAL)
                                     .text_color(if done {
@@ -245,7 +247,6 @@ pub fn render_todo_item<V: 'static>(
                                     } else {
                                         rgb(0xf8fafc)
                                     })
-                                    .truncate()
                                     .when(done, |d: Div| d.line_through())
                                     .child(text),
                             )
@@ -294,6 +295,9 @@ pub fn render_todo_item<V: 'static>(
                             .flex()
                             .items_center()
                             .gap(px(1.5))
+                            // 默认透明，鼠标悬停整行时浮现
+                            .opacity(if is_expanded { 1.0 } else { 0.0 })
+                            .group_hover("todo-row", |s| s.opacity(1.0))
                             .child(
                                 div()
                                     .w(px(16.0))
