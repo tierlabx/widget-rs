@@ -1,23 +1,17 @@
-mod content_panel;
-mod drag;
-mod item_card;
-mod item_detail;
 mod model;
-#[cfg(test)]
-mod model_tests;
 mod notification;
-mod preset_editor;
-mod reminder;
-mod settings_view;
-mod sidebar;
-mod tag_modal;
+mod settings;
 mod timer;
+mod ui;
 mod view;
+
+#[cfg(test)]
+mod tests;
 
 use gpui::*;
 use widget_core::Plugin;
 
-use settings_view::TodoSettingsView;
+use settings::TodoSettingsView;
 use view::TodoWidget;
 
 pub struct TodoDataReloadTrigger(pub bool);

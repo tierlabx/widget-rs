@@ -2,12 +2,12 @@ use gpui::prelude::FluentBuilder;
 use gpui::*;
 use gpui_component::input::{InputEvent, InputState};
 
-use crate::content_panel::{render_content_panel, ContentPanelProps};
-use crate::item_card::{render_todo_item, ItemCardProps};
 use crate::model::{TodoData, TodoItem, TodoModel, TodoTag};
-use crate::sidebar::render_sidebar;
-use crate::tag_modal::{render_tag_modal, TagModalMode, TagModalState};
 use crate::timer::{get_now_secs, get_simple_time_str, spawn_todo_timer};
+use crate::ui::content_panel::{render_content_panel, ContentPanelProps};
+use crate::ui::item_card::{render_todo_item, ItemCardProps};
+use crate::ui::sidebar::render_sidebar;
+use crate::ui::tag_modal::{render_tag_modal, TagModalMode, TagModalState};
 
 pub struct TodoWidget {
     data: TodoData,
@@ -136,7 +136,7 @@ impl Render for TodoWidget {
         let mut pending_elements = Vec::new();
         let mut completed_elements = Vec::new();
 
-        let callbacks = crate::item_card::ItemCardCallbacks {
+        let callbacks = crate::ui::item_card::ItemCardCallbacks {
             on_toggle_done: std::rc::Rc::new(|this: &mut Self, _, cx, idx| {
                 if let Some(it) = this.data.items.get_mut(idx) {
                     it.done = !it.done;

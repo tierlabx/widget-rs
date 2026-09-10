@@ -2,7 +2,7 @@ use gpui::*;
 use widget_core::render_settings_shell;
 
 use crate::model::{ReminderRule, TodoData, TodoModel};
-use crate::preset_editor::{render_add_card, render_preset_list};
+use crate::settings::preset_editor::{render_add_card, render_preset_list};
 
 /// 待办事项插件独立设置视图
 pub struct TodoSettingsView {

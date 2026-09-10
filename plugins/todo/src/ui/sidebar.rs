@@ -1,5 +1,4 @@
 use gpui::*;
-use gpui_component::{Icon, IconName};
 
 use crate::model::{TodoTag, GANTT_COLORS};
 
@@ -145,7 +144,7 @@ pub fn render_sidebar<V: 'static>(
                 )
                 .child(tag.name.clone())
         }))
-        // 3. 底部“+”新建分类按钮
+        // 3. 底部"+"新建分类按钮
         .child(
             div()
                 .w_full()
@@ -164,6 +163,6 @@ pub fn render_sidebar<V: 'static>(
                 .on_click(cx.listener(move |this, _, window, cx| {
                     on_add_tag_click(this, window, cx);
                 }))
-                .child(Icon::new(IconName::Plus).size(px(12.0))),
+                .child(gpui_component::Icon::new(gpui_component::IconName::Plus).size(px(12.0))),
         )
 }

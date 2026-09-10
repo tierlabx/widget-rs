@@ -3,7 +3,7 @@ use gpui_component::{Icon, IconName};
 use widget_core::{settings_card, settings_section_header};
 
 use crate::model::ReminderRule;
-use crate::settings_view::TodoSettingsView;
+use crate::settings::view::TodoSettingsView;
 
 /// 渲染提醒预设列表
 pub fn render_preset_list(

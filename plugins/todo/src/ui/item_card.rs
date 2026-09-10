@@ -3,9 +3,9 @@ use gpui::*;
 use gpui_component::input::{Input, InputState};
 use gpui_component::{Icon, IconName};
 
-use crate::drag::{render_drag_handle, DraggedTodoItem, TodoDragPreview};
-use crate::item_detail::render_item_detail;
 use crate::model::{ReminderPreset, ReminderRule, TodoItem, TodoTag, GANTT_COLORS};
+use crate::ui::drag::{render_drag_handle, DraggedTodoItem, TodoDragPreview};
+use crate::ui::item_detail::render_item_detail;
 
 /// 单条待办项的渲染参数
 pub struct ItemCardProps<'a> {
