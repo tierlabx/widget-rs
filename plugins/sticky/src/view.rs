@@ -60,12 +60,22 @@ impl widget_core::WidgetContent for StickyWidget {
 
 impl Render for StickyWidget {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        // 确保在便签窗口中，Theme 文本、光标与选区颜色为深炭黑墨水色（防止深色主题下的白色光标在浅色便签上隐形）
+        // 根据当前便签主题动态调整光标与选区颜色：
+        // 深色主题用浅色光标，浅色主题用深色光标，防止光标在背景上隐形
+        let current_color_index = self.data.current().color_index.min(STICKY_THEMES.len() - 1);
+        let is_dark_theme = STICKY_THEMES[current_color_index].is_dark;
         let theme_mut = gpui_component::Theme::global_mut(cx);
-        theme_mut.colors.foreground = gpui::hsla(0.0, 0.0, 0.12, 1.0);
-        theme_mut.colors.muted_foreground = gpui::hsla(0.0, 0.0, 0.40, 1.0);
-        theme_mut.colors.caret = gpui::hsla(0.0, 0.0, 0.10, 1.0);
-        theme_mut.colors.selection = gpui::hsla(0.0, 0.0, 0.0, 0.15);
+        if is_dark_theme {
+            theme_mut.colors.foreground = gpui::hsla(0.0, 0.0, 0.90, 1.0);
+            theme_mut.colors.muted_foreground = gpui::hsla(0.0, 0.0, 0.65, 1.0);
+            theme_mut.colors.caret = gpui::hsla(0.0, 0.0, 0.92, 1.0);
+            theme_mut.colors.selection = gpui::hsla(0.0, 0.0, 1.0, 0.18);
+        } else {
+            theme_mut.colors.foreground = gpui::hsla(0.0, 0.0, 0.12, 1.0);
+            theme_mut.colors.muted_foreground = gpui::hsla(0.0, 0.0, 0.40, 1.0);
+            theme_mut.colors.caret = gpui::hsla(0.0, 0.0, 0.10, 1.0);
+            theme_mut.colors.selection = gpui::hsla(0.0, 0.0, 0.0, 0.15);
+        }
 
         if self.pending_input_reset {
             self.pending_input_reset = false;

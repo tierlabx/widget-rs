@@ -98,9 +98,11 @@ pub struct StickyTheme {
     pub text_hex: u32,
     pub border_hex: u32,
     pub btn_hover_hex: u32,
+    /// 是否为深色主题（影响光标与选区颜色）
+    pub is_dark: bool,
 }
 
-pub const STICKY_THEMES: [StickyTheme; 6] = [
+pub const STICKY_THEMES: [StickyTheme; 7] = [
     // 0: 黄色 (Yellow)
     StickyTheme {
         name: "黄色",
@@ -109,6 +111,7 @@ pub const STICKY_THEMES: [StickyTheme; 6] = [
         text_hex: 0x262626,
         border_hex: 0xf5e386,
         btn_hover_hex: 0xffe680,
+        is_dark: false,
     },
     // 1: 绿色 (Green)
     StickyTheme {
@@ -118,6 +121,7 @@ pub const STICKY_THEMES: [StickyTheme; 6] = [
         text_hex: 0x1e3a1a,
         border_hex: 0xb5e9ad,
         btn_hover_hex: 0xbdf0b5,
+        is_dark: false,
     },
     // 2: 粉色 (Pink)
     StickyTheme {
@@ -127,6 +131,7 @@ pub const STICKY_THEMES: [StickyTheme; 6] = [
         text_hex: 0x4a1525,
         border_hex: 0xfcb5be,
         btn_hover_hex: 0xffbec6,
+        is_dark: false,
     },
     // 3: 紫色 (Purple)
     StickyTheme {
@@ -136,6 +141,7 @@ pub const STICKY_THEMES: [StickyTheme; 6] = [
         text_hex: 0x38144d,
         border_hex: 0xcda0f5,
         btn_hover_hex: 0xd4a8fc,
+        is_dark: false,
     },
     // 4: 蓝色 (Blue)
     StickyTheme {
@@ -145,6 +151,7 @@ pub const STICKY_THEMES: [StickyTheme; 6] = [
         text_hex: 0x103b52,
         border_hex: 0x93dbfa,
         btn_hover_hex: 0xa1defc,
+        is_dark: false,
     },
     // 5: 碳黑 (Charcoal)
     StickyTheme {
@@ -154,6 +161,17 @@ pub const STICKY_THEMES: [StickyTheme; 6] = [
         text_hex: 0xf2f2f2,
         border_hex: 0x3d3d3d,
         btn_hover_hex: 0x333333,
+        is_dark: true,
+    },
+    // 6: 暗夜 Todo 风格 (Dark Todo)
+    StickyTheme {
+        name: "暗夜",
+        bg_hex: 0x1a1f2e,
+        header_hex: 0x141824,
+        text_hex: 0xe2e8f0,
+        border_hex: 0x2d3748,
+        btn_hover_hex: 0x2a3244,
+        is_dark: true,
     },
 ];
 
