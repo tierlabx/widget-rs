@@ -9,6 +9,26 @@ pub struct StickyNote {
     pub color_index: usize,
     #[serde(default)]
     pub images: Vec<String>,
+    /// 便签标题，用于侧边栏 Tab 显示；为空时退回到内容前缀
+    #[serde(default)]
+    pub title: String,
+}
+
+impl StickyNote {
+    /// 返回侧边栏 Tab 上显示的短标签文字
+    pub fn tab_label(&self, index: usize) -> String {
+        if !self.title.is_empty() {
+            // 最多取 4 个字符
+            self.title.chars().take(4).collect()
+        } else {
+            let snippet: String = self.content.trim().chars().take(4).collect();
+            if snippet.is_empty() {
+                format!("#{}", index + 1)
+            } else {
+                snippet
+            }
+        }
+    }
 }
 
 impl Default for StickyNote {
@@ -17,6 +37,7 @@ impl Default for StickyNote {
             content: String::new(),
             color_index: 0,
             images: Vec::new(),
+            title: String::new(),
         }
     }
 }
@@ -62,18 +83,46 @@ impl StickyData {
         self.current_index = self.notes.len() - 1;
     }
 
-    /// 向前翻页
+    /// 向前翻页（保留备用）
+    #[allow(dead_code)]
     pub fn prev(&mut self) {
         if self.current_index > 0 {
             self.current_index -= 1;
         }
     }
 
-    /// 向后翻页
+    /// 向后翻页（保留备用）
+    #[allow(dead_code)]
     pub fn next(&mut self) {
         if self.current_index + 1 < self.notes.len() {
             self.current_index += 1;
         }
+    }
+
+    /// 直接切换到指定索引
+    pub fn switch_to(&mut self, idx: usize) {
+        if idx < self.notes.len() {
+            self.current_index = idx;
+        }
+    }
+
+    /// 拖拽排序：将 from_idx 处的便签移动到 to_idx 位置，current_index 跟随
+    pub fn reorder_note(&mut self, from_idx: usize, to_idx: usize) -> bool {
+        if from_idx == to_idx || from_idx >= self.notes.len() || to_idx >= self.notes.len() {
+            return false;
+        }
+        let note = self.notes.remove(from_idx);
+        let adjusted = if to_idx > from_idx {
+            to_idx - 1
+        } else {
+            to_idx
+        };
+        self.notes.insert(adjusted, note);
+        // 让 current_index 跟随被移动的便签
+        if self.current_index == from_idx {
+            self.current_index = adjusted;
+        }
+        true
     }
 
     /// 删除当前便签（至少保留一张）
@@ -194,6 +243,7 @@ impl StickyModel {
                         content,
                         color_index: 0,
                         images: Vec::new(),
+                        title: String::new(),
                     }],
                     current_index: 0,
                 };

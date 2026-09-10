@@ -270,53 +270,70 @@ impl Render for TodoWidget {
 
         div()
             .relative()
-            .flex()
-            .flex_row()
             .size_full()
-            .gap(px(2.0))
-            .overflow_hidden()
-            // ── 左侧：吸附 Tab 侧边栏 ──────────────────────────────
-            .child(render_sidebar(
-                &tags,
-                &active_tag_id,
-                |this, _, cx, tag_id| {
-                    this.data.active_tag_id = tag_id;
-                    cx.notify();
-                },
-                |this, window, cx, tag| {
-                    this.open_tag_edit(&tag, window, cx);
-                },
-                |this, window, cx| {
-                    this.open_tag_create(window, cx);
-                },
-                cx,
-            ))
-            // ── 右侧：主体内容毛玻璃主面板 ───────────────────────────────
-            .child(render_content_panel(
-                ContentPanelProps {
-                    active_tag_obj,
-                    pending_count: pending_elements.len(),
-                    can_delete_tag,
-                    new_input,
-                    scroll_handle: &self.scroll_handle,
-                    show_completed: self.show_completed,
-                    pending_elements,
-                    completed_elements,
-                },
-                |this, window, cx, tag| {
-                    this.open_tag_edit(&tag, window, cx);
-                },
-                |this, _, cx, tag_id| {
-                    this.data.delete_tag_and_migrate(&tag_id);
-                    TodoModel::save(&this.data, cx);
-                    cx.notify();
-                },
-                |this, _, cx| {
-                    this.show_completed = !this.show_completed;
-                    cx.notify();
-                },
-                cx,
-            ))
+            // ── 主内容面板：absolute 铺满（left=104 为 sidebar 留浮动空间）──
+            .child(
+                div()
+                    .absolute()
+                    .left(px(104.0))
+                    .right(px(0.0))
+                    .top(px(0.0))
+                    .bottom(px(0.0))
+                    .child(render_content_panel(
+                        ContentPanelProps {
+                            active_tag_obj,
+                            pending_count: pending_elements.len(),
+                            can_delete_tag,
+                            new_input,
+                            scroll_handle: &self.scroll_handle,
+                            show_completed: self.show_completed,
+                            pending_elements,
+                            completed_elements,
+                        },
+                        |this, window, cx, tag| {
+                            this.open_tag_edit(&tag, window, cx);
+                        },
+                        |this, _, cx, tag_id| {
+                            this.data.delete_tag_and_migrate(&tag_id);
+                            TodoModel::save(&this.data, cx);
+                            cx.notify();
+                        },
+                        |this, _, cx| {
+                            this.show_completed = !this.show_completed;
+                            cx.notify();
+                        },
+                        cx,
+                    )),
+            )
+            // ── 浮动标签侧边栏：absolute left:0 w:104，右对齐贴齐内容面板，允许向左溢出 ──
+            .child(
+                div()
+                    .absolute()
+                    .left(px(0.0))
+                    .top(px(0.0))
+                    .bottom(px(0.0))
+                    .w(px(104.0))
+                    .child(render_sidebar(
+                        &tags,
+                        &active_tag_id,
+                        |this, _, cx, tag_id| {
+                            this.data.active_tag_id = tag_id;
+                            cx.notify();
+                        },
+                        |this, window, cx, tag| {
+                            this.open_tag_edit(&tag, window, cx);
+                        },
+                        |this, window, cx| {
+                            this.open_tag_create(window, cx);
+                        },
+                        |this, _, cx, from_idx, to_idx| {
+                            this.data.reorder_tag(from_idx, to_idx);
+                            TodoModel::save(&this.data, cx);
+                            cx.notify();
+                        },
+                        cx,
+                    )),
+            )
             // ── 弹窗浮层（标签新建/编辑） ─────────────────────────
             .when_some(self.tag_modal.as_ref(), |d: Div, modal| {
                 d.child(render_tag_modal(

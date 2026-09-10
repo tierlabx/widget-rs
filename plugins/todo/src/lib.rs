@@ -45,7 +45,7 @@ impl Plugin for TodoWidgetPlugin {
         let options = widget_core::default_widget_window_options(
             cx,
             "todo_widget",
-            (1250.0, 450.0, 360.0, 460.0),
+            (1250.0, 450.0, 410.0, 460.0),
         );
 
         cx.open_window(options, |window, cx| {

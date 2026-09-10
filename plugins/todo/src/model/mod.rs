@@ -257,6 +257,21 @@ pub struct TodoData {
 }
 
 impl TodoData {
+    /// 拖拽排序：移动标签顺序，from_idx 移动到 to_idx 位置
+    pub fn reorder_tag(&mut self, from_idx: usize, to_idx: usize) -> bool {
+        if from_idx == to_idx || from_idx >= self.tags.len() || to_idx >= self.tags.len() {
+            return false;
+        }
+        let tag = self.tags.remove(from_idx);
+        let adjusted = if to_idx > from_idx {
+            to_idx - 1
+        } else {
+            to_idx
+        };
+        self.tags.insert(adjusted, tag);
+        true
+    }
+
     /// 拖拽排序：将指定 ID 的待办项移动到目标 ID 项的位置
     /// - 若向下拖动（源索引 < 目标索引）：移动到目标项之后
     /// - 若向上拖动（源索引 > 目标索引）：移动到目标项之前
