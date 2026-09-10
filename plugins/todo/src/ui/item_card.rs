@@ -248,7 +248,7 @@ pub fn render_todo_item<V: 'static>(
                                         rgb(0xf8fafc)
                                     })
                                     .when(done, |d: Div| d.line_through())
-                                    .child(text),
+                                    .child(text.clone()),
                             )
                             .when(active_tag_id == "all", |d| {
                                 if let Some(tag) = &item_tag {
@@ -298,6 +298,27 @@ pub fn render_todo_item<V: 'static>(
                             // 默认透明，鼠标悬停整行时浮现
                             .opacity(if is_expanded { 1.0 } else { 0.0 })
                             .group_hover("todo-row", |s| s.opacity(1.0))
+                            .child({
+                                let copy_text = text.clone();
+                                div()
+                                    .w(px(16.0))
+                                    .h(px(16.0))
+                                    .flex_shrink_0()
+                                    .flex()
+                                    .justify_center()
+                                    .items_center()
+                                    .rounded(px(3.0))
+                                    .cursor_pointer()
+                                    .text_color(rgba(0xffffff50))
+                                    .hover(|s| s.bg(rgba(0xffffff15)).text_color(rgb(0x38bdf8)))
+                                    .id(ElementId::Name(format!("todo-copy-{idx}").into()))
+                                    .on_click(cx.listener(move |_this, _, _window, cx| {
+                                        cx.write_to_clipboard(ClipboardItem::new_string(
+                                            copy_text.clone(),
+                                        ));
+                                    }))
+                                    .child(Icon::new(IconName::Copy).size(px(8.5)))
+                            })
                             .child(
                                 div()
                                     .w(px(16.0))
