@@ -1,4 +1,5 @@
 pub mod dashboard;
+pub mod dashboard_preview;
 pub mod dashboard_stats;
 pub mod dashboard_widgets;
 pub mod settings;

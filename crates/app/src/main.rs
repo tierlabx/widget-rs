@@ -41,6 +41,10 @@ fn main() {
     let mut pm = PluginManager::new();
     plugin::registry::register_all_plugins(&mut pm);
 
+    // 2.1 扫描并注册外部 JS 扩展小组件
+    let extensions = plugin::extension_loader::scan_and_load_extensions();
+    pm.register_external_plugins(extensions);
+
     // 3. 初始化系统托盘（包括托盘图标和菜单）
     let tray_handles = tray::setup_tray(app_config.silent_start).expect("系统托盘初始化失败");
 
@@ -63,21 +67,34 @@ fn main() {
         cx.set_global(app_config.clone());
 
         // 提取并存储全局 PluginList 元数据
-        let metadata_list = pm
-            .get_plugins()
-            .iter()
-            .map(|p| widget_core::PluginMetadata {
-                id: p.id(),
-                name: p.name(),
-                description: p.description(),
-                icon: p.icon(),
-                version: p.version(),
-                author: p.author(),
-                estimated_memory: p.estimated_memory(),
-                has_settings: p.has_settings(),
-            })
-            .collect::<Vec<_>>();
+        let metadata_list = pm.build_metadata_list();
         cx.set_global(widget_core::PluginList(metadata_list));
+
+        // 注册打开外部扩展目录的回调
+        cx.set_global(widget_core::OpenExtensionsDirCallback(std::sync::Arc::new(
+            move |_cx: &mut App| {
+                let ext_dir = widget_core::get_extensions_dir();
+                let _ = std::process::Command::new("explorer").arg(&ext_dir).spawn();
+            },
+        )));
+
+        // 注册重新扫描加载外部扩展的回调
+        cx.set_global(widget_core::ReloadExtensionsCallback(std::sync::Arc::new(
+            move |cx: &mut App| {
+                let new_exts = plugin::extension_loader::scan_and_load_extensions();
+                let meta_list = if let Some(mut pm) = cx.try_global::<PluginManager>().cloned() {
+                    pm.reload_external_plugins(new_exts);
+                    let list = pm.build_metadata_list();
+                    cx.set_global(pm);
+                    list
+                } else {
+                    Vec::new()
+                };
+                if !meta_list.is_empty() {
+                    cx.set_global(widget_core::PluginList(meta_list));
+                }
+            },
+        )));
 
         // 注册更新状态桥接（异步任务通过此全局变量回传更新检查/下载状态）
         cx.set_global(widget_ui::MainWindowUpdateBridge {
@@ -121,7 +138,7 @@ fn main() {
                                     cx.background_executor().timer(std::time::Duration::from_millis(100)).await;
                                     hwnd = cx.update(|cx| {
                                         let h = cx.try_global::<WindowManager>()
-                                            .and_then(|wm| wm.widget_windows.get(&plugin_id_string.as_str()))
+                                            .and_then(|wm| wm.widget_windows.get(&plugin_id_string))
                                             .map(|(h, _, _)| *h);
                                         if let Some(h) = h {
                                             h.update(cx, |_, win, _| {
@@ -139,9 +156,9 @@ fn main() {
                                 }
 
                                 if hwnd != 0 {
-                                    let _ = cx.update(|cx| {
+                                    cx.update(|cx| {
                                         cx.update_global::<WindowManager, _>(|wm, _| {
-                                            if let Some(e) = wm.widget_windows.get_mut(plugin_id_string.as_str()) {
+                                            if let Some(e) = wm.widget_windows.get_mut(&plugin_id_string) {
                                                 e.1 = hwnd;
                                             }
                                         });
@@ -150,7 +167,7 @@ fn main() {
                                         let owner_hwnd = window::platform::windows::apply_plugin_window_styles(hwnd, &plugin_id_string, config.as_ref());
                                         // 将 Owner HWND 存入 widget_windows
                                         cx.update_global::<WindowManager, _>(|wm, _| {
-                                            if let Some(e) = wm.widget_windows.get_mut(plugin_id_string.as_str()) {
+                                            if let Some(e) = wm.widget_windows.get_mut(&plugin_id_string) {
                                                 e.2 = owner_hwnd;
                                             }
                                         });

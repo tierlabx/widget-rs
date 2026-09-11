@@ -140,3 +140,22 @@ pub fn set_window_always_on_top(hwnd: isize, always_on_top: bool) {
         ALLOW_EXPLICIT_ZORDER.store(false, Ordering::SeqCst);
     }
 }
+
+/// 设置或取消窗口的鼠标点击穿透（WS_EX_TRANSPARENT）
+pub fn set_window_mouse_passthrough(hwnd: isize, passthrough: bool) {
+    if hwnd == 0 {
+        return;
+    }
+    #[cfg(target_os = "windows")]
+    unsafe {
+        use windows_sys::Win32::UI::WindowsAndMessaging::{
+            GetWindowLongW, SetWindowLongW, GWL_EXSTYLE, WS_EX_TRANSPARENT,
+        };
+        let style = GetWindowLongW(hwnd, GWL_EXSTYLE);
+        if passthrough {
+            SetWindowLongW(hwnd, GWL_EXSTYLE, style | WS_EX_TRANSPARENT as i32);
+        } else {
+            SetWindowLongW(hwnd, GWL_EXSTYLE, style & !(WS_EX_TRANSPARENT as i32));
+        }
+    }
+}

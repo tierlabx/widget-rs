@@ -9114,6 +9114,7 @@ dependencies = [
 name = "widget-core"
 version = "0.8.1"
 dependencies = [
+ "anyhow",
  "directories",
  "gpui-component",
  "gpui-pre",

@@ -49,3 +49,12 @@ pub fn get_app_icon_path() -> PathBuf {
     }
     icon_path
 }
+
+/// 获取外部扩展小部件的存放目录，并确保目录存在
+pub fn get_extensions_dir() -> PathBuf {
+    let ext_dir = get_data_dir().join("extensions");
+    if !ext_dir.exists() {
+        let _ = fs::create_dir_all(&ext_dir);
+    }
+    ext_dir
+}

@@ -182,7 +182,7 @@ pub fn toggle_main_window_win32(main_hwnd: isize, is_visible_current: bool) -> b
 
 /// 批量应用所有小组件的置顶/垫底设置。
 pub fn apply_always_on_top(
-    widget_windows: &std::collections::HashMap<&'static str, (gpui::AnyWindowHandle, isize, isize)>,
+    widget_windows: &std::collections::HashMap<String, (gpui::AnyWindowHandle, isize, isize)>,
     always_on_top: bool,
 ) {
     for (id, (_, hwnd, _)) in widget_windows {

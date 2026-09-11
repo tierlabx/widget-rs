@@ -29,8 +29,42 @@ impl PluginManager {
         self.plugins.push(plugin);
     }
 
+    /// 批量注册外部扩展插件（自动跳过已存在的插件）
+    pub fn register_external_plugins(&mut self, ext_plugins: Vec<Arc<dyn Plugin>>) {
+        for ext in ext_plugins {
+            let id = ext.id();
+            if !self.plugins.iter().any(|p| p.id() == id) {
+                self.plugins.push(ext);
+            }
+        }
+    }
+
+    /// 重载外部扩展插件：保留内置插件，重新填入最新的外部扩展
+    pub fn reload_external_plugins(&mut self, new_exts: Vec<Arc<dyn Plugin>>) {
+        self.plugins.retain(|p| !p.is_external());
+        self.plugins.extend(new_exts);
+    }
+
     /// 获取当前所有已注册的插件列表
     pub fn get_plugins(&self) -> &[Arc<dyn Plugin>] {
         &self.plugins
+    }
+
+    /// 提取全局小组件元数据列表
+    pub fn build_metadata_list(&self) -> Vec<widget_core::PluginMetadata> {
+        self.plugins
+            .iter()
+            .map(|p| widget_core::PluginMetadata {
+                id: p.id().to_string().into(),
+                name: p.name().to_string().into(),
+                description: p.description().to_string().into(),
+                icon: p.icon(),
+                version: p.version().to_string().into(),
+                author: p.author().to_string().into(),
+                estimated_memory: p.estimated_memory(),
+                has_settings: p.has_settings(),
+                is_external: p.is_external(),
+            })
+            .collect()
     }
 }

@@ -8,10 +8,10 @@ use crate::{start_window_drag, update_window_edit_mode, UIState};
 /// 窗口边框切换等窗口级通用逻辑，这些全部由 `WidgetWindow<T>` 统一管理。
 pub trait WidgetContent: Render + Sized + 'static {
     /// 返回此内容对应的插件 ID（与 Plugin::id 一致）
-    fn plugin_id(&self) -> &'static str;
+    fn plugin_id(&self) -> &str;
 
     /// 返回编辑模式拖拽条上的标签文字（如 "拖拽移动便签"、"拖拽移动待办"）
-    fn drag_label(&self) -> &'static str {
+    fn drag_label(&self) -> &str {
         "拖拽移动"
     }
 

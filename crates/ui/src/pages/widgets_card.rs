@@ -49,14 +49,15 @@ fn get_plugin_theme(id: &str) -> PluginTheme {
 /// 渲染小部件市场卡片
 #[allow(clippy::too_many_arguments)]
 pub fn render_market_card(
-    name: &'static str,
-    id_str: &'static str,
-    desc: &'static str,
+    name: &str,
+    id_str: &str,
+    desc: &str,
     icon: gpui_component::IconName,
-    version: &'static str,
-    author: &'static str,
+    version: &str,
+    author: &str,
     estimated_memory: usize,
     is_loaded: bool,
+    is_external: bool,
     index: usize,
     anim_token: u32,
 ) -> impl IntoElement {
@@ -66,6 +67,10 @@ pub fn render_market_card(
     } else {
         "< 2.0 MB".to_string()
     };
+
+    let name_str = name.to_string();
+    let desc_str = desc.to_string();
+    let id_string = id_str.to_string();
 
     let card_content =
         div()
@@ -117,10 +122,24 @@ pub fn render_market_card(
                                     .w_full()
                                     .child(
                                         div()
-                                            .text_base()
-                                            .font_weight(FontWeight::BOLD)
-                                            .text_color(rgb(0xf4f4f5))
-                                            .child(name),
+                                            .flex()
+                                            .items_center()
+                                            .gap(px(6.0))
+                                            .child(
+                                                div()
+                                                    .text_base()
+                                                    .font_weight(FontWeight::BOLD)
+                                                    .text_color(rgb(0xf4f4f5))
+                                                    .child(name_str),
+                                            )
+                                            .child(if is_external {
+                                                Badge::new("JS 扩展")
+                                                    .variant(BadgeVariant::Default)
+                                                    .show_dot(false)
+                                                    .into_any_element()
+                                            } else {
+                                                div().into_any_element()
+                                            }),
                                     )
                                     .child(
                                         Badge::new(format!("v{}", version))
@@ -148,7 +167,7 @@ pub fn render_market_card(
                             .text_color(rgb(0xa1a1aa))
                             .h(px(38.0))
                             .overflow_hidden()
-                            .child(desc),
+                            .child(desc_str),
                     )
                     .child(div().flex().items_center().gap(px(6.0)).children(
                         theme.tags.iter().map(|tag| {
@@ -192,8 +211,9 @@ pub fn render_market_card(
                                     .child(format!("预估内存 {}", mem_str)),
                             ),
                     )
-                    .child(
-                        Button::new(id_str, if is_loaded { "已安装" } else { "获取" })
+                    .child({
+                        let pid = id_string.clone();
+                        Button::new(id_string.clone(), if is_loaded { "已安装" } else { "获取" })
                             .variant(if is_loaded {
                                 ButtonVariant::Secondary
                             } else {
@@ -209,36 +229,35 @@ pub fn render_market_card(
                                     return;
                                 }
                                 cx.update_global::<widget_core::UIState, _>(|s, _| {
-                                    s.plugin_loaded.insert(id_str.to_string(), true);
-                                    s.plugin_enabled.insert(id_str.to_string(), true);
+                                    s.plugin_loaded.insert(pid.clone(), true);
+                                    s.plugin_enabled.insert(pid.clone(), true);
                                 });
 
                                 cx.update_global::<widget_core::AppConfig, _>(|c, _| {
-                                    let cfg =
-                                        c.plugins.entry(id_str.to_string()).or_insert_with(|| {
-                                            widget_core::PluginConfig {
-                                                x: 0.0,
-                                                y: 0.0,
-                                                width: 0.0,
-                                                height: 0.0,
-                                                scale: 1.0,
-                                                phys_x: 0,
-                                                phys_y: 0,
-                                                phys_w: 0,
-                                                phys_h: 0,
-                                                always_on_top: false,
-                                                mouse_passthrough: false,
-                                                pinned_to_desktop: false,
-                                                loaded: true,
-                                                enabled: true,
-                                            }
-                                        });
+                                    let cfg = c.plugins.entry(pid.clone()).or_insert_with(|| {
+                                        widget_core::PluginConfig {
+                                            x: 0.0,
+                                            y: 0.0,
+                                            width: 0.0,
+                                            height: 0.0,
+                                            scale: 1.0,
+                                            phys_x: 0,
+                                            phys_y: 0,
+                                            phys_w: 0,
+                                            phys_h: 0,
+                                            always_on_top: false,
+                                            mouse_passthrough: false,
+                                            pinned_to_desktop: false,
+                                            loaded: true,
+                                            enabled: true,
+                                        }
+                                    });
                                     cfg.loaded = true;
                                     cfg.enabled = true;
                                 });
                                 widget_core::save_config_now(cx);
 
-                                let plugin_id_string = id_str.to_string();
+                                let plugin_id_string = pid.clone();
                                 if let Some(cb) = cx
                                     .try_global::<widget_core::TogglePluginCallback>()
                                     .cloned()
@@ -249,14 +268,14 @@ pub fn render_market_card(
                                 }
 
                                 cx.refresh_windows();
-                            }),
-                    ),
+                            })
+                    }),
             );
 
     // 阶梯式平滑入场动画（Staggered entrance animation）
     let anim_duration = 200 + (index as u64).min(8) * 35;
     card_content.with_animation(
-        ElementId::Name(format!("market-anim-{}-{}-{}", id_str, index, anim_token).into()),
+        ElementId::Name(format!("market-anim-{}-{}-{}", id_string, index, anim_token).into()),
         Animation::new(Duration::from_millis(anim_duration)).with_easing(gpui::ease_in_out),
         move |el, delta| {
             let progress = delta.clamp(0.0, 1.0);

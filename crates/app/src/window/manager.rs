@@ -14,7 +14,7 @@ pub struct WindowManager {
     /// 主窗口的 Win32 HWND（提取后单独存储，避免后续操作时产生不必要的生命周期或借用嵌套）
     pub main_hwnd: isize,
     /// 注册的所有插件窗口：插件 ID 映射到 (窗口泛型句柄, Win32 HWND, Owner HWND)
-    pub widget_windows: HashMap<&'static str, (AnyWindowHandle, isize, isize)>,
+    pub widget_windows: HashMap<String, (AnyWindowHandle, isize, isize)>,
     /// 全局应用是否可见的状态标志
     pub is_visible: bool,
 }
@@ -119,10 +119,11 @@ impl WindowManager {
     /// 注册插件窗口
     ///
     /// 将插件窗口记录到 `widget_windows` 字典中。初始时如果无法直接读取 HWND，则记录为 0。
-    pub fn register_widget_window(&mut self, id: &'static str, handle: AnyWindowHandle) {
+    pub fn register_widget_window(&mut self, id: &str, handle: AnyWindowHandle) {
         // 尝试从窗口句柄中提取 HWND，默认先给 0
         let hwnd = Self::extract_hwnd(&handle);
-        self.widget_windows.insert(id, (handle, hwnd, 0));
+        self.widget_windows
+            .insert(id.to_string(), (handle, hwnd, 0));
     }
 
     /// 移除插件窗口记录，同时销毁关联的隐藏 Owner 窗口
@@ -150,7 +151,7 @@ impl WindowManager {
     ///
     /// 此方法通常在插件窗口渲染完成、可以通过底层 API 拿到真正系统句柄后调用。
     #[allow(dead_code)]
-    pub fn set_hwnd(&mut self, id: &'static str, hwnd: isize) {
+    pub fn set_hwnd(&mut self, id: &str, hwnd: isize) {
         if let Some(entry) = self.widget_windows.get_mut(id) {
             entry.1 = hwnd;
         }
@@ -203,7 +204,7 @@ impl WindowManager {
                     phys_h = (78.0 * actual_scale).round() as i32;
                 }
 
-                let config_for_id = config.plugins.get(*id).cloned();
+                let config_for_id = config.plugins.get(id).cloned();
                 let plugin_cfg = config_for_id.unwrap_or(widget_core::PluginConfig {
                     x: 0.0,
                     y: 0.0,

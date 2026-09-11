@@ -1,0 +1,15 @@
+{
+  "id": "digital_clock",
+  "name": "极简数字时钟",
+  "version": "1.0.0",
+  "author": "widget-rs team",
+  "description": "基于 GPUI Shell 架构的轻量级 JavaScript 动态时钟小组件",
+  "main": "main.js",
+  "icon": "clock",
+  "window": {
+    "width": 260.0,
+    "height": 96.0,
+    "transparent": true,
+    "blur": true
+  }
+}

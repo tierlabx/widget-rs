@@ -1,3 +1,4 @@
+pub mod js_plugin;
 pub mod monitor;
 pub mod paths;
 mod settings_window;
@@ -8,7 +9,9 @@ pub use monitor::{
     clamp_to_work_area, enumerate_monitors, find_best_monitor, get_saved_physical_bounds,
     resolve_plugin_bounds, MonitorInfo, Rect,
 };
-pub use paths::{get_app_icon_path, get_data_dir, get_log_dir, get_project_dirs};
+pub use paths::{
+    get_app_icon_path, get_data_dir, get_extensions_dir, get_log_dir, get_project_dirs,
+};
 pub use settings_window::{
     default_settings_window_options, render_settings_shell, render_settings_titlebar,
     settings_card, settings_section_header,
@@ -132,6 +135,16 @@ impl Global for TogglePluginCallback {}
 pub struct OpenPluginSettingsCallback(pub std::sync::Arc<dyn Fn(&mut App, &str)>);
 impl Global for OpenPluginSettingsCallback {}
 
+/// 打开外部扩展目录的回调
+#[derive(Clone)]
+pub struct OpenExtensionsDirCallback(pub std::sync::Arc<dyn Fn(&mut App) + Send + Sync>);
+impl Global for OpenExtensionsDirCallback {}
+
+/// 重新扫描加载外部扩展的回调
+#[derive(Clone)]
+pub struct ReloadExtensionsCallback(pub std::sync::Arc<dyn Fn(&mut App) + Send + Sync>);
+impl Global for ReloadExtensionsCallback {}
+
 /// 立即落盘：克隆数据后交给后台执行器执行 IO，不阻塞 GPUI 主线程
 /// 在任何 GPUI 事件处理器（subscribe/listener）内都可安全调用
 pub fn save_config_now(cx: &mut App) {
@@ -186,13 +199,13 @@ impl Global for UIState {}
 
 /// 插件 trait
 pub trait Plugin: Send + Sync {
-    fn id(&self) -> &'static str;
+    fn id(&self) -> &str;
 
-    fn name(&self) -> &'static str {
+    fn name(&self) -> &str {
         self.id()
     }
 
-    fn description(&self) -> &'static str {
+    fn description(&self) -> &str {
         ""
     }
 
@@ -200,16 +213,21 @@ pub trait Plugin: Send + Sync {
         gpui_component::IconName::WindowMaximize
     }
 
-    fn version(&self) -> &'static str {
+    fn version(&self) -> &str {
         "v1.0.0"
     }
 
-    fn author(&self) -> &'static str {
+    fn author(&self) -> &str {
         "官方 (内置)"
     }
 
     fn estimated_memory(&self) -> usize {
         0
+    }
+
+    /// 是否为外部动态扩展插件（默认为 false）
+    fn is_external(&self) -> bool {
+        false
     }
 
     #[allow(unused_variables)]
@@ -231,14 +249,15 @@ pub trait Plugin: Send + Sync {
 
 #[derive(Clone)]
 pub struct PluginMetadata {
-    pub id: &'static str,
-    pub name: &'static str,
-    pub description: &'static str,
+    pub id: SharedString,
+    pub name: SharedString,
+    pub description: SharedString,
     pub icon: gpui_component::IconName,
-    pub version: &'static str,
-    pub author: &'static str,
+    pub version: SharedString,
+    pub author: SharedString,
     pub estimated_memory: usize,
     pub has_settings: bool,
+    pub is_external: bool,
 }
 
 pub struct PluginList(pub Vec<PluginMetadata>);

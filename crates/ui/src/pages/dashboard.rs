@@ -19,17 +19,17 @@ pub fn render_dashboard_content(
         .map(|meta| {
             let loaded = cx
                 .try_global::<widget_core::UIState>()
-                .is_none_or(|s| s.is_plugin_loaded(meta.id));
+                .is_none_or(|s| s.is_plugin_loaded(&meta.id));
             let enabled = cx
                 .try_global::<widget_core::UIState>()
-                .is_none_or(|s| s.is_plugin_enabled(meta.id));
+                .is_none_or(|s| s.is_plugin_enabled(&meta.id));
             let top = cx
                 .try_global::<widget_core::AppConfig>()
-                .and_then(|c| c.plugins.get(meta.id))
+                .and_then(|c| c.plugins.get(meta.id.as_ref()))
                 .is_some_and(|p| p.always_on_top);
             let pass = cx
                 .try_global::<widget_core::AppConfig>()
-                .and_then(|c| c.plugins.get(meta.id))
+                .and_then(|c| c.plugins.get(meta.id.as_ref()))
                 .is_some_and(|p| p.mouse_passthrough);
             let estimated_memory = meta.estimated_memory;
 
@@ -177,8 +177,8 @@ pub fn render_dashboard_content(
                     |(i, (meta, loaded, enabled, top, pass, mem))| {
                         loaded.then(|| {
                             render_widget_card(
-                                meta.name,
-                                meta.id,
+                                &meta.name,
+                                &meta.id,
                                 meta.icon,
                                 loaded,
                                 enabled,

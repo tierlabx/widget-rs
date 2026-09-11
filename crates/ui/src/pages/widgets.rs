@@ -9,6 +9,7 @@ pub enum WidgetsFilter {
     #[default]
     All,
     Installed,
+    External,
     Available,
 }
 
@@ -28,7 +29,7 @@ pub fn render_widgets_content(
         .map(|meta| {
             let is_loaded = cx
                 .try_global::<widget_core::UIState>()
-                .is_none_or(|s| s.is_plugin_loaded(meta.id));
+                .is_none_or(|s| s.is_plugin_loaded(&meta.id));
             (meta, is_loaded)
         })
         .collect();
@@ -37,19 +38,24 @@ pub fn render_widgets_content(
         .iter()
         .filter(|(_, loaded)| *loaded)
         .count();
+    let external_count = plugins_with_status
+        .iter()
+        .filter(|(meta, _)| meta.is_external)
+        .count();
     let available_count = total_count.saturating_sub(installed_count);
 
     let filtered_plugins: Vec<_> = plugins_with_status
         .into_iter()
-        .filter(|(_, loaded)| match filter {
+        .filter(|(meta, loaded)| match filter {
             WidgetsFilter::All => true,
             WidgetsFilter::Installed => *loaded,
+            WidgetsFilter::External => meta.is_external,
             WidgetsFilter::Available => !*loaded,
         })
         .collect();
 
     vec![
-        // 顶部标题与分类过滤器
+        // 顶部标题与操作工具栏
         div()
             .flex()
             .justify_between()
@@ -57,15 +63,23 @@ pub fn render_widgets_content(
             .w_full()
             .child(page_header(
                 "小部件库 (市场)",
-                "发现并安装社区与官方开发的桌面功能扩展，打造专属工作台",
+                "发现并安装社区与官方开发的桌面功能扩展，支持 JavaScript 扩展小部件",
             ))
-            .child(render_filter_tabs(
-                filter,
-                total_count,
-                installed_count,
-                available_count,
-                cx,
-            ))
+            .child(
+                div()
+                    .flex()
+                    .items_center()
+                    .gap(px(10.0))
+                    .child(render_filter_tabs(
+                        filter,
+                        total_count,
+                        installed_count,
+                        external_count,
+                        available_count,
+                        cx,
+                    ))
+                    .child(render_extension_actions(cx)),
+            )
             .into_any_element(),
         // 插件网格列表或空状态
         if filtered_plugins.is_empty() {
@@ -80,14 +94,15 @@ pub fn render_widgets_content(
                 .children(filtered_plugins.into_iter().enumerate().map(
                     |(idx, (meta, is_loaded))| {
                         render_market_card(
-                            meta.name,
-                            meta.id,
-                            meta.description,
+                            &meta.name,
+                            &meta.id,
+                            &meta.description,
                             meta.icon,
-                            meta.version,
-                            meta.author,
+                            &meta.version,
+                            &meta.author,
                             meta.estimated_memory,
                             is_loaded,
+                            meta.is_external,
                             idx,
                             anim_token,
                         )
@@ -102,6 +117,7 @@ fn render_filter_tabs(
     current: WidgetsFilter,
     total: usize,
     installed: usize,
+    external: usize,
     available: usize,
     cx: &mut Context<crate::main_window::MainWindow>,
 ) -> impl IntoElement {
@@ -131,6 +147,14 @@ fn render_filter_tabs(
             cx,
         ))
         .child(filter_tab_button(
+            "filter-tab-external",
+            "JS 扩展",
+            external,
+            current == WidgetsFilter::External,
+            WidgetsFilter::External,
+            cx,
+        ))
+        .child(filter_tab_button(
             "filter-tab-available",
             "待发现",
             available,
@@ -138,6 +162,77 @@ fn render_filter_tabs(
             WidgetsFilter::Available,
             cx,
         ))
+}
+
+fn render_extension_actions(cx: &mut Context<crate::main_window::MainWindow>) -> impl IntoElement {
+    let open_dir_cb = cx
+        .try_global::<widget_core::OpenExtensionsDirCallback>()
+        .cloned();
+    let reload_cb = cx
+        .try_global::<widget_core::ReloadExtensionsCallback>()
+        .cloned();
+
+    div()
+        .flex()
+        .items_center()
+        .gap(px(6.0))
+        .child(
+            div()
+                .id("btn-open-extensions-dir")
+                .flex()
+                .items_center()
+                .gap(px(6.0))
+                .px(px(10.0))
+                .py(px(6.0))
+                .rounded(px(6.0))
+                .cursor_pointer()
+                .bg(rgba(0xffffff0a))
+                .border_1()
+                .border_color(rgb(0x27272a))
+                .text_color(rgb(0xd4d4d8))
+                .hover(|s| s.bg(rgba(0xffffff15)).text_color(rgb(0xffffff)))
+                .on_click(move |_, _, cx| {
+                    if let Some(cb) = &open_dir_cb {
+                        (cb.0)(cx);
+                    }
+                })
+                .child(gpui_component::Icon::new(gpui_component::IconName::Folder).size(px(14.0)))
+                .child(
+                    div()
+                        .text_xs()
+                        .font_weight(FontWeight::MEDIUM)
+                        .child("打开扩展目录"),
+                ),
+        )
+        .child(
+            div()
+                .id("btn-reload-extensions")
+                .flex()
+                .items_center()
+                .gap(px(6.0))
+                .px(px(10.0))
+                .py(px(6.0))
+                .rounded(px(6.0))
+                .cursor_pointer()
+                .bg(rgba(0x00d99214))
+                .border_1()
+                .border_color(rgba(0x00d99240))
+                .text_color(rgb(0x00d992))
+                .hover(|s| s.bg(rgba(0x00d99225)))
+                .on_click(move |_, _, cx| {
+                    if let Some(cb) = &reload_cb {
+                        (cb.0)(cx);
+                        cx.refresh_windows();
+                    }
+                })
+                .child(gpui_component::Icon::new(gpui_component::IconName::Redo).size(px(14.0)))
+                .child(
+                    div()
+                        .text_xs()
+                        .font_weight(FontWeight::MEDIUM)
+                        .child("刷新扩展"),
+                ),
+        )
 }
 
 fn filter_tab_button(
@@ -209,6 +304,9 @@ fn filter_tab_button(
 fn render_empty_state(filter: WidgetsFilter, anim_token: u32) -> impl IntoElement {
     let msg = match filter {
         WidgetsFilter::Installed => "暂无已安装的小部件，可在「待发现」中一键获取",
+        WidgetsFilter::External => {
+            "暂无外部扩展小组件，点击上方「打开扩展目录」即可放入自定义 JS 插件"
+        }
         WidgetsFilter::Available => "所有小部件均已安装完毕！可在控制面板中进行排版",
         WidgetsFilter::All => "暂无可用的小部件",
     };
