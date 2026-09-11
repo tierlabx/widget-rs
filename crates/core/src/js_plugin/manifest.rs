@@ -9,7 +9,7 @@ pub struct JsWindowConfig {
     pub width: f32,
     #[serde(default = "default_height")]
     pub height: f32,
-    #[serde(default)]
+    #[serde(default, alias = "blur")]
     pub blurred: bool,
     #[serde(default)]
     pub always_on_top: bool,

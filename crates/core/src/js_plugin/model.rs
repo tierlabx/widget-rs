@@ -34,6 +34,10 @@ pub struct JsNodeStyle {
     pub justify_between: Option<bool>,
     #[serde(default)]
     pub flex_grow: Option<bool>,
+    #[serde(default)]
+    pub w_full: Option<bool>,
+    #[serde(default)]
+    pub h_full: Option<bool>,
 }
 
 /// JS 小组件渲染节点描述（树状结构）
@@ -135,6 +139,16 @@ impl JsRenderNode {
                     container = container.flex_row();
                 } else {
                     container = container.flex_col();
+                }
+
+                if let Some(true) = self.style.w_full {
+                    container = container.w_full();
+                }
+                if let Some(true) = self.style.h_full {
+                    container = container.h_full();
+                }
+                if let Some(true) = self.style.flex_grow {
+                    container = container.flex_1();
                 }
 
                 if let Some(p) = self.style.p {

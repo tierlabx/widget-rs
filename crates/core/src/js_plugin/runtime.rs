@@ -5,6 +5,8 @@ use crate::js_plugin::model::JsRenderNode;
 #[derive(Debug, Clone, serde::Serialize)]
 pub struct HostContext {
     pub time: String,
+    pub hours_minutes: String,
+    pub seconds: String,
     pub date: String,
     pub timestamp: u64,
     pub plugin_id: String,
@@ -14,28 +16,44 @@ pub struct HostContext {
 impl HostContext {
     /// 构造当前时刻的宿主上下文数据
     pub fn now(manifest: &JsWidgetManifest) -> Self {
-        use std::time::{SystemTime, UNIX_EPOCH};
+        #[cfg(target_os = "windows")]
+        unsafe {
+            use windows_sys::Win32::System::SystemInformation::GetLocalTime;
+            let mut st = std::mem::zeroed();
+            GetLocalTime(&mut st);
 
-        // 获取系统当前时间戳
-        let duration = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap_or_default();
-        let secs = duration.as_secs();
+            let week_days = ["周日", "周一", "周二", "周三", "周四", "周五", "周六"];
+            let week_str = week_days.get(st.wDayOfWeek as usize).unwrap_or(&"周五");
 
-        // 计算简易本地/UTC时间（或标准格式化）
-        let sec = secs % 60;
-        let min = (secs / 60) % 60;
-        let hour = ((secs / 3600) + 8) % 24; // 简易东八区校正
+            let time_str = format!("{:02}:{:02}:{:02}", st.wHour, st.wMinute, st.wSecond);
+            let hm_str = format!("{:02}:{:02}", st.wHour, st.wMinute);
+            let sec_str = format!("{:02}", st.wSecond);
+            let date_str = format!("{:02}/{:02} {}", st.wMonth, st.wDay, week_str);
 
-        let time_str = format!("{:02}:{:02}:{:02}", hour, min, sec);
-        let date_str = "桌面小组件".to_string();
-
-        Self {
-            time: time_str,
-            date: date_str,
-            timestamp: secs,
-            plugin_id: manifest.id.clone(),
-            plugin_name: manifest.name.clone(),
+            Self {
+                time: time_str,
+                hours_minutes: hm_str,
+                seconds: sec_str,
+                date: date_str,
+                timestamp: std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .unwrap_or_default()
+                    .as_millis() as u64,
+                plugin_id: manifest.id.clone(),
+                plugin_name: manifest.name.clone(),
+            }
+        }
+        #[cfg(not(target_os = "windows"))]
+        {
+            Self {
+                time: "12:00:00".to_string(),
+                hours_minutes: "12:00".to_string(),
+                seconds: "00".to_string(),
+                date: "01/01 周五".to_string(),
+                timestamp: 0,
+                plugin_id: manifest.id.clone(),
+                plugin_name: manifest.name.clone(),
+            }
         }
     }
 }
@@ -69,51 +87,97 @@ impl JsEngine {
         let ctx = HostContext::now(&self.manifest);
 
         if let Some(script) = &self.cached_script {
-            // 尝试从脚本中提取或解析 JSON 模板（若脚本声明了 JSON 格式的 UI 树）
             if let Some(node) = try_eval_script(script, &ctx) {
                 return node;
             }
         }
 
-        // 默认回退渲染节点（展示基础时钟与信息）
+        // 默认现代亚克力半透明毛玻璃灵动岛胶囊
         JsRenderNode {
-            node_type: "v_flex".to_string(),
+            node_type: "h_flex".to_string(),
             text: None,
             action: None,
             style: crate::js_plugin::model::JsNodeStyle {
-                p: Some(16.0),
-                gap: Some(6.0),
+                w_full: Some(true),
+                h_full: Some(true),
+                px: Some(16.0),
+                py: Some(12.0),
+                gap: Some(16.0),
                 items_center: Some(true),
-                justify_center: Some(true),
-                rounded: Some(12.0),
-                bg: Some("#121215ee".to_string()),
-                border_color: Some("#27272a".to_string()),
+                justify_between: Some(true),
+                rounded: Some(16.0),
+                bg: Some("#0f172a65".to_string()),
+                border_color: Some("#ffffff18".to_string()),
                 border_width: Some(1.0),
                 ..Default::default()
             },
             children: vec![
+                // 左侧大字号时分
                 JsRenderNode {
                     node_type: "text".to_string(),
-                    text: Some(ctx.time),
+                    text: Some(ctx.hours_minutes),
                     action: None,
                     style: crate::js_plugin::model::JsNodeStyle {
-                        font_size: Some(30.0),
+                        font_size: Some(40.0),
                         bold: Some(true),
-                        color: Some("#00d992".to_string()),
+                        color: Some("#f8fafc".to_string()),
                         ..Default::default()
                     },
                     children: Vec::new(),
                 },
+                // 右侧：秒数胶囊与日期
                 JsRenderNode {
-                    node_type: "text".to_string(),
-                    text: Some(format!("{} (JS 扩展)", self.manifest.name)),
+                    node_type: "v_flex".to_string(),
+                    text: None,
                     action: None,
                     style: crate::js_plugin::model::JsNodeStyle {
-                        font_size: Some(12.0),
-                        color: Some("#a1a1aa".to_string()),
+                        gap: Some(6.0),
+                        justify_center: Some(true),
                         ..Default::default()
                     },
-                    children: Vec::new(),
+                    children: vec![
+                        // 秒针跳动芯片
+                        JsRenderNode {
+                            node_type: "h_flex".to_string(),
+                            text: None,
+                            action: None,
+                            style: crate::js_plugin::model::JsNodeStyle {
+                                px: Some(8.0),
+                                py: Some(2.0),
+                                rounded: Some(6.0),
+                                bg: Some("#00d99222".to_string()),
+                                border_color: Some("#00d99244".to_string()),
+                                border_width: Some(1.0),
+                                items_center: Some(true),
+                                justify_center: Some(true),
+                                ..Default::default()
+                            },
+                            children: vec![JsRenderNode {
+                                node_type: "text".to_string(),
+                                text: Some(format!("{}s", ctx.seconds)),
+                                action: None,
+                                style: crate::js_plugin::model::JsNodeStyle {
+                                    font_size: Some(11.0),
+                                    bold: Some(true),
+                                    color: Some("#00d992".to_string()),
+                                    ..Default::default()
+                                },
+                                children: Vec::new(),
+                            }],
+                        },
+                        // 日期星期
+                        JsRenderNode {
+                            node_type: "text".to_string(),
+                            text: Some(ctx.date),
+                            action: None,
+                            style: crate::js_plugin::model::JsNodeStyle {
+                                font_size: Some(11.0),
+                                color: Some("#94a3b8".to_string()),
+                                ..Default::default()
+                            },
+                            children: Vec::new(),
+                        },
+                    ],
                 },
             ],
         }
@@ -122,13 +186,14 @@ impl JsEngine {
 
 /// 快速评估或从脚本中匹配提取 UI 描述
 fn try_eval_script(script: &str, ctx: &HostContext) -> Option<JsRenderNode> {
-    // 若脚本包含标准 JSON 结构块，可进行宏变量替换（{{time}}, {{date}}）并反序列化
     if let (Some(start), Some(end)) = (
         script.find("/*WIDGET_UI_START*/"),
         script.find("/*WIDGET_UI_END*/"),
     ) {
         let raw_json = &script[start + 19..end].trim();
         let replaced = raw_json
+            .replace("{{hours_minutes}}", &ctx.hours_minutes)
+            .replace("{{seconds}}", &ctx.seconds)
             .replace("{{time}}", &ctx.time)
             .replace("{{date}}", &ctx.date)
             .replace("{{plugin_name}}", &ctx.plugin_name);

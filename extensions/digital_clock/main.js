@@ -1,58 +1,79 @@
 /**
  * 极简数字时钟 (GPUI Shell JavaScript 扩展插件)
  * 
- * 本脚本直接被 GPUI 宿主环境的 JS 引擎执行。
- * 宿主每次渲染周期会调用 `render(context)` 获取声明式节点树，
- * 并以原生 GPUI 元素无损实时渲染，零 DOM、零 WebView 损耗。
+ * 采用现代磨砂毛玻璃双栏胶囊设计：
+ * - 背景：与 Todo/Fences 完全一致的 DirectComposition 原生亚克力半透明透视壁纸
+ * - 左侧：大号极简高亮纯白时分显示
+ * - 右侧：动态信号绿秒针胶囊芯片 + 精致日期星期副文本
  */
 function render(context) {
-    var now = new Date(context.timestamp || Date.now());
-    var hours = String(now.getHours()).padStart(2, '0');
-    var minutes = String(now.getMinutes()).padStart(2, '0');
-    var seconds = String(now.getSeconds()).padStart(2, '0');
-    var timeStr = hours + ":" + minutes + ":" + seconds;
-
-    var year = now.getFullYear();
-    var month = String(now.getMonth() + 1).padStart(2, '0');
-    var day = String(now.getDate()).padStart(2, '0');
-    var weekdays = ["星期日", "星期一", "星期二", "星期三", "星期四", "星期五", "星期六"];
-    var weekStr = weekdays[now.getDay()];
-    var dateStr = year + "-" + month + "-" + day + " " + weekStr;
-
-    return {
-        type: "div",
-        style: {
-            display: "flex",
-            flex_direction: "col",
-            justify_content: "center",
-            align_items: "center",
-            width: "full",
-            height: "full",
-            padding: "12px",
-            background_color: "#18181bE6",
-            border_radius: "12px",
-            border_color: "#3f3f46",
-            border_width: "1px"
+    return /*WIDGET_UI_START*/{
+        "type": "h_flex",
+        "style": {
+            "w_full": true,
+            "h_full": true,
+            "px": 16,
+            "py": 12,
+            "gap": 16,
+            "items_center": true,
+            "justify_between": true,
+            "bg": "#0f172a65",
+            "rounded": 16,
+            "border_color": "#ffffff18",
+            "border_width": 1
         },
-        children: [
+        "children": [
             {
-                type: "text",
-                text: timeStr,
-                style: {
-                    font_size: "32px",
-                    font_weight: "bold",
-                    color: "#60a5fa"
+                "type": "text",
+                "text": "{{hours_minutes}}",
+                "style": {
+                    "font_size": 40,
+                    "bold": true,
+                    "color": "#f8fafc"
                 }
             },
             {
-                type: "text",
-                text: dateStr,
-                style: {
-                    font_size: "12px",
-                    font_weight: "normal",
-                    color: "#94a3b8"
-                }
+                "type": "v_flex",
+                "style": {
+                    "gap": 6,
+                    "items_center": false,
+                    "justify_center": true
+                },
+                "children": [
+                    {
+                        "type": "h_flex",
+                        "style": {
+                            "px": 8,
+                            "py": 2,
+                            "rounded": 6,
+                            "bg": "#00d99222",
+                            "border_color": "#00d99244",
+                            "border_width": 1,
+                            "items_center": true,
+                            "justify_center": true
+                        },
+                        "children": [
+                            {
+                                "type": "text",
+                                "text": "{{seconds}}s",
+                                "style": {
+                                    "font_size": 11,
+                                    "bold": true,
+                                    "color": "#00d992"
+                                }
+                            }
+                        ]
+                    },
+                    {
+                        "type": "text",
+                        "text": "{{date}}",
+                        "style": {
+                            "font_size": 11,
+                            "color": "#94a3b8"
+                        }
+                    }
+                ]
             }
         ]
-    };
+    }/*WIDGET_UI_END*/;
 }
