@@ -56,6 +56,15 @@ impl<T: WidgetContent> Render for WidgetWindow<T> {
 
         let content = self.content.read(cx);
         let plugin_id = content.plugin_id();
+        let is_enabled = cx
+            .try_global::<UIState>()
+            .map(|s| s.is_plugin_enabled(plugin_id))
+            .unwrap_or(true);
+
+        if !is_enabled {
+            return div().size_full().bg(rgba(0x00000000));
+        }
+
         let drag_label = content.drag_label();
         let show_drag = content.show_drag_handle();
 

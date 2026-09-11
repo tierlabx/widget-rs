@@ -96,6 +96,29 @@ fn main() {
             },
         )));
 
+        // 注册关闭/隐藏主控制面板窗口的回调
+        cx.set_global(widget_core::CloseMainWindowCallback(std::sync::Arc::new(
+            move |cx: &mut App| {
+                let hwnd = cx.update_global::<WindowManager, _>(|wm, _| {
+                    wm.is_visible = false;
+                    wm.main_hwnd
+                });
+                cx.update_global::<widget_core::UIState, _>(|s, _| {
+                    s.is_visible = false;
+                });
+                if hwnd != 0 {
+                    unsafe {
+                        windows_sys::Win32::UI::WindowsAndMessaging::ShowWindow(
+                            hwnd,
+                            windows_sys::Win32::UI::WindowsAndMessaging::SW_HIDE,
+                        );
+                    }
+                }
+                widget_core::trim_process_memory();
+                cx.refresh_windows();
+            },
+        )));
+
         // 注册更新状态桥接（异步任务通过此全局变量回传更新检查/下载状态）
         cx.set_global(widget_ui::MainWindowUpdateBridge {
             status: widget_ui::UpdateStatus::Idle,

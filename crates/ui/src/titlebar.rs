@@ -154,9 +154,13 @@ pub fn render_titlebar(
                         .id("close-btn")
                         .hover(|s| s.bg(rgb(0xe81123)).text_color(rgb(0xffffff)))
                         .on_click(|_, win, cx| {
-                            cx.update_global::<widget_core::UIState, _>(|s, _| {
-                                s.is_visible = false;
-                            });
+                            if let Some(cb) = cx.try_global::<widget_core::CloseMainWindowCallback>().cloned() {
+                                (cb.0)(cx);
+                            } else {
+                                cx.update_global::<widget_core::UIState, _>(|s, _| {
+                                    s.is_visible = false;
+                                });
+                            }
                             if let Ok(h) = win.window_handle() {
                                 if let RawWindowHandle::Win32(h) = h.as_raw() {
                                     unsafe {

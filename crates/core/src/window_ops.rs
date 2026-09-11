@@ -159,3 +159,19 @@ pub fn set_window_mouse_passthrough(hwnd: isize, passthrough: bool) {
         }
     }
 }
+
+/// 控制特定窗口的显示与隐藏（基于 HWND）
+pub fn show_window_hwnd(hwnd: isize, visible: bool) {
+    if hwnd == 0 {
+        return;
+    }
+    #[cfg(target_os = "windows")]
+    unsafe {
+        use windows_sys::Win32::UI::WindowsAndMessaging::{ShowWindow, SW_HIDE, SW_SHOW};
+        if visible {
+            ShowWindow(hwnd, SW_SHOW);
+        } else {
+            ShowWindow(hwnd, SW_HIDE);
+        }
+    }
+}

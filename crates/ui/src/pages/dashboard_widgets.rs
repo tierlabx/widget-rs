@@ -321,6 +321,23 @@ pub fn render_widget_card(
                                         });
                                         p.enabled = new_enabled;
                                     });
+
+                                    // 系统级控制小组件窗口的显示与隐藏
+                                    let hwnd = widget_core::get_plugin_hwnd(&pid);
+                                    if hwnd != 0 {
+                                        widget_core::show_window_hwnd(hwnd, new_enabled);
+                                    } else if new_enabled {
+                                        let toggle_cb = cx
+                                            .try_global::<widget_core::TogglePluginCallback>()
+                                            .map(|c| c.0.clone());
+                                        if let Some(cb) = toggle_cb {
+                                            let pid_clone = pid.clone();
+                                            cx.defer(move |cx| {
+                                                cb(cx, &pid_clone, true);
+                                            });
+                                        }
+                                    }
+
                                     widget_core::save_config_now(cx);
                                     cx.refresh_windows();
                                 })

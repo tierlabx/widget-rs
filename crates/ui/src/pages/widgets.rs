@@ -55,31 +55,31 @@ pub fn render_widgets_content(
         .collect();
 
     vec![
-        // 顶部标题与操作工具栏
+        // 顶部第一行：页面标题与右侧快捷扩展操作
         div()
             .flex()
             .justify_between()
-            .items_end()
+            .items_center()
             .w_full()
             .child(page_header(
                 "小部件库 (市场)",
-                "发现并安装社区与官方开发的桌面功能扩展，支持 JavaScript 扩展小部件",
+                "发现并安装社区与官方桌面功能扩展，支持 JavaScript 编写扩展",
             ))
-            .child(
-                div()
-                    .flex()
-                    .items_center()
-                    .gap(px(10.0))
-                    .child(render_filter_tabs(
-                        filter,
-                        total_count,
-                        installed_count,
-                        external_count,
-                        available_count,
-                        cx,
-                    ))
-                    .child(render_extension_actions(cx)),
-            )
+            .child(render_extension_actions(cx))
+            .into_any_element(),
+        // 顶部第二行：分类标签筛选栏
+        div()
+            .flex()
+            .items_center()
+            .w_full()
+            .child(render_filter_tabs(
+                filter,
+                total_count,
+                installed_count,
+                external_count,
+                available_count,
+                cx,
+            ))
             .into_any_element(),
         // 插件网格列表或空状态
         if filtered_plugins.is_empty() {

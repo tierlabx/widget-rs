@@ -145,6 +145,11 @@ impl Global for OpenExtensionsDirCallback {}
 pub struct ReloadExtensionsCallback(pub std::sync::Arc<dyn Fn(&mut App) + Send + Sync>);
 impl Global for ReloadExtensionsCallback {}
 
+/// 关闭（隐藏）控制面板主窗口的回调
+#[derive(Clone)]
+pub struct CloseMainWindowCallback(pub std::sync::Arc<dyn Fn(&mut App) + Send + Sync>);
+impl Global for CloseMainWindowCallback {}
+
 /// 立即落盘：克隆数据后交给后台执行器执行 IO，不阻塞 GPUI 主线程
 /// 在任何 GPUI 事件处理器（subscribe/listener）内都可安全调用
 pub fn save_config_now(cx: &mut App) {
