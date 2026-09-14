@@ -71,6 +71,7 @@ pub fn render_item_card(
     item: &FenceItem,
     cat_idx: usize,
     item_idx: usize,
+    click_anim: f32,
     cx: &mut Context<FencesWidget>,
 ) -> impl IntoElement {
     let item_path = item.path.clone();
@@ -149,9 +150,17 @@ pub fn render_item_card(
                 .id(ElementId::Name(
                     format!("fence-launch-{cat_idx}-{item_idx}").into(),
                 ))
-                .on_click(cx.listener(move |_, _, _, _| {
+                .on_click(cx.listener(move |this, _, _, cx| {
+                    this.trigger_click_animation(cat_idx, item_idx, cx);
                     launch_item(&item_path);
                 }))
+                .map(|d| {
+                    if click_anim > 0.0 {
+                        d.opacity(1.0 - (click_anim * 0.6))
+                    } else {
+                        d
+                    }
+                })
                 // 图标展示区域：包裹微透明高质感底衬，彻底解决暗色/全黑 Favicon 看不清的问题
                 .child(
                     div()

@@ -12,6 +12,7 @@ pub fn render_category_section(
     cat_idx: usize,
     cat: &FenceCategory,
     progress: f32,
+    click_anims: &std::collections::HashMap<(usize, usize), f32>,
     weak_this: WeakEntity<FencesWidget>,
     cx: &mut Context<FencesWidget>,
 ) -> impl IntoElement {
@@ -227,14 +228,16 @@ pub fn render_category_section(
                     ),
             );
         } else {
-            content_div = content_div.child(
-                div().w_full().flex().flex_wrap().gap(px(6.0)).children(
-                    cat_items
-                        .iter()
-                        .enumerate()
-                        .map(|(item_idx, item)| render_item_card(item, cat_idx, item_idx, cx)),
-                ),
-            );
+            content_div =
+                content_div.child(div().w_full().flex().flex_wrap().gap(px(6.0)).children(
+                    cat_items.iter().enumerate().map(|(item_idx, item)| {
+                        let click_progress = click_anims
+                            .get(&(cat_idx, item_idx))
+                            .copied()
+                            .unwrap_or(0.0);
+                        render_item_card(item, cat_idx, item_idx, click_progress, cx)
+                    }),
+                ));
         }
         section_div = section_div.child(content_div);
     }

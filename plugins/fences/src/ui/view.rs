@@ -12,6 +12,7 @@ pub struct FencesWidget {
     /// 记录各分类栏目的手风琴展开平滑进度：0.0 (完全折叠) ~ 1.0 (完全展开)
     pub(crate) expand_progress: Vec<f32>,
     pub(crate) add_url_modal: Option<AddUrlModalState>,
+    pub(crate) click_animations: std::collections::HashMap<(usize, usize), f32>,
 }
 
 impl FencesWidget {
@@ -58,6 +59,7 @@ impl FencesWidget {
             data,
             expand_progress,
             add_url_modal: None,
+            click_animations: std::collections::HashMap::new(),
         }
     }
 
@@ -170,6 +172,54 @@ impl FencesWidget {
                                 this.expand_progress[cat_idx] = target_val;
                                 cx.notify();
                             }
+                        });
+                    }
+                });
+            })
+            .detach();
+    }
+
+    /// 触发指定项目的点击动画（不阻塞主线程）
+    pub fn trigger_click_animation(
+        &mut self,
+        cat_idx: usize,
+        item_idx: usize,
+        cx: &mut Context<Self>,
+    ) {
+        self.click_animations.insert((cat_idx, item_idx), 1.0);
+        let entity_weak = cx.weak_entity();
+        let app_cx: &mut App = cx;
+        app_cx
+            .spawn(async move |async_cx| {
+                let total_steps = 10;
+                let step_dur = std::time::Duration::from_millis(15);
+
+                for step in 1..=total_steps {
+                    async_cx.background_executor().timer(step_dur).await;
+                    let t = 1.0 - (step as f32 / total_steps as f32); // 1.0 down to 0.0
+
+                    let is_active = async_cx.update(|cx| {
+                        if let Some(entity) = entity_weak.upgrade() {
+                            entity.update(cx, |this, cx| {
+                                this.click_animations.insert((cat_idx, item_idx), t);
+                                cx.notify();
+                            });
+                            true
+                        } else {
+                            false
+                        }
+                    });
+
+                    if !is_active {
+                        break;
+                    }
+                }
+
+                let _ = async_cx.update(|cx| {
+                    if let Some(entity) = entity_weak.upgrade() {
+                        entity.update(cx, |this, cx| {
+                            this.click_animations.remove(&(cat_idx, item_idx));
+                            cx.notify();
                         });
                     }
                 });
@@ -322,7 +372,14 @@ impl Render for FencesWidget {
                             .unwrap_or(if cat.collapsed { 0.0 } else { 1.0 });
                         let weak_this = cx.weak_entity();
 
-                        render_category_section(cat_idx, cat, progress, weak_this, cx)
+                        render_category_section(
+                            cat_idx,
+                            cat,
+                            progress,
+                            &self.click_animations,
+                            weak_this,
+                            cx,
+                        )
                     })),
             );
 
