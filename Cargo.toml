@@ -20,6 +20,7 @@ gpui-component = "0.6.1"
 gpui-base = "0.6.1"
 gpui-kit-assets = "0.6.1"
 gpui-shell = { git = "https://github.com/longbridge/gpui-kit", branch = "main" }
+gpui-fps = { git = "https://github.com/longbridge/gpui-kit", branch = "main" }
 sticky_plugin = { path = "plugins/sticky", version = "0.9.0" }
 todo_plugin = { path = "plugins/todo", version = "0.9.0" }
 stretchly_plugin = { path = "plugins/stretchly", version = "0.9.0" }

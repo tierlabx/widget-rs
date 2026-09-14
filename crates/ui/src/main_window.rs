@@ -154,6 +154,13 @@ impl Render for MainWindow {
             root = root.child(modal);
         }
 
+        let show_fps = cx
+            .try_global::<widget_core::AppConfig>()
+            .is_some_and(|c| c.show_fps);
+        if show_fps {
+            root = root.child(gpui_fps::fps_monitor(window, cx));
+        }
+
         root.into_any_element()
     }
 }

@@ -6,6 +6,7 @@ edition.workspace = true
 [dependencies]
 gpui.workspace = true
 gpui-component.workspace = true
+gpui-fps.workspace = true
 memory-stats = "1.2.0"
 open = "5"
 raw-window-handle.workspace = true

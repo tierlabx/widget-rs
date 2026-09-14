@@ -1,5 +1,6 @@
 use gpui::*;
 
+use crate::components::toggle::toggle_switch;
 use crate::layout::page_header;
 use crate::pages::dashboard_stats::{get_private_memory_usage, render_stat_card};
 use crate::pages::dashboard_widgets::render_widget_card;
@@ -13,6 +14,10 @@ pub fn render_dashboard_content(
         .try_global::<widget_core::PluginList>()
         .map(|list| list.0.clone())
         .unwrap_or_default();
+
+    let show_fps = cx
+        .try_global::<widget_core::AppConfig>()
+        .is_some_and(|c| c.show_fps);
 
     let plugins_info: Vec<_> = plugin_list
         .iter()
@@ -55,59 +60,77 @@ pub fn render_dashboard_content(
             .w_full()
             .child(page_header("控制面板", "管理您的桌面小部件"))
             .child(
-                div().flex().gap(px(16.0)).items_center().child(
-                    div()
-                        .flex()
-                        .items_center()
-                        .justify_center()
-                        .gap(px(8.0))
-                        .px(px(20.0))
-                        .py(px(12.0))
-                        .rounded(px(8.0))
-                        .bg(rgba(0x00d99218))
-                        .border_1()
-                        .border_color(rgb(0x00d992))
-                        .id("edit-mode-btn")
-                        .cursor_pointer()
-                        .hover(|s| s.bg(rgba(0x00d99230)))
-                        .on_click(|_, _, cx| {
-                            let mut was_edit_mode = false;
-                            let mut is_edit = false;
-                            cx.update_global::<widget_core::UIState, _>(|s, _| {
-                                was_edit_mode = s.is_edit_mode;
-                                s.is_edit_mode = !s.is_edit_mode;
-                                is_edit = s.is_edit_mode;
-                            });
-                            widget_core::NATIVE_EDIT_MODE
-                                .store(is_edit, std::sync::atomic::Ordering::SeqCst);
+                div()
+                    .flex()
+                    .gap(px(16.0))
+                    .items_center()
+                    .child(
+                        div()
+                            .flex()
+                            .items_center()
+                            .gap(px(8.0))
+                            .child(div().text_sm().text_color(rgb(0x8b949e)).child("FPS 监控"))
+                            .child(toggle_switch("show-fps", show_fps, move |val, cx| {
+                                cx.update_global::<widget_core::AppConfig, _>(|c, _| {
+                                    c.show_fps = val;
+                                });
+                                widget_core::save_config_now(cx);
+                            })),
+                    )
+                    .child(
+                        div()
+                            .flex()
+                            .items_center()
+                            .justify_center()
+                            .gap(px(8.0))
+                            .px(px(20.0))
+                            .py(px(12.0))
+                            .rounded(px(8.0))
+                            .bg(rgba(0x00d99218))
+                            .border_1()
+                            .border_color(rgb(0x00d992))
+                            .id("edit-mode-btn")
+                            .cursor_pointer()
+                            .hover(|s| s.bg(rgba(0x00d99230)))
+                            .on_click(|_, _, cx| {
+                                let mut was_edit_mode = false;
+                                let mut is_edit = false;
+                                cx.update_global::<widget_core::UIState, _>(|s, _| {
+                                    was_edit_mode = s.is_edit_mode;
+                                    s.is_edit_mode = !s.is_edit_mode;
+                                    is_edit = s.is_edit_mode;
+                                });
+                                widget_core::NATIVE_EDIT_MODE
+                                    .store(is_edit, std::sync::atomic::Ordering::SeqCst);
 
-                            if was_edit_mode {
-                                if let Some(cb) = cx.try_global::<widget_core::SaveBoundsCallback>()
-                                {
-                                    let cb = cb.0.clone();
-                                    cb(cx);
+                                if was_edit_mode {
+                                    if let Some(cb) =
+                                        cx.try_global::<widget_core::SaveBoundsCallback>()
+                                    {
+                                        let cb = cb.0.clone();
+                                        cb(cx);
+                                    }
                                 }
-                            }
-                            cx.refresh_windows();
-                        })
-                        .child(
-                            div()
-                                .text_base()
-                                .text_color(rgb(0x2fd6a1))
-                                .child(if is_edit_mode { "✓" } else { "+" }),
-                        )
-                        .child(
-                            div()
-                                .text_base()
-                                .font_weight(FontWeight::MEDIUM)
-                                .text_color(rgb(0x2fd6a1))
-                                .child(if is_edit_mode {
-                                    "完成排版"
-                                } else {
-                                    "添加 / 排版"
-                                }),
-                        ),
-                ),
+                                cx.refresh_windows();
+                            })
+                            .child(
+                                div()
+                                    .text_base()
+                                    .text_color(rgb(0x2fd6a1))
+                                    .child(if is_edit_mode { "✓" } else { "+" }),
+                            )
+                            .child(
+                                div()
+                                    .text_base()
+                                    .font_weight(FontWeight::MEDIUM)
+                                    .text_color(rgb(0x2fd6a1))
+                                    .child(if is_edit_mode {
+                                        "完成排版"
+                                    } else {
+                                        "添加 / 排版"
+                                    }),
+                            ),
+                    ),
             )
             .into_any_element(),
         div()

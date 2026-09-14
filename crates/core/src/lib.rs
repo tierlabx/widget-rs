@@ -80,6 +80,9 @@ pub struct AppConfig {
     /// 启动时静默运行（不自动弹出控制面板）
     #[serde(default)]
     pub silent_start: bool,
+    /// 显示 FPS 监控
+    #[serde(default = "default_true")]
+    pub show_fps: bool,
     /// 应用启动时自动检查新版本
     #[serde(default = "default_true")]
     pub auto_check_update: bool,
@@ -96,6 +99,7 @@ impl Default for AppConfig {
         Self {
             auto_start: false,
             silent_start: false,
+            show_fps: true,
             auto_check_update: true,
             plugins: HashMap::new(),
             plugin_data: HashMap::new(),
