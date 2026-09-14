@@ -156,14 +156,30 @@ pub fn set_window_mouse_passthrough(hwnd: isize, passthrough: bool) {
     #[cfg(target_os = "windows")]
     unsafe {
         use windows_sys::Win32::UI::WindowsAndMessaging::{
-            GetWindowLongW, SetWindowLongW, GWL_EXSTYLE, WS_EX_TRANSPARENT,
+            GetWindowLongW, SetWindowLongW, SetWindowPos, GWL_EXSTYLE, SWP_FRAMECHANGED,
+            SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOSIZE, SWP_NOZORDER, WS_EX_LAYERED, WS_EX_TRANSPARENT,
         };
         let style = GetWindowLongW(hwnd, GWL_EXSTYLE);
         if passthrough {
-            SetWindowLongW(hwnd, GWL_EXSTYLE, style | WS_EX_TRANSPARENT as i32);
+            SetWindowLongW(
+                hwnd,
+                GWL_EXSTYLE,
+                style | WS_EX_TRANSPARENT as i32 | WS_EX_LAYERED as i32,
+            );
         } else {
             SetWindowLongW(hwnd, GWL_EXSTYLE, style & !(WS_EX_TRANSPARENT as i32));
         }
+
+        // 必须调用 SetWindowPos 并带有 SWP_FRAMECHANGED 才能让窗口样式立即生效
+        SetWindowPos(
+            hwnd,
+            0,
+            0,
+            0,
+            0,
+            0,
+            SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_FRAMECHANGED | SWP_NOACTIVATE,
+        );
     }
 }
 
