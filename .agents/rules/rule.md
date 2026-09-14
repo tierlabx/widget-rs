@@ -81,4 +81,11 @@ trigger: always_on
 - **透明/磨砂直通桌面通道**：
   - 必须保留 `DwmExtendFrameIntoClientArea` 与 `SetWindowCompositionAttribute`，确保 DirectComposition 渲染管线透明通道直通壁纸，无原生白边与闪烁。
 
+## 6. GPUI Kit 开发规范 (GPUI Kit Guidelines)
+- **架构分层**：遵守应用架构层次（App shell -> Feature crate -> app component -> gpui-component -> gpui-base）。大型功能应该独立为 crate，而非将代码散落在全局目录中，依赖必须单向向下。
+- **Root 包装容器**：在所有的窗口第一层必须初始化并使用 `gpui_component::Root::new(content, window, cx)` 作为根容器，以正确协调 Dialog, Sheet, 焦点捕获, Tooltip 和上下文菜单。**不能绕过 Root 而直接返回普通视图。**
+- **实体状态与传递**：跨帧的状态必须使用 `Entity<T>` 存储并以引用或柄（Handle）传递；不需要留存跨帧状态的纯 UI 渲染单元应实现 `RenderOnce` 或是 `IntoElement` 接口。
+- **身份标识稳定**：对集合与循环生成的组件提供基于域信息的稳定 `ElementId` 而非循环的 index 下标，保证状态可以正确匹配。
+- **禁止传递上下文所有权**：**不能**将 `&mut Window`, `&mut App`, `&mut Context<_>` 保存到当前闭包/函数调用范围之外；可以保存的应为 `Entity`, `FocusHandle` 等句柄。
+
 ## 注意：我没有确保功能正常实现之前，不要提交git
