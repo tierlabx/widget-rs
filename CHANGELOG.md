@@ -6,6 +6,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+## [0.9.0](https://github.com/tierlabx/widget-rs/releases/tag/v0.9.0) - 2026-09-14
+
+### Added
+
+- add visual animation feedback on item click
+- 接入官方 gpui-shell 脚本引擎并支持 ES Module 小组件开发
+- 实现包括显现、运行和声明式 UI 模型在内的 JS 插件基础设施
+- 集成 GPUI Shell 架构与 JavaScript 扩展插件系统
+
+### Fixed
+
+- resolve garbled text when adding folders with Chinese characters
+- 修复侧边栏标签绝对定位导致的留白过大与内容窗口尺寸失衡问题
+- 修复控制面板与小组件关闭失效及小部件库布局溢出问题
+
 ## [0.8.1](https://github.com/tierlabx/widget-rs/releases/tag/v0.8.1) - 2026-09-10
 
 ### Added
