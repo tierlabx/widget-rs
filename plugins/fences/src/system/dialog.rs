@@ -83,7 +83,8 @@ pub fn open_add_dialog(this_entity: WeakEntity<FencesWidget>, target_cat: usize,
             use std::os::windows::process::CommandExt;
             cmd.creation_flags(0x08000000); // CREATE_NO_WINDOW，杜绝黑框终端窗口
         }
-        cmd.args(["-NoProfile", "-Command", script]);
+        let utf8_script = format!("[Console]::OutputEncoding = [System.Text.Encoding]::UTF8; {}", script);
+        cmd.args(["-NoProfile", "-Command", &utf8_script]);
 
         let output = cmd.output();
 
