@@ -53,9 +53,9 @@ pub struct JsWidgetManifest {
     pub window: JsWindowConfig,
     #[serde(default)]
     pub has_settings: bool,
-    /// 刷新频率（毫秒），若为 0 则不自动定时触发刷新
-    #[serde(default = "default_refresh_interval")]
-    pub refresh_interval_ms: u64,
+    /// 插件私有用户自定义配置
+    #[serde(default)]
+    pub settings: serde_json::Value,
     /// 插件根目录的绝对路径（运行时填充）
     #[serde(skip)]
     pub root_dir: PathBuf,
@@ -77,10 +77,6 @@ fn default_entry() -> String {
     "main.js".to_string()
 }
 
-fn default_refresh_interval() -> u64 {
-    1000
-}
-
 impl JsWidgetManifest {
     /// 从插件目录加载 widget.json 或 gpui-shell.json
     pub fn load_from_dir<P: AsRef<Path>>(dir: P) -> anyhow::Result<Self> {
@@ -98,7 +94,7 @@ impl JsWidgetManifest {
 
         let content = std::fs::read_to_string(&manifest_path)?;
         let mut manifest: Self = serde_json::from_str(&content)?;
-        manifest.root_dir = dir.to_path_buf();
+        manifest.root_dir = dir.canonicalize().unwrap_or_else(|_| dir.to_path_buf());
         Ok(manifest)
     }
 

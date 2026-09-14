@@ -7,9 +7,11 @@ edition.workspace = true
 directories.workspace = true
 gpui.workspace = true
 gpui-component.workspace = true
+gpui-shell.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 anyhow = "1.0"
+ureq = { version = "3", features = ["json"] }
 raw-window-handle = "0.6"
 windows-sys = { version = "0.52.0", features = [
     "Win32_Foundation",

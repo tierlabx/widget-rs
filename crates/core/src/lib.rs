@@ -5,6 +5,8 @@ mod settings_window;
 mod widget_window;
 mod window_ops;
 
+pub use js_plugin::{get_shell_runtime, init_shell};
+
 pub use monitor::{
     clamp_to_work_area, enumerate_monitors, find_best_monitor, get_saved_physical_bounds,
     resolve_plugin_bounds, MonitorInfo, Rect,

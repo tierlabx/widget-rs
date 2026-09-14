@@ -55,9 +55,10 @@ fn test_sticky_note_lifecycle() {
 
 #[test]
 fn test_sticky_themes() {
-    assert_eq!(STICKY_THEMES.len(), 6);
+    assert_eq!(STICKY_THEMES.len(), 7);
     assert_eq!(STICKY_THEMES[0].name, "黄色");
     assert_eq!(STICKY_THEMES[5].name, "碳黑");
+    assert_eq!(STICKY_THEMES[6].name, "暗夜");
 }
 
 #[test]
@@ -68,6 +69,7 @@ fn bench_sticky_notes_lifecycle() {
     let start = Instant::now();
     for i in 0..note_count {
         data.notes.push(StickyNote {
+            title: String::new(),
             content: format!("便签内容测试 #{i}"),
             color_index: i % STICKY_THEMES.len(),
             images: vec![],

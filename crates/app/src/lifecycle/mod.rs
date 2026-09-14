@@ -39,7 +39,7 @@ pub fn spawn_hwnd_polling_task(cx: &mut App, store: Arc<Store>) {
                 });
 
                 if captured_main_hwnd != 0 {
-                    let _ = cx.update_global::<WindowManager, _>(|wm, cx| {
+                    cx.update_global::<WindowManager, _>(|wm, cx| {
                         wm.main_hwnd = captured_main_hwnd;
                         let config = cx.try_global::<widget_core::AppConfig>();
                         if config.map(|c| c.silent_start).unwrap_or(false) {
@@ -98,7 +98,7 @@ pub fn spawn_hwnd_polling_task(cx: &mut App, store: Arc<Store>) {
             println!("[main] 插件 {} HWND = {}", id, hwnd);
         }
 
-        let _ = cx.update_global::<WindowManager, _>(|wm, cx| {
+        cx.update_global::<WindowManager, _>(|wm, cx| {
             let config = cx.try_global::<widget_core::AppConfig>().cloned();
             for (id, hwnd) in &id_hwnd {
                 if let Some(e) = wm.widget_windows.get_mut(id.as_str()) {
@@ -152,9 +152,13 @@ pub fn spawn_hwnd_polling_task(cx: &mut App, store: Arc<Store>) {
 
 pub fn spawn_tray_polling_task(
     cx: &mut App,
-    tray_handles: crate::tray::TrayHandles,
+    tray_handles: Option<crate::tray::TrayHandles>,
     store: Arc<Store>,
 ) {
+    let Some(tray_handles) = tray_handles else {
+        eprintln!("[tray] 未初始化托盘或托盘不可用，跳过托盘事件轮询");
+        return;
+    };
     let store_for_tray = store;
     cx.spawn(async move |cx| {
         let _tray = tray_handles.tray_icon;
@@ -186,10 +190,10 @@ pub fn spawn_tray_polling_task(
                     });
                 } else if event.id == quit_id {
                     let store_quit = Arc::clone(&store_for_tray);
-                    let _ = cx.update_global::<WindowManager, _>(|wm, cx| {
+                    cx.update_global::<WindowManager, _>(|wm, cx| {
                         wm.save_all_plugin_bounds(cx, &store_quit);
                     });
-                    let _ = cx.update(|cx| {
+                    cx.update(|cx| {
                         if let Some(pm) = cx.try_global::<PluginManager>() {
                             let plugins = pm.get_plugins().to_vec();
                             for plugin in plugins {
@@ -198,7 +202,7 @@ pub fn spawn_tray_polling_task(
                         }
                     });
                     drop(_tray);
-                    let _ = cx.update(|cx| cx.quit());
+                    cx.update(|cx| cx.quit());
                     return;
                 }
             }
@@ -236,10 +240,10 @@ pub fn spawn_tray_polling_task(
                 };
                 if actual_visible != last_visible || actual_visible != is_wm_visible {
                     last_visible = actual_visible;
-                    let _ = cx.update_global::<widget_core::UIState, _>(|s, _| {
+                    cx.update_global::<widget_core::UIState, _>(|s, _| {
                         s.is_visible = actual_visible;
                     });
-                    let _ = cx.update_global::<WindowManager, _>(|wm, _| {
+                    cx.update_global::<WindowManager, _>(|wm, _| {
                         wm.is_visible = actual_visible;
                     });
                     toggle_item.set_text(if actual_visible {
@@ -261,10 +265,10 @@ pub fn spawn_tray_polling_task(
 /// 辅助函数：切换主控制面板窗口显示/隐藏状态
 fn toggle_main_panel(cx: &AsyncApp) -> bool {
     // 确保 main_hwnd 存在；若为 0 尝试即时从 main_window 句柄获取
-    let _ = cx.update(|cx| {
+    cx.update(|cx| {
         let (main_hwnd, main_handle) = cx
             .try_global::<WindowManager>()
-            .map(|wm| (wm.main_hwnd, wm.main_window.clone()))
+            .map(|wm| (wm.main_hwnd, wm.main_window))
             .unwrap_or((0, None));
 
         if main_hwnd == 0 {
@@ -291,10 +295,10 @@ fn toggle_main_panel(cx: &AsyncApp) -> bool {
 
     let next_visible = cx.update_global::<WindowManager, _>(|wm, _| wm.toggle_main_window_win32());
 
-    let _ = cx.update_global::<widget_core::UIState, _>(|s, _| {
+    cx.update_global::<widget_core::UIState, _>(|s, _| {
         s.is_visible = next_visible;
     });
-    let _ = cx.update(|cx| cx.refresh_windows());
+    cx.update(|cx| cx.refresh_windows());
 
     next_visible
 }

@@ -1,0 +1,7 @@
+{
+  "id": "digital_clock",
+  "name": "极简数字时钟",
+  "version": "1.0.0",
+  "shell-version": "0.6.1",
+  "entry": "main.js"
+}

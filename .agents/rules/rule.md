@@ -16,11 +16,20 @@ trigger: always_on
   - 遵循项目的 `app`、`core`、`ui` 及 `plugins` 隔离架构。
   - 重要的业务逻辑、开放的 API（public structs/traits/functions）必须添加标准的 Rust 文档注释（`///`）。
   - **单文件行数限制**：任何 `.rs` 文件不应超过 **400 行**。超出时必须按职责拆分为子模块。
-- **插件开发规范**：
+- **原生 Rust 插件开发规范 (Native Plugins)**：
+  - **开发参考**：开发前必须查阅 [docs/插件开发指南.md](file:///F:/03_OpenSource/widget-rs/docs/插件开发指南.md)，推荐使用脚手架命令 `cargo run -p widget-cli -- add <plugin_name>` 自动创建模板与注册。
   - 所有小部件插件**必须**使用 `WidgetWindow<T>` 容器包装，**禁止**在插件的 `view.rs` 中手动实现编辑模式检测、拖拽条渲染、窗口边框切换、`update_window_edit_mode` 等窗口级逻辑。
   - 插件的 UI 结构体必须实现 `widget_core::WidgetContent` trait（提供 `plugin_id()` 和 `drag_label()`）。
   - `spawn_window` 必须使用 `widget_core::default_widget_window_options()` 创建窗口选项，并通过 `WidgetWindow::new(content)` 包装内容。
   - 如有特殊需求（如条件隐藏拖拽条），通过覆盖 `show_drag_handle()` 方法实现，不要自行渲染拖拽条。
+- **JavaScript 动态扩展插件规范 (GPUI Shell)**：
+  - **开发参考**：开发前必须查阅 [docs/JS插件开发指南.md](file:///F:/03_OpenSource/widget-rs/docs/JS插件开发指南.md)。
+  - **脚本环境标准**：基于官方 `gpui-shell`（QuickJS JIT），采用标准 ES Modules 语法，默认导出继承自 `gpui-kit` 的 `View` 类。
+  - **状态与定时机制**：视图状态赋值在 `init(props, cx)` 中进行；状态变更时必须调用 `cx.notify()` 通知 GPUI 重新渲染；周期任务必须使用 `cx.timer.every(interval, cb)`，严禁依赖浏览器特有 API（如 `window`、`document`）。
+  - **清单配置文件**：
+    - `widget.json`：定义小组件名称、版本、初始宽高、全透明及亚克力磨砂（`"blurred": true`）等宿主窗口属性。
+    - `gpui-shell.json`：定义脚本引擎目标版本（`"shell-version": "0.6.1"`）与入口（`"entry": "main.js"`）。
+  - **核心能力保护**：外部 JS 扩展小组件由 `widget_core::JsPlugin` 加载并统一包入 `WidgetWindow`，自动继承 `Progman` Win+D 常驻、拖拽移动与亚克力透明直通壁纸能力。
 - **插件设置弹窗规范**：
   - 所有带有独立设置弹窗的插件，必须在 `Plugin::build_settings_window` 中使用 `widget_core::default_settings_window_options(cx, initial_size)` 创建窗口。
   - 设置页面**必须**使用 `widget_core::render_settings_shell(title, content)` 统一包装，禁止在插件内手写标题栏拖拽逻辑、关闭按钮或外层滚动容器。

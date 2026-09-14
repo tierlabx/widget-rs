@@ -8,9 +8,9 @@ use tray_icon::{
 /// 将图片文件解码为 RGBA 格式，并创建 `Icon` 实例用于系统托盘。
 fn build_icon() -> Icon {
     let icon_bytes = include_bytes!("../../../../assets/logos/icon.png");
-    let image = image::load_from_memory(icon_bytes)
-        .expect("Failed to load icon image")
-        .into_rgba8();
+    let dyn_image = image::load_from_memory(icon_bytes).expect("Failed to load icon image");
+    let resized = dyn_image.resize_exact(32, 32, image::imageops::FilterType::Lanczos3);
+    let image = resized.into_rgba8();
     let (width, height) = image.dimensions();
     let rgba = image.into_raw();
     Icon::from_rgba(rgba, width, height).expect("Failed to create tray icon")
@@ -30,6 +30,14 @@ pub struct TrayHandles {
 /// # 返回值
 /// 成功时返回包含托盘句柄与菜单项引用的 `TrayHandles` 结构体。
 pub fn setup_tray(silent_start: bool) -> Result<TrayHandles, Box<dyn std::error::Error>> {
+    #[cfg(target_os = "windows")]
+    unsafe {
+        windows_sys::Win32::System::Com::CoInitializeEx(
+            std::ptr::null(),
+            windows_sys::Win32::System::Com::COINIT_APARTMENTTHREADED as u32,
+        );
+    }
+
     let tray_menu = Menu::new();
 
     // 根据启动模式设定初始文案（静默启动时主面板隐藏，文案为“显示控制面板”）

@@ -3,11 +3,11 @@
   "name": "极简数字时钟",
   "version": "1.0.0",
   "author": "widget-rs team",
-  "description": "基于 GPUI Shell 架构的轻量级 JavaScript 动态时钟小组件",
+  "description": "基于 GPUI Shell 架构的轻量级 JavaScript 动态时钟小组件，拥有完整原生 JS 执行环境与亚克力毛玻璃视觉",
   "main": "main.js",
   "icon": "clock",
   "window": {
-    "width": 268.0,
+    "width": 310.0,
     "height": 92.0,
     "transparent": true,
     "blurred": true

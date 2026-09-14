@@ -1,9 +1,5 @@
 use gpui::Window;
 
-extern "C" {
-    fn mi_collect(force: bool);
-}
-
 /// 触发窗口拖拽
 pub fn start_window_drag(window: &mut Window) {
     use raw_window_handle::HasWindowHandle;
@@ -65,13 +61,24 @@ pub fn update_window_edit_mode(window: &mut Window, is_edit_mode: bool) {
 }
 
 /// 主动触发进程闲置堆内存归还给操作系统内核
+static MEMORY_TRIM_FN: std::sync::RwLock<Option<fn()>> = std::sync::RwLock::new(None);
+
+/// 注册底层内存整理回调函数（由启用 mimalloc 的主程序在启动时挂载）
+pub fn register_memory_trim_fn(f: fn()) {
+    if let Ok(mut lock) = MEMORY_TRIM_FN.write() {
+        *lock = Some(f);
+    }
+}
+
+/// 主动触发进程闲置堆内存归还给操作系统内核
 ///
-/// 通过 mimalloc 的 `mi_collect(true)` 将已释放但缓存在内存池中的空闲页安全归还给 OS，
+/// 通过主应用注册的 `mi_collect(true)` 将已释放但缓存在内存池中的空闲页安全归还给 OS，
 /// 真实减少进程占用的物理工作集，同时避免了 Win32 `EmptyWorkingSet` 导致的剧烈缺页抖动。
 pub fn trim_process_memory() {
-    #[cfg(target_os = "windows")]
-    unsafe {
-        mi_collect(true);
+    if let Ok(lock) = MEMORY_TRIM_FN.read() {
+        if let Some(trim_fn) = *lock {
+            trim_fn();
+        }
     }
 }
 

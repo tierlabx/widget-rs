@@ -2,6 +2,7 @@ use gpui::*;
 use std::path::Path;
 
 use crate::js_plugin::manifest::JsWidgetManifest;
+use crate::js_plugin::runtime::get_shell_runtime;
 use crate::js_plugin::view::JsWidgetContent;
 use crate::{
     default_widget_window_options, default_widget_window_options_blurred, Plugin, WidgetWindow,
@@ -55,7 +56,7 @@ impl Plugin for JsPlugin {
     }
 
     fn estimated_memory(&self) -> usize {
-        1024 * 1024 * 3 // 预估约 3MB
+        1024 * 1024 * 5 // 预估约 5MB (含嵌入式 QuickJS VM 及上下文缓存)
     }
 
     fn is_external(&self) -> bool {
@@ -77,8 +78,13 @@ impl Plugin for JsPlugin {
             default_widget_window_options(cx, &plugin_id, default_size)
         };
 
-        cx.open_window(window_options, move |_window, cx| {
-            let content = cx.new(|cx| JsWidgetContent::new(manifest, cx));
+        let runtime = get_shell_runtime(cx)
+            .expect("gpui-shell 脚本引擎尚未初始化，请在启动时调用 init_shell");
+        let root_dir = manifest.root_dir.clone();
+
+        cx.open_window(window_options, move |window, cx| {
+            let root = runtime.load(&root_dir, window, cx);
+            let content = cx.new(|_| JsWidgetContent::new(manifest, root));
             cx.new(|_| WidgetWindow::new(content))
         })
         .expect("创建 JS 小组件窗口失败")

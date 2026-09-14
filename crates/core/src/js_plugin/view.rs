@@ -1,55 +1,26 @@
 use gpui::*;
-use std::sync::{Arc, Mutex};
-use std::time::Duration;
+use gpui_shell::ShellRoot;
 
 use crate::js_plugin::manifest::JsWidgetManifest;
-use crate::js_plugin::runtime::JsEngine;
 use crate::WidgetContent;
 
-/// 动态 JavaScript 小部件视图内容组件
+/// 托管并渲染 gpui-shell 根视图的通用小组件内容容器
 pub struct JsWidgetContent {
     manifest: JsWidgetManifest,
-    engine: Arc<Mutex<JsEngine>>,
-    _timer: Option<Task<()>>,
+    root: Entity<ShellRoot>,
 }
 
 impl JsWidgetContent {
-    pub fn new(manifest: JsWidgetManifest, cx: &mut Context<Self>) -> Self {
-        let engine = Arc::new(Mutex::new(JsEngine::new(manifest.clone())));
+    pub fn new(manifest: JsWidgetManifest, root: Entity<ShellRoot>) -> Self {
+        Self { manifest, root }
+    }
 
-        // 若设置了定时刷新间隔，启动后台定时器触发 cx.notify()
-        let interval = manifest.refresh_interval_ms;
-        let timer = if interval > 0 {
-            let entity_weak = cx.entity().downgrade();
-            let app_cx: &mut App = cx;
-            Some(app_cx.spawn(async move |async_cx| loop {
-                async_cx
-                    .background_executor()
-                    .timer(Duration::from_millis(interval))
-                    .await;
-                let active = async_cx.update(|cx| {
-                    if let Some(entity) = entity_weak.upgrade() {
-                        entity.update(cx, |_, cx| {
-                            cx.notify();
-                        });
-                        true
-                    } else {
-                        false
-                    }
-                });
-                if !active {
-                    break;
-                }
-            }))
-        } else {
-            None
-        };
+    pub fn manifest(&self) -> &JsWidgetManifest {
+        &self.manifest
+    }
 
-        Self {
-            manifest,
-            engine,
-            _timer: timer,
-        }
+    pub fn root(&self) -> &Entity<ShellRoot> {
+        &self.root
     }
 }
 
@@ -69,18 +40,12 @@ impl WidgetContent for JsWidgetContent {
 
 impl Render for JsWidgetContent {
     fn render(&mut self, _window: &mut Window, _cx: &mut Context<Self>) -> impl IntoElement {
-        let node = if let Ok(engine) = self.engine.lock() {
-            engine.render_frame()
-        } else {
-            crate::js_plugin::model::JsRenderNode::new_text("扩展加载失败", 14.0, "#ef4444")
-        };
-
         div()
             .size_full()
             .flex()
             .flex_col()
             .items_center()
             .justify_center()
-            .child(node.into_element())
+            .child(self.root.clone())
     }
 }

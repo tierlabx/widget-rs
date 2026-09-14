@@ -26,7 +26,7 @@ pub fn sync_auto_start_with_registry(config: &mut AppConfig, store: &Store) {
 
                 if config.auto_start != is_enabled {
                     config.auto_start = is_enabled;
-                    store.save_config(&config);
+                    store.save_config(config);
                     println!(
                         "[main] 开机自启动状态与系统注册表不一致，已同步配置 auto_start = {}",
                         is_enabled

@@ -3,6 +3,10 @@
 #[global_allocator]
 static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
 
+extern "C" {
+    fn mi_collect(force: bool);
+}
+
 mod assets;
 mod config;
 mod lifecycle;
@@ -25,6 +29,11 @@ fn main() {
         return;
     }
 
+    // 挂载 mimalloc 堆内存整理函数
+    widget_core::register_memory_trim_fn(|| unsafe {
+        mi_collect(true);
+    });
+
     // 0. 初始化崩溃日志捕获机制（确保启动阶段及后续运行期的任何 panic/崩溃均能记录到本地文件）
     system::crash_handler::init_crash_handler();
     // 0.1 注册 Windows 原生 AUMID（确保系统通知与任务栏识别为 "桌面小部件 (widget-rs)"）
@@ -45,15 +54,16 @@ fn main() {
     let extensions = plugin::extension_loader::scan_and_load_extensions();
     pm.register_external_plugins(extensions);
 
-    // 3. 初始化系统托盘（包括托盘图标和菜单）
-    let tray_handles = tray::setup_tray(app_config.silent_start).expect("系统托盘初始化失败");
-
     let app = gpui_kit::application().with_assets(assets::AppAssets);
     let store_for_app = Arc::clone(&store);
 
     app.run(move |cx| {
         // 初始化全局状态和组件资产
         gpui_kit::init(cx);
+        // 初始化 gpui-shell JavaScript 脚本引擎
+        if let Err(err) = widget_core::init_shell(cx) {
+            eprintln!("[main] 初始化 gpui-shell 脚本引擎失败: {err}");
+        }
         // 全局启用深色主题（让所有 Input 输入框、文字、光标默认呈现纯白色）
         gpui_component::Theme::change(gpui_component::ThemeMode::Dark, None, cx);
         // 将 gpui_component Root 默认背景色改为 100% 全透明，杜绝小组件窗口被刷上底板
@@ -285,7 +295,14 @@ fn main() {
         let store_for_hwnd = Arc::clone(&store_for_app);
         lifecycle::spawn_hwnd_polling_task(cx, store_for_hwnd);
 
-        // 启动托盘菜单事件的独立轮询循环
+        // 启动系统托盘与托盘菜单事件的独立轮询循环
+        let tray_handles = match tray::setup_tray(app_config.silent_start) {
+            Ok(handles) => Some(handles),
+            Err(err) => {
+                eprintln!("[main] 初始化系统托盘警告 (托盘可能不可用): {err}");
+                None
+            }
+        };
         let store_for_tray = Arc::clone(&store_for_app);
         lifecycle::spawn_tray_polling_task(cx, tray_handles, store_for_tray);
 
