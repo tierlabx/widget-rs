@@ -1,6 +1,7 @@
 mod model;
 #[cfg(test)]
 mod model_tests;
+mod sidebar;
 mod view;
 
 use gpui::*;
@@ -36,7 +37,7 @@ impl Plugin for StickyWidgetPlugin {
         let options = widget_core::default_widget_window_options(
             cx,
             "sticky_widget",
-            (1250.0, 50.0, 368.0, 360.0),
+            (1250.0, 50.0, 348.0, 360.0),
         );
 
         cx.open_window(options, |window, cx| {

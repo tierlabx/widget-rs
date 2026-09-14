@@ -57,26 +57,26 @@ pub fn render_sidebar<V: 'static>(
     let active_tag_id = active_tag_id.to_string();
 
     div()
-        .w(px(104.0)) // 104px 浮动空间基准，长标签向左延伸不撞窗口左边界，右边缘紧贴内容面板
+        .w(px(46.0))
         .flex()
         .flex_col()
-        .items_end() // Tab 右对齐，紧贴内容面板左边缘，文字长时向左朝外超出
         .gap(px(3.0))
         .pt(px(16.0))
         .pb(px(8.0))
-        // 不加 overflow_hidden，允许长标签朝左边超出，不裁剪文字
+        .overflow_hidden()
         // 1. "全部" 分类 Tab（不可拖动）
         .child({
             let is_active = active_tag_id == "all";
             let on_select = on_select_tag.clone();
             div()
+                .relative()
+                .w_full()
                 .h(px(32.0))
                 .rounded_l(px(8.0))
-                .px(px(8.0))
                 .flex()
                 .items_center()
                 .justify_center()
-                .whitespace_nowrap() // 防止换行
+                .overflow_hidden()
                 .cursor_pointer()
                 .text_xs()
                 .font_weight(if is_active {
@@ -132,14 +132,14 @@ pub fn render_sidebar<V: 'static>(
 
             div()
                 .relative()
+                .w_full()
                 .h(px(32.0))
                 .rounded_l(px(8.0))
-                .px(px(8.0))
+                .px(px(6.0))
                 .flex()
                 .items_center()
                 .justify_center()
-                .gap(px(4.0))
-                .whitespace_nowrap() // 防止换行
+                .overflow_hidden()
                 .cursor_grab()
                 .text_xs()
                 .font_weight(if is_active {
@@ -211,14 +211,19 @@ pub fn render_sidebar<V: 'static>(
                             rgb(tag_color.hex).into()
                         }),
                 )
-                .child(tag.name.clone())
+                .child(
+                    div()
+                        .overflow_hidden()
+                        .whitespace_nowrap()
+                        .child(tag.name.clone()),
+                )
         }))
         // 3. 底部"+"新建分类按钮
         .child(
             div()
+                .w_full()
                 .h(px(28.0))
                 .rounded_l(px(6.0))
-                .px(px(8.0))
                 .flex()
                 .items_center()
                 .justify_center()

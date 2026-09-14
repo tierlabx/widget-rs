@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 use widget_core::AppConfig;
 
 /// 单张便签的数据
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
 pub struct StickyNote {
     pub content: String,
     pub color_index: usize,
@@ -27,17 +27,6 @@ impl StickyNote {
             } else {
                 snippet
             }
-        }
-    }
-}
-
-impl Default for StickyNote {
-    fn default() -> Self {
-        Self {
-            content: String::new(),
-            color_index: 0,
-            images: Vec::new(),
-            title: String::new(),
         }
     }
 }

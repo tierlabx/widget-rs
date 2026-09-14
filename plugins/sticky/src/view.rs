@@ -4,35 +4,7 @@ use gpui_component::input::{Input, InputEvent, InputState, Textarea, TextareaSta
 use gpui_component::{Icon, IconName};
 
 use crate::model::{StickyData, StickyModel, StickyNote, STICKY_THEMES};
-
-/// 便签拖拽排序载荷
-#[derive(Clone, Debug, PartialEq, Eq)]
-struct DraggedNote {
-    from_idx: usize,
-}
-
-/// 便签拖拽跨随预览
-struct NoteDragPreview {
-    text: String,
-    bg_hex: u32,
-    text_hex: u32,
-}
-
-impl Render for NoteDragPreview {
-    fn render(&mut self, _window: &mut Window, _cx: &mut Context<Self>) -> impl IntoElement {
-        div()
-            .px(px(10.0))
-            .py(px(5.0))
-            .bg(rgb(self.bg_hex))
-            .rounded(px(6.0))
-            .border_1()
-            .border_color(rgb(self.text_hex))
-            .shadow_lg()
-            .text_xs()
-            .text_color(rgb(self.text_hex))
-            .child(self.text.clone())
-    }
-}
+use crate::sidebar::render_sidebar;
 
 pub struct StickyWidget {
     input: Entity<TextareaState>,
@@ -159,11 +131,13 @@ impl Render for StickyWidget {
 
         // 克隆 notes 用于侧边栏渲染
         let notes: Vec<StickyNote> = self.data.notes.clone();
-        let note_count = notes.len();
 
         div()
             .relative()
+            .flex()
+            .flex_row()
             .size_full()
+            .overflow_hidden()
             .on_drop(cx.listener(|this, paths: &gpui::ExternalPaths, _, cx| {
                 for path in paths.paths() {
                     let ext = path
@@ -181,170 +155,35 @@ impl Render for StickyWidget {
                     }
                 }
             }))
-            // ── 浮动便签 Tab 侧边栏：absolute left:0 w:104，右对齐贴齐内容面板，允许向左溢出 ──
+            // ── 左侧：便签 Tab 侧边栏 ──
+            .child(render_sidebar(
+                &notes,
+                current_idx,
+                |this, _, cx, idx| {
+                    this.data.switch_to(idx);
+                    this.pending_input_reset = true;
+                    StickyModel::save(&this.data, cx);
+                    cx.notify();
+                },
+                |this, _, cx| {
+                    this.data.new_note();
+                    this.pending_input_reset = true;
+                    StickyModel::save(&this.data, cx);
+                    cx.notify();
+                },
+                |this, _, cx, from_idx, to_idx| {
+                    this.data.reorder_note(from_idx, to_idx);
+                    this.pending_input_reset = true;
+                    StickyModel::save(&this.data, cx);
+                    cx.notify();
+                },
+                cx,
+            ))
+            // ── 右侧：便签纸主内容区 ──
             .child(
                 div()
-                    .absolute()
-                    .left(px(0.0))
-                    .top(px(0.0))
-                    .bottom(px(0.0))
-                    .w(px(104.0)) // 104px 浮动空间基准，长标签向左延伸不撞窗口左边界，右边缘紧贴内容面板
-                    .flex()
-                    .flex_col()
-                    .items_end() // Tab 右对齐，紧贴内容面板左边缘，文字长时向左朝外超出
-                    .gap(px(3.0))
-                    .pt(px(10.0))
-                    .pb(px(6.0))
-                    // 不加 overflow_hidden，允许长标签朝左边超出，不裁剪文字
-                    // 各便签 Tab
-                    .children(notes.iter().enumerate().map(|(idx, note)| {
-                        let is_active = idx == current_idx;
-                        let note_theme =
-                            &STICKY_THEMES[note.color_index.min(STICKY_THEMES.len() - 1)];
-                        let tab_label = note.tab_label(idx);
-
-                        // 激活色：使用该便签自身的主题色
-                        let active_bg = rgb(note_theme.header_hex);
-                        let active_border = rgb(note_theme.border_hex);
-                        let active_text: Hsla = if note_theme.is_dark {
-                            rgb(0xf0f0f0).into()
-                        } else {
-                            rgb(note_theme.text_hex).into()
-                        };
-
-                        div()
-                            .relative()
-                            .h(px(32.0))
-                            .rounded_l(px(7.0))
-                            .px(px(8.0))
-                            .flex()
-                            .items_center()
-                            .justify_center()
-                            .gap(px(3.0))
-                            .whitespace_nowrap() // 防止换行
-                            .cursor_grab()
-                            .text_size(px(10.5))
-                            .font_weight(if is_active {
-                                FontWeight::BOLD
-                            } else {
-                                FontWeight::MEDIUM
-                            })
-                            .text_color(if is_active {
-                                active_text
-                            } else {
-                                rgba(0x000000bb).into()
-                            })
-                            .bg(if is_active {
-                                active_bg
-                            } else {
-                                rgba(0xffffff35)
-                            })
-                            .border_1()
-                            .border_color(if is_active {
-                                active_border
-                            } else {
-                                rgba(0x00000015)
-                            })
-                            .hover(|s| {
-                                s.bg(if is_active {
-                                    active_bg
-                                } else {
-                                    rgba(0xffffff60)
-                                })
-                            })
-                            // id 必须在 on_drag 之前，将 Div 转为 Stateful<Div>
-                            .id(ElementId::Name(format!("sticky-tab-{idx}").into()))
-                            // 拖拽悬停高亮
-                            .drag_over::<DraggedNote>(|s, _, _, _| {
-                                s.border_color(rgb(note_theme.border_hex))
-                                    .bg(rgba(note_theme.bg_hex | 0x99))
-                            })
-                            // 放下：触发排序
-                            .on_drop(cx.listener(move |this, drag: &DraggedNote, _, cx| {
-                                this.data.reorder_note(drag.from_idx, idx);
-                                this.pending_input_reset = true;
-                                StickyModel::save(&this.data, cx);
-                                cx.notify();
-                            }))
-                            // 开始拖拽：生成预览
-                            .on_drag(DraggedNote { from_idx: idx }, {
-                                let preview_text = note.tab_label(idx);
-                                let preview_bg = note_theme.bg_hex;
-                                let preview_text_hex = note_theme.text_hex;
-                                move |_, _, _, cx| {
-                                    cx.new(|_| NoteDragPreview {
-                                        text: preview_text.clone(),
-                                        bg_hex: preview_bg,
-                                        text_hex: preview_text_hex,
-                                    })
-                                }
-                            })
-                            .on_click(cx.listener(move |this, _, _, cx| {
-                                this.data.switch_to(idx);
-                                this.pending_input_reset = true;
-                                StickyModel::save(&this.data, cx);
-                                cx.notify();
-                            }))
-                            // 激活时左侧竖条指示
-                            .when(is_active, |d: Stateful<Div>| {
-                                d.child(
-                                    div()
-                                        .absolute()
-                                        .left(px(0.0))
-                                        .top(px(6.0))
-                                        .bottom(px(6.0))
-                                        .w(px(3.0))
-                                        .rounded_r(px(2.0))
-                                        .bg(rgb(note_theme.text_hex)),
-                                )
-                            })
-                            .child(div().text_align(TextAlign::Center).child(tab_label))
-                    }))
-                    // 底部新建便签按钮
-                    .child(
-                        div()
-                            .h(px(26.0))
-                            .rounded_l(px(6.0))
-                            .px(px(8.0))
-                            .flex()
-                            .items_center()
-                            .justify_center()
-                            .cursor_pointer()
-                            .text_color(rgba(0x00000060))
-                            .bg(rgba(0xffffff20))
-                            .border_1()
-                            .border_color(rgba(0x00000015))
-                            .hover(|s| s.bg(rgba(0xffffff60)).text_color(rgba(0x000000cc)))
-                            .id("sticky-new-tab")
-                            .on_click(cx.listener(move |this, _, _, cx| {
-                                this.data.new_note();
-                                this.pending_input_reset = true;
-                                StickyModel::save(&this.data, cx);
-                                cx.notify();
-                            }))
-                            .child(Icon::new(IconName::Plus).size(px(11.0))),
-                    )
-                    // 便签数量指示
-                    .when(note_count > 1, |d: Div| {
-                        d.child(
-                            div()
-                                .w_full()
-                                .flex()
-                                .justify_center()
-                                .text_size(px(9.0))
-                                .text_color(rgba(0x00000055))
-                                .child(format!("{}/{}", current_idx + 1, note_count)),
-                        )
-                    }),
-            )
-            // ── 主内容区：absolute 铺满，left=104→right:0 ───────────────────────
-            .child(
-                div()
-                    .absolute()
-                    .left(px(104.0))
-                    .right(px(0.0))
-                    .top(px(0.0))
-                    .bottom(px(0.0))
+                    .flex_1()
+                    .h_full()
                     .flex()
                     .flex_col()
                     .bg(bg_color)
