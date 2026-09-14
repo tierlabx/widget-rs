@@ -110,7 +110,7 @@ impl Render for MainWindow {
                     .w_full()
                     .overflow_hidden()
                     .min_h_0()
-                    .child(render_sidebar(nav_page, cx))
+                    .child(render_sidebar(window, nav_page, cx))
                     .child(match nav_page {
                         NavPage::Dashboard => div()
                             .id("page-scroll")
@@ -152,13 +152,6 @@ impl Render for MainWindow {
         // 顶层挂载更新提示弹窗
         if let Some(modal) = render_update_modal(cx) {
             root = root.child(modal);
-        }
-
-        let show_fps = cx
-            .try_global::<widget_core::AppConfig>()
-            .is_some_and(|c| c.show_fps);
-        if show_fps {
-            root = root.child(gpui_fps::fps_monitor(window, cx));
         }
 
         root.into_any_element()
