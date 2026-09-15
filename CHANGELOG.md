@@ -6,6 +6,19 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+## [0.10.0](https://github.com/tierlabx/widget-rs/releases/tag/v0.10.0) - 2026-09-15
+
+### Added
+
+- add 3-day weather forecast, full-color icons and animated dashboard
+- replace system status badge with gpui-fps monitor in sidebar
+- add gpui-fps monitor to dashboard with default enable
+
+### Fixed
+
+- optimize fps monitor overhead and disable heavy resource polling
+- 修复穿透没立即生效问题
+
 ## [0.9.0](https://github.com/tierlabx/widget-rs/releases/tag/v0.9.0) - 2026-09-14
 
 ### Added

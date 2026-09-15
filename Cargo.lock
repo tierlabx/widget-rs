@@ -2552,7 +2552,7 @@ dependencies = [
 
 [[package]]
 name = "fences_plugin"
-version = "0.9.0"
+version = "0.10.0"
 dependencies = [
  "gpui-component",
  "gpui-pre",
@@ -8669,7 +8669,7 @@ checksum = "a2eb9349b6444b326872e140eb1cf5e7c522154d69e7a0ffb0fb81c06b37543f"
 
 [[package]]
 name = "sticky_plugin"
-version = "0.9.0"
+version = "0.10.0"
 dependencies = [
  "gpui-component",
  "gpui-pre",
@@ -8690,7 +8690,7 @@ checksum = "d08889ec5408683408db66ad89e0e1f93dff55c73a4ccc71c427d5b277ee47e6"
 
 [[package]]
 name = "stretchly_plugin"
-version = "0.9.0"
+version = "0.10.0"
 dependencies = [
  "gpui-component",
  "gpui-pre",
@@ -9302,7 +9302,7 @@ checksum = "1f3ccbac311fea05f86f61904b462b55fb3df8837a366dfc601a0161d0532f20"
 
 [[package]]
 name = "todo_plugin"
-version = "0.9.0"
+version = "0.10.0"
 dependencies = [
  "gpui-component",
  "gpui-pre",
@@ -10477,7 +10477,7 @@ dependencies = [
 
 [[package]]
 name = "widget-cli"
-version = "0.9.0"
+version = "0.10.0"
 dependencies = [
  "clap",
  "toml_edit 0.22.27",
@@ -10485,7 +10485,7 @@ dependencies = [
 
 [[package]]
 name = "widget-core"
-version = "0.9.0"
+version = "0.10.0"
 dependencies = [
  "anyhow",
  "directories",
@@ -10502,7 +10502,7 @@ dependencies = [
 
 [[package]]
 name = "widget-rs"
-version = "0.9.0"
+version = "0.10.0"
 dependencies = [
  "anyhow",
  "directories",
@@ -10533,7 +10533,7 @@ dependencies = [
 
 [[package]]
 name = "widget-ui"
-version = "0.9.0"
+version = "0.10.0"
 dependencies = [
  "gpui-component",
  "gpui-fps",
