@@ -28,7 +28,6 @@ pub struct MainWindow {
     pub settings_anim_tokens: [u32; 3],
     pub widgets_filter: crate::pages::widgets::WidgetsFilter,
     pub widgets_anim_token: u32,
-    pub fps_monitor: Option<Entity<gpui_fps::FpsMonitor>>,
 }
 
 impl Default for MainWindow {
@@ -48,7 +47,6 @@ impl MainWindow {
             settings_anim_tokens: [0; 3],
             widgets_filter: crate::pages::widgets::WidgetsFilter::All,
             widgets_anim_token: 0,
-            fps_monitor: None,
         }
     }
 }
@@ -68,15 +66,6 @@ impl Render for MainWindow {
             .detach();
             self.settings_search_input = Some(input);
         }
-        if self.fps_monitor.is_none() {
-            let monitor = cx.new(|cx| {
-                gpui_fps::FpsMonitor::new(window, cx)
-                    .capacity(60)
-                    .show_resources(false)
-            });
-            self.fps_monitor = Some(monitor);
-        }
-        let fps_monitor = self.fps_monitor.as_ref().unwrap();
 
         let is_visible = cx
             .try_global::<widget_core::UIState>()
@@ -122,7 +111,7 @@ impl Render for MainWindow {
                     .w_full()
                     .overflow_hidden()
                     .min_h_0()
-                    .child(render_sidebar(window, nav_page, fps_monitor, cx))
+                    .child(render_sidebar(nav_page, cx))
                     .child(match nav_page {
                         NavPage::Dashboard => div()
                             .id("page-scroll")

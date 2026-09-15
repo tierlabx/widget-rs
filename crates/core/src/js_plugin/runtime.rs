@@ -67,6 +67,14 @@ pub fn get_shell_runtime(cx: &App) -> Option<Rc<gpui_shell::ShellRuntime>> {
     cx.try_global::<GlobalShellRuntime>().map(|g| g.0.clone())
 }
 
+/// 确保 gpui-shell 脚本引擎已按需懒加载初始化
+pub fn ensure_shell_runtime(cx: &mut App) -> Result<Rc<gpui_shell::ShellRuntime>> {
+    if let Some(runtime) = get_shell_runtime(cx) {
+        return Ok(runtime);
+    }
+    init_shell(cx)
+}
+
 /// 读取插件的配置数据（优先读取本地私有 config.json，其次读取 manifest.json 中的 settings 字段）
 fn read_plugin_config(plugin_id: &str) -> String {
     let candidate_dirs = [

@@ -5,5 +5,5 @@ pub mod view;
 
 pub use manifest::{JsWidgetManifest, JsWindowConfig};
 pub use plugin::JsPlugin;
-pub use runtime::{get_shell_runtime, init_shell};
+pub use runtime::{ensure_shell_runtime, get_shell_runtime, init_shell};
 pub use view::JsWidgetContent;

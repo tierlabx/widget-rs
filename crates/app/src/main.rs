@@ -60,10 +60,6 @@ fn main() {
     app.run(move |cx| {
         // 初始化全局状态和组件资产
         gpui_kit::init(cx);
-        // 初始化 gpui-shell JavaScript 脚本引擎
-        if let Err(err) = widget_core::init_shell(cx) {
-            eprintln!("[main] 初始化 gpui-shell 脚本引擎失败: {err}");
-        }
         // 全局启用深色主题（让所有 Input 输入框、文字、光标默认呈现纯白色）
         gpui_component::Theme::change(gpui_component::ThemeMode::Dark, None, cx);
         // 将 gpui_component 和 gpui_base 的 Theme 默认背景色改为 100% 全透明，杜绝小组件窗口被刷上底板

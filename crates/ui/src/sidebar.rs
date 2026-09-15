@@ -3,9 +3,7 @@ use gpui::prelude::FluentBuilder;
 use gpui::*;
 
 pub fn render_sidebar(
-    _window: &mut Window,
     nav_page: NavPage,
-    fps_monitor: &Entity<gpui_fps::FpsMonitor>,
     cx: &mut Context<crate::main_window::MainWindow>,
 ) -> impl IntoElement {
     div()
@@ -49,19 +47,26 @@ pub fn render_sidebar(
         )
         .child(div().flex_1())
         .child(
-            div()
-                .flex()
-                .flex_col()
-                .w_full()
-                .p(px(16.0))
-                .pb(px(20.0))
-                .child(
-                    div()
-                        .relative()
-                        .w_full()
-                        .h(px(112.0))
-                        .child(gpui_fps::FpsOverlay::new(fps_monitor)),
-                ),
+            div().flex().flex_col().w_full().p(px(16.0)).child(
+                div()
+                    .flex()
+                    .items_center()
+                    .w_full()
+                    .p(px(12.0))
+                    .gap(px(8.0))
+                    .bg(rgba(0x00d9920d))
+                    .border_1()
+                    .border_color(rgba(0x00d99230))
+                    .rounded(px(8.0))
+                    .child(div().w(px(8.0)).h(px(8.0)).rounded_full().bg(rgb(0x00d992)))
+                    .child(
+                        div()
+                            .text_xs()
+                            .font_weight(FontWeight::MEDIUM)
+                            .text_color(rgb(0x2fd6a1))
+                            .child("系统运行中"),
+                    ),
+            ),
         )
 }
 

@@ -2,7 +2,6 @@ use gpui::*;
 use std::path::Path;
 
 use crate::js_plugin::manifest::JsWidgetManifest;
-use crate::js_plugin::runtime::get_shell_runtime;
 use crate::js_plugin::view::JsWidgetContent;
 use crate::{
     default_widget_window_options, default_widget_window_options_blurred, Plugin, WidgetWindow,
@@ -78,8 +77,8 @@ impl Plugin for JsPlugin {
             default_widget_window_options(cx, &plugin_id, default_size)
         };
 
-        let runtime = get_shell_runtime(cx)
-            .expect("gpui-shell 脚本引擎尚未初始化，请在启动时调用 init_shell");
+        let runtime =
+            crate::js_plugin::ensure_shell_runtime(cx).expect("初始化 gpui-shell 脚本引擎失败");
         let root_dir = manifest.root_dir.clone();
 
         cx.open_window(window_options, move |window, cx| {

@@ -6,6 +6,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+## [0.10.1](https://github.com/tierlabx/widget-rs/releases/tag/v0.10.1) - 2026-09-15
+
+### Fixed
+
+- 修复静止内存持续泄漏并实现 JS 脚本引擎按需懒加载
+
 ## [0.10.0](https://github.com/tierlabx/widget-rs/releases/tag/v0.10.0) - 2026-09-15
 
 ### Added
