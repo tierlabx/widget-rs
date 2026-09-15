@@ -137,7 +137,7 @@ pub fn check_for_update(cx: &mut App) {
                 })
                 .await;
 
-            let _ = async_cx.update(|cx| {
+            async_cx.update(|cx| {
                 cx.update_global::<MainWindowUpdateBridge, _>(|bridge, _| {
                     bridge.status = status;
                 });
@@ -255,7 +255,7 @@ pub fn download_update(url: String, is_installer: bool, cx: &mut App) {
                     if let Some(status) = msg {
                         match &status {
                             UpdateStatus::Downloading(_) => {
-                                let _ = async_cx.update(|cx| {
+                                async_cx.update(|cx| {
                                     cx.update_global::<MainWindowUpdateBridge, _>(|bridge, _| {
                                         bridge.status = status;
                                     });
@@ -271,7 +271,7 @@ pub fn download_update(url: String, is_installer: bool, cx: &mut App) {
                 }
 
                 if let Some(status) = final_status {
-                    let _ = async_cx.update(|cx| {
+                    async_cx.update(|cx| {
                         cx.update_global::<MainWindowUpdateBridge, _>(|bridge, _| {
                             bridge.status = status;
                         });

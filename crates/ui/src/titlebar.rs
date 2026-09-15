@@ -121,7 +121,7 @@ pub fn render_titlebar(
                                             .background_executor()
                                             .timer(std::time::Duration::from_millis(50))
                                             .await;
-                                        let _ = async_cx.update(|cx| {
+                                        async_cx.update(|cx| {
                                             cx.refresh_windows();
                                         });
                                     }

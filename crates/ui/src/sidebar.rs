@@ -3,8 +3,9 @@ use gpui::prelude::FluentBuilder;
 use gpui::*;
 
 pub fn render_sidebar(
-    window: &mut Window,
+    _window: &mut Window,
     nav_page: NavPage,
+    fps_monitor: &Entity<gpui_fps::FpsMonitor>,
     cx: &mut Context<crate::main_window::MainWindow>,
 ) -> impl IntoElement {
     div()
@@ -53,13 +54,13 @@ pub fn render_sidebar(
                 .flex_col()
                 .w_full()
                 .p(px(16.0))
-                .pb(px(32.0))
+                .pb(px(20.0))
                 .child(
                     div()
                         .relative()
                         .w_full()
-                        .h(px(150.0))
-                        .child(gpui_fps::fps_monitor(window, cx)),
+                        .h(px(112.0))
+                        .child(gpui_fps::FpsOverlay::new(fps_monitor)),
                 ),
         )
 }
