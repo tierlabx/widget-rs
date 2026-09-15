@@ -5,3 +5,6 @@ tmp/
 installer/
 
 .tmp-ztest/
+
+# gpui-shell 运行时自动生成的 TypeScript 类型声明文件
+**/gpui-kit.d.ts
