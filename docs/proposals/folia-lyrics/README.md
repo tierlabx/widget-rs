@@ -1,5 +1,9 @@
 # 提案 PROP-001：沉浸式桌面流光歌词小部件 (Folia Lyrics)
 
+<p align="center">
+  <a href="../../../en/proposals/folia-lyrics/README.md">English</a> | <strong>简体中文</strong>
+</p>
+
 > **当前状态**：方案评审中 (Review / RFC)  
 > **灵感来源**：[chthollyphile/folia-major](https://github.com/chthollyphile/folia-major)（高质感沉浸式动效歌词播放器）与现代音乐文字 PV（Typography Music Video）  
 > **目标架构**：Rust + GPUI 原生桌面渲染引擎  

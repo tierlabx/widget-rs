@@ -1,5 +1,9 @@
 # Folia 歌词：架构与 GPUI 文字 PV 动效渲染管线
 
+<p align="center">
+  <a href="../../../en/proposals/folia-lyrics/architecture-and-rendering.md">English</a> | <strong>简体中文</strong>
+</p>
+
 本文档详细规划如何在 `gpui` 原生桌面渲染框架下，构建具备**文字 PV (Typography Music Video)** 级视觉表现力的全屏与桌面歌词动效管线，包括字词级弹簧跳入、动态镜头与景深排版、双层霓虹辉光遮罩及流光舞台背景。
 
 ---

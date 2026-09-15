@@ -1,5 +1,9 @@
 # Widget-RS CLI (`widget-cli`)
 
+<p align="center">
+  <a href="README_EN.md">English</a> | <strong>简体中文</strong>
+</p>
+
 `widget-cli` 是 `widget-rs` 的辅助构建、管理与自动化发布工具。作为一个独立的命令行工具，它主要用于简化插件管理、自动化版本计算发布、维护更新日志（CHANGELOG）并与 CI/CD 流水线联动。
 
 ---

@@ -1,5 +1,9 @@
 # 常见问题 (FAQ)
 
+<p align="center">
+  <a href="en/faq.md">English</a> | <strong>简体中文</strong>
+</p>
+
 本页面记录了 Widget-RS 用户及开发者常遇到的问题及解答。
 
 ## 通用使用问题

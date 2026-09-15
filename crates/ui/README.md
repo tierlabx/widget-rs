@@ -1,5 +1,9 @@
 # Widget RS UI Crate
 
+<p align="center">
+  <a href="README_EN.md">English</a> | <strong>简体中文</strong>
+</p>
+
 `widget-ui` 模块包揽了 `widget-rs` 项目中除了具体各个插件本身逻辑之外的“核心交互界面”，基于 GPUI 框架搭建。
 
 ## 主要功能

@@ -1,5 +1,9 @@
 # Widget RS App Crate
 
+<p align="center">
+  <a href="README_EN.md">English</a> | <strong>简体中文</strong>
+</p>
+
 `widget-app` 是 `widget-rs` 项目的应用程序主干模块，负责整个桌面端应用程序的生命周期和系统集成。
 
 ## 主要功能

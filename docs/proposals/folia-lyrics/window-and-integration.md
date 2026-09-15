@@ -1,5 +1,9 @@
 # Folia 歌词：窗口宿主与系统集成规范
 
+<p align="center">
+  <a href="../../../en/proposals/folia-lyrics/window-and-integration.md">English</a> | <strong>简体中文</strong>
+</p>
+
 本文档阐述小部件如何严格遵守 `widget-rs` 架构约束，包括 `WidgetWindow<T>` 封装、Win+D 桌面常驻、设置弹窗规范以及工程模块拆分。
 
 ---

@@ -1,5 +1,9 @@
 # Widget-RS JavaScript 插件开发指南 (基于 GPUI Shell 架构)
 
+<p align="center">
+  <a href="en/js-plugin-guide.md">English</a> | <strong>简体中文</strong>
+</p>
+
 本文档面向希望使用 JavaScript 编写桌面小组件的开发者。`widget-rs` 集成了 `gpui-kit` 生态官方的 **GPUI Shell** 扩展系统，允许开发者在无需搭建 Rust 编译环境的情况下，通过轻量级 JavaScript 脚本（ES Modules + 原生 QuickJS JIT 执行环境）声明式构建桌面小组件。
 
 ---

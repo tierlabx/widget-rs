@@ -1,5 +1,9 @@
 # 贡献指南 (Contributing to Widget-RS)
 
+<p align="center">
+  <a href="CONTRIBUTING_EN.md">English</a> | <strong>简体中文</strong>
+</p>
+
 感谢你考虑为 Widget-RS 做出贡献！本项目致力于构建一个基于 Rust 的现代桌面小部件平台，不论是提交 Bug 反馈、代码优化还是新增插件，我们都非常欢迎！
 
 ## 👨‍💻 开发准备
@@ -69,7 +73,7 @@
 
 > **注意**: 编辑模式检测、拖拽条、窗口边框、`update_window_edit_mode` 等窗口级逻辑已由 `WidgetWindow` 容器统一封装，**不要**在插件中重复实现。
 
-详细的 API 说明请参考 `docs/PLUGIN_DEVELOPMENT.md`。
+详细的 API 说明请参考 [插件开发指南](docs/插件开发指南.md)（英文版：[Plugin Development Guide](docs/en/plugin-development-guide.md)）。
 
 ## 📦 打包与构建
 

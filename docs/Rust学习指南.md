@@ -1,5 +1,9 @@
 # 面向前端开发者的 Rust & GPUI 学习指南
 
+<p align="center">
+  <a href="en/rust-learning-guide.md">English</a> | <strong>简体中文</strong>
+</p>
+
 由于你有 TypeScript 和前端（如 Vue3）的基础，学习 Rust（特别是结合 GPUI 这个有着浓厚前端设计思想的 UI 框架）将会变得容易很多。本指南基于当前工作区中的 `widget-rs` 项目，通过类比的方式帮你快速建立 Rust 编程的心智模型。
 
 ## 1. 工程化与依赖管理

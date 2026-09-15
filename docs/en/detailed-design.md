@@ -1,7 +1,7 @@
 # Design System Inspired by VoltAgent
 
 <p align="center">
-  <a href="en/detailed-design.md">English</a> | <strong>简体中文</strong>
+  <strong>English</strong> | <a href="../详细设计.md">简体中文</a>
 </p>
 
 ## 1. Visual Theme & Atmosphere

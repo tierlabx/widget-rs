@@ -1,5 +1,9 @@
 # Plugins 规划与孵化体系 (Plugin Proposals)
 
+<p align="center">
+  <a href="../en/proposals/README.md">English</a> | <strong>简体中文</strong>
+</p>
+
 本目录用于存放 `widget-rs` 新插件/小组件的功能设计、技术架构预研与实施规划文档，作为新组件从概念到工程落地的统一设计中心。
 
 ---

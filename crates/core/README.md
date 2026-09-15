@@ -1,5 +1,9 @@
 # Widget RS Core Crate
 
+<p align="center">
+  <a href="README_EN.md">English</a> | <strong>简体中文</strong>
+</p>
+
 `widget-core` 是 `widget-rs` 的核心通用层，承载了所有基础的数据结构和 Traits。
 
 ## 主要功能

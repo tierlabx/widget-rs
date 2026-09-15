@@ -1,5 +1,9 @@
 # Folia 歌词：SMTC 媒体监听与歌词引擎设计
 
+<p align="center">
+  <a href="../../../en/proposals/folia-lyrics/smtc-and-lyrics-engine.md">English</a> | <strong>简体中文</strong>
+</p>
+
 本文档规划小部件如何监听 Windows 全局媒体播放器（SMTC），以及逐字歌词解析与高精度时间轴对齐机制。
 
 ---

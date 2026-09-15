@@ -1,5 +1,9 @@
 # Widget-RS 🎨
 
+<p align="center">
+  <a href="README_EN.md">English</a> | <strong>简体中文</strong>
+</p>
+
 [![CI](https://github.com/tierlabx/widget-rs/actions/workflows/packager.yml/badge.svg)](https://github.com/tierlabx/widget-rs/actions/workflows/packager.yml)
 [![Rust](https://img.shields.io/badge/rust-1.75%2B-blue.svg)](https://www.rust-lang.org)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
