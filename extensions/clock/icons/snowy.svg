@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24">
+  <defs>
+    <linearGradient id="snowCloud" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#f8fafc"/>
+      <stop offset="100%" stop-color="#cbd5e1"/>
+    </linearGradient>
+  </defs>
+  <path d="M17 14H7a4.5 4.5 0 0 1-.8-8.93 5.5 5.5 0 0 1 10.7-1.37A4 4 0 0 1 17 14Z" fill="url(#snowCloud)" stroke="#94a3b8" stroke-width="0.8"/>
+  <g stroke="#38bdf8" stroke-width="1.8" stroke-linecap="round">
+    <line x1="8" y1="17" x2="8" y2="21"/>
+    <line x1="6" y1="19" x2="10" y2="19"/>
+    <line x1="14" y1="17" x2="14" y2="21"/>
+    <line x1="12" y1="19" x2="16" y2="19"/>
+  </g>
+</svg>

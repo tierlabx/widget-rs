@@ -7,4 +7,8 @@ installer/
 .tmp-ztest/
 
 # gpui-shell 运行时自动生成的 TypeScript 类型声明文件
-**/gpui-kit.d.ts
+**/gpui-kit.d.ts
+
+# 插件本地私有配置文件（保护个人 API Key、Token 等不被提交到 Git）
+extensions/**/config.json
+extensions/**/config.local.json

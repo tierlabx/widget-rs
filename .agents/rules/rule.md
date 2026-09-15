@@ -27,8 +27,7 @@ trigger: always_on
   - **脚本环境标准**：基于官方 `gpui-shell`（QuickJS JIT），采用标准 ES Modules 语法，默认导出继承自 `gpui-kit` 的 `View` 类。
   - **状态与定时机制**：视图状态赋值在 `init(props, cx)` 中进行；状态变更时必须调用 `cx.notify()` 通知 GPUI 重新渲染；周期任务必须使用 `cx.timer.every(interval, cb)`，严禁依赖浏览器特有 API（如 `window`、`document`）。
   - **清单配置文件**：
-    - `widget.json`：定义小组件名称、版本、初始宽高、全透明及亚克力磨砂（`"blurred": true`）等宿主窗口属性。
-    - `gpui-shell.json`：定义脚本引擎目标版本（`"shell-version": "0.6.1"`）与入口（`"entry": "main.js"`）。
+    - `manifest.json`：统一小组件清单，定义名称、版本、脚本入口（`"entry": "main.js"`）、初始宽高、全透明及亚克力磨砂（`"blurred": true`）等宿主窗口属性（向下兼容旧版 `widget.json`）。
   - **核心能力保护**：外部 JS 扩展小组件由 `widget_core::JsPlugin` 加载并统一包入 `WidgetWindow`，自动继承 `Progman` Win+D 常驻、拖拽移动与亚克力透明直通壁纸能力。
 - **插件设置弹窗规范**：
   - 所有带有独立设置弹窗的插件，必须在 `Plugin::build_settings_window` 中使用 `widget_core::default_settings_window_options(cx, initial_size)` 创建窗口。

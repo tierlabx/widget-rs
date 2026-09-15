@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24">
+  <defs>
+    <linearGradient id="thunderCloud" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#cbd5e1"/>
+      <stop offset="100%" stop-color="#64748b"/>
+    </linearGradient>
+    <linearGradient id="lightning" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#fde047"/>
+      <stop offset="100%" stop-color="#f59e0b"/>
+    </linearGradient>
+  </defs>
+  <path d="M17 14H7a4.5 4.5 0 0 1-.8-8.93 5.5 5.5 0 0 1 10.7-1.37A4 4 0 0 1 17 14Z" fill="url(#thunderCloud)" stroke="#475569" stroke-width="0.8"/>
+  <polygon points="12,13 8.5,18 11.5,18 10,22.5 15,16.5 12.5,16.5" fill="url(#lightning)" stroke="#ca8a04" stroke-width="0.6"/>
+</svg>

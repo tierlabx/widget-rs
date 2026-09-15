@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24">
+  <defs>
+    <linearGradient id="rainCloud" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#f1f5f9"/>
+      <stop offset="100%" stop-color="#94a3b8"/>
+    </linearGradient>
+  </defs>
+  <path d="M17 15H7a4.5 4.5 0 0 1-.8-8.93 5.5 5.5 0 0 1 10.7-1.37A4 4 0 0 1 17 15Z" fill="url(#rainCloud)" stroke="#64748b" stroke-width="0.8"/>
+  <g stroke="#38bdf8" stroke-width="2" stroke-linecap="round">
+    <line x1="8" y1="17" x2="6.5" y2="21"/>
+    <line x1="12" y1="17" x2="10.5" y2="21"/>
+    <line x1="16" y1="17" x2="14.5" y2="21"/>
+  </g>
+</svg>

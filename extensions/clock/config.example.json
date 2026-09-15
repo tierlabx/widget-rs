@@ -1,0 +1,6 @@
+{
+  "apiHost": "devapi.qweather.com",
+  "apiKey": "",
+  "location": "auto",
+  "updateIntervalMs": 1200000
+}

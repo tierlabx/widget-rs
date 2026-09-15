@@ -4,5 +4,5 @@ Please refer to the detailed documentation in [JS插件开发指南.md](./JS插�
 
 For quick overview:
 - Extensions are located under `%APPDATA%/tierlabx/widget-rs/extensions` or `./extensions/`.
-- Each extension directory contains `widget.json` (metadata & window specs) and `main.js` (logic & declarative node render tree).
+- Each extension directory contains `manifest.json` (metadata & window specs) and `main.js` (logic & declarative node render tree).
 - Native GPUI rendering with zero DOM overhead.

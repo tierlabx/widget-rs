@@ -1,0 +1,20 @@
+{
+  "id": "clock",
+  "name": "时钟",
+  "version": "1.0.0",
+  "author": "widget-rs team",
+  "description": "简洁优雅的桌面动态时钟小组件，支持实时时间、日期与秒针跳动展示",
+  "entry": "main.js",
+  "icon": "clock",
+  "window": {
+    "width": 390.0,
+    "height": 104.0,
+    "transparent": true,
+    "blurred": true
+  },
+  "settings": {
+    "apiHost": "devapi.qweather.com",
+    "apiKey": "",
+    "location": "auto"
+  }
+}

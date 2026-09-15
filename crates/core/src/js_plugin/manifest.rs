@@ -34,7 +34,7 @@ impl Default for JsWindowConfig {
     }
 }
 
-/// JS 小部件清单配置（对应 widget.json / gpui-shell.json）
+/// JS 小部件清单配置（对应 manifest.json / widget.json / gpui-shell.json）
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct JsWidgetManifest {
     pub id: String,
@@ -47,7 +47,7 @@ pub struct JsWidgetManifest {
     pub description: String,
     #[serde(default = "default_icon")]
     pub icon: String,
-    #[serde(default = "default_entry")]
+    #[serde(default = "default_entry", alias = "main")]
     pub entry: String,
     #[serde(default)]
     pub window: JsWindowConfig,
@@ -78,16 +78,18 @@ fn default_entry() -> String {
 }
 
 impl JsWidgetManifest {
-    /// 从插件目录加载 widget.json 或 gpui-shell.json
+    /// 从插件目录加载 manifest.json，并向下兼容 widget.json 或 gpui-shell.json
     pub fn load_from_dir<P: AsRef<Path>>(dir: P) -> anyhow::Result<Self> {
         let dir = dir.as_ref();
-        let manifest_path = if dir.join("widget.json").exists() {
+        let manifest_path = if dir.join("manifest.json").exists() {
+            dir.join("manifest.json")
+        } else if dir.join("widget.json").exists() {
             dir.join("widget.json")
         } else if dir.join("gpui-shell.json").exists() {
             dir.join("gpui-shell.json")
         } else {
             return Err(anyhow::anyhow!(
-                "在目录 {:?} 中未找到 widget.json 或 gpui-shell.json",
+                "在目录 {:?} 中未找到 manifest.json、widget.json 或 gpui-shell.json",
                 dir
             ));
         };
@@ -115,5 +117,52 @@ impl JsWidgetManifest {
     /// 获取脚本入口文件的绝对路径
     pub fn entry_path(&self) -> PathBuf {
         self.root_dir.join(&self.entry)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_manifest_deserialization_with_entry() {
+        let json = r#"{
+            "id": "test_clock",
+            "name": "测试时钟",
+            "entry": "index.js"
+        }"#;
+        let manifest: JsWidgetManifest = serde_json::from_str(json).unwrap();
+        assert_eq!(manifest.id, "test_clock");
+        assert_eq!(manifest.entry, "index.js");
+    }
+
+    #[test]
+    fn test_manifest_deserialization_with_main_alias() {
+        let json = r#"{
+            "id": "test_clock",
+            "name": "测试时钟",
+            "main": "bundle.js"
+        }"#;
+        let manifest: JsWidgetManifest = serde_json::from_str(json).unwrap();
+        assert_eq!(manifest.id, "test_clock");
+        assert_eq!(manifest.entry, "bundle.js");
+    }
+
+    #[test]
+    fn test_load_clock_manifest() {
+        let clock_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .parent()
+            .unwrap()
+            .parent()
+            .unwrap()
+            .join("extensions")
+            .join("clock");
+        if clock_dir.exists() {
+            let manifest = JsWidgetManifest::load_from_dir(&clock_dir).unwrap();
+            assert_eq!(manifest.id, "clock");
+            assert_eq!(manifest.name, "时钟");
+            assert_eq!(manifest.entry, "main.js");
+            assert!(manifest.window.blurred);
+        }
     }
 }

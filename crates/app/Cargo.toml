@@ -21,6 +21,7 @@ before-packaging-command = "cargo build --release"
 [dependencies]
 gpui.workspace = true
 gpui-kit.workspace = true
+gpui-base.workspace = true
 gpui-component.workspace = true
 mimalloc = { version = "0.1", default-features = false }
 sticky_plugin.workspace = true

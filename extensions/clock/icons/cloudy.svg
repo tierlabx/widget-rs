@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24">
+  <defs>
+    <linearGradient id="cloudBack" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#94a3b8"/>
+      <stop offset="100%" stop-color="#64748b"/>
+    </linearGradient>
+    <linearGradient id="cloudFront" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#f8fafc"/>
+      <stop offset="100%" stop-color="#cbd5e1"/>
+    </linearGradient>
+  </defs>
+  <path d="M19 15h-1a4 4 0 0 0-7.8-1.2A3.5 3.5 0 0 0 5 16h14a2 2 0 0 0 0-4c-.3 0-.6.1-.9.2A4 4 0 0 0 19 15Z" fill="url(#cloudBack)" opacity="0.6"/>
+  <path d="M17.5 19H7a5 5 0 0 1-.9-9.92 6 6 0 0 1 11.66-1.5A4.5 4.5 0 0 1 17.5 19Z" fill="url(#cloudFront)" stroke="#94a3b8" stroke-width="0.8"/>
+</svg>

@@ -19,19 +19,18 @@
 ```text
 extensions/
 └── my_widget/
-    ├── widget.json       # 插件元数据与窗口配置（必需）
-    ├── gpui-shell.json   # GPUI Shell 标准模块配置（可选）
+    ├── manifest.json     # 插件统一元数据与窗口配置（必需）
     ├── main.js           # 业务逻辑与 View 渲染入口（必需）
+    ├── jsconfig.json     # 编辑器 IDE 智能提示与类型检查配置（推荐）
+    ├── gpui-kit.d.ts     # gpui-kit 全局类型定义文件（推荐）
     └── icon.png          # 插件图标（可选，支持 .png 或 .svg）
 ```
 
 ---
 
-## 3. 配置文件
+## 3. 配置文件 `manifest.json`
 
-### 1. `widget.json` (小组件窗口属性)
-
-用于定义小组件在 `widget-rs` 控制面板中的呈现方式与窗口样式：
+用于定义小组件在 `widget-rs` 控制面板中的呈现方式、脚本入口与窗口样式（同时向下兼容旧版 `widget.json`）：
 
 ```json
 {
@@ -40,7 +39,7 @@ extensions/
   "version": "1.0.0",
   "author": "Your Name",
   "description": "基于 GPUI Shell 架构的桌面小组件",
-  "main": "main.js",
+  "entry": "main.js",
   "icon": "clock",
   "window": {
     "width": 310.0,
@@ -51,19 +50,9 @@ extensions/
 }
 ```
 
-### 2. `gpui-shell.json` (GPUI Shell 标准清单)
-
-定义给底层 `gpui-shell` 引擎识别的模块信息：
-
-```json
-{
-  "id": "my_custom_widget",
-  "name": "我的自定义小组件",
-  "version": "1.0.0",
-  "shell-version": "0.6.1",
-  "entry": "main.js"
-}
-```
+> **说明**：
+> - 脚本入口字段支持 `"entry": "main.js"` 或 `"main": "main.js"`。
+> - `jsconfig.json` 为编辑器类型支持文件，不参与插件运行时加载。
 
 ---
 

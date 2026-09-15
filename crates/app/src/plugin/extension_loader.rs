@@ -46,9 +46,10 @@ fn scan_directory(
     for entry in entries.flatten() {
         let path = entry.path();
         if path.is_dir() {
-            // 如果该目录有 widget.json 或 gpui-shell.json，尝试加载
-            let has_manifest =
-                path.join("widget.json").exists() || path.join("gpui-shell.json").exists();
+            // 如果该目录有 manifest.json、widget.json 或 gpui-shell.json，尝试加载
+            let has_manifest = path.join("manifest.json").exists()
+                || path.join("widget.json").exists()
+                || path.join("gpui-shell.json").exists();
             if has_manifest {
                 // 避免重复扫描相同绝对路径
                 if let Ok(canonical) = path.canonicalize() {

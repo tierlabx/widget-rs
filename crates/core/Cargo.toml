@@ -8,6 +8,7 @@ directories.workspace = true
 gpui.workspace = true
 gpui-component.workspace = true
 gpui-shell.workspace = true
+gpui-pre-reqwest = { version = "0.12.15", default-features = false, features = ["gzip", "brotli", "deflate"] }
 serde.workspace = true
 serde_json.workspace = true
 anyhow = "1.0"
