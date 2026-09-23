@@ -6,6 +6,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+## [0.10.2](https://github.com/tierlabx/widget-rs/releases/tag/v0.10.2) - 2026-09-23
+
+### Fixed
+
+- 优化多显示器自适应与 GPUI DisplayId 目标屏幕定位
+
 ## [0.10.1](https://github.com/tierlabx/widget-rs/releases/tag/v0.10.1) - 2026-09-15
 
 ### Fixed
