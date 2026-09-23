@@ -87,6 +87,13 @@ use std::sync::atomic::{AtomicBool, Ordering};
 /// 允许显式 Z 序/置顶变更的全局标记，防止窗口过程中的组联动拦截器误判
 pub static ALLOW_EXPLICIT_ZORDER: AtomicBool = AtomicBool::new(false);
 
+/// 显示器配置已变更的全局标记（接入/拔出显示器、分辨率/DPI 变更）
+///
+/// 由 `plugin_wnd_proc` 在收到 `WM_DISPLAYCHANGE` 时设为 `true`，
+/// 由 `spawn_tray_polling_task` 在下次轮询时读取并清零，
+/// 触发 `WindowManager::reposition_all_to_valid_screens` 自动将离屏插件归位。
+pub static DISPLAY_CHANGED: AtomicBool = AtomicBool::new(false);
+
 /// 设置或取消窗口的系统级置顶状态（Always on Top）
 ///
 /// 遵循 Win32 窗口体系规范：

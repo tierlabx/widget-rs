@@ -83,7 +83,6 @@ pub fn spawn_hwnd_polling_task(cx: &mut App, store: Arc<Store>) {
                 });
                 if hwnd == 0 {
                     all_ready = false;
-                    break;
                 } else {
                     id_hwnd.push((id.clone(), hwnd));
                 }
@@ -117,22 +116,45 @@ pub fn spawn_hwnd_polling_task(cx: &mut App, store: Arc<Store>) {
                 if let Some((px, py, pw, ph)) =
                     widget_core::get_saved_physical_bounds(cx, id.as_str())
                 {
-                    unsafe {
-                        windows_sys::Win32::UI::WindowsAndMessaging::SetWindowPos(
-                            *hwnd,
-                            0,
+                    let curr_pos = crate::window::platform::windows::get_hwnd_physical_rect(*hwnd);
+                    let need_fix = if let Some((cx_, cy_, cw_, ch_)) = curr_pos {
+                        let is_exact = cx_ == px && cy_ == py && cw_ == pw && ch_ == ph;
+                        println!(
+                            "[main] {} 初始位置 ({},{}) {}x{} → 目标 ({},{}) {}x{}{}",
+                            id,
+                            cx_,
+                            cy_,
+                            cw_,
+                            ch_,
                             px,
                             py,
                             pw,
                             ph,
-                            windows_sys::Win32::UI::WindowsAndMessaging::SWP_NOZORDER
-                                | windows_sys::Win32::UI::WindowsAndMessaging::SWP_NOACTIVATE,
+                            if is_exact {
+                                " [无需修正]"
+                            } else {
+                                " [修正中]"
+                            }
                         );
+                        !is_exact
+                    } else {
+                        true
+                    };
+
+                    if need_fix {
+                        unsafe {
+                            windows_sys::Win32::UI::WindowsAndMessaging::SetWindowPos(
+                                *hwnd,
+                                0,
+                                px,
+                                py,
+                                pw,
+                                ph,
+                                windows_sys::Win32::UI::WindowsAndMessaging::SWP_NOZORDER
+                                    | windows_sys::Win32::UI::WindowsAndMessaging::SWP_NOACTIVATE,
+                            );
+                        }
                     }
-                    println!(
-                        "[main] SetWindowPos 精确修正 {} -> ({}, {}) {}x{}",
-                        id, px, py, pw, ph
-                    );
                 }
 
                 if let Some(cfg) = &config {
@@ -252,6 +274,15 @@ pub fn spawn_tray_polling_task(
                         "显示控制面板"
                     });
                 }
+            }
+
+            // 4. 检测显示器配置变更（WM_DISPLAYCHANGE），触发自愈归位
+            if widget_core::DISPLAY_CHANGED.swap(false, std::sync::atomic::Ordering::SeqCst) {
+                println!("[lifecycle] 检测到 WM_DISPLAYCHANGE，触发插件位置自愈检查...");
+                cx.update_global::<WindowManager, _>(|wm, cx| {
+                    wm.reposition_all_to_valid_screens(cx);
+                });
+                cx.update(|cx| cx.refresh_windows());
             }
 
             cx.background_executor()

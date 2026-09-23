@@ -31,6 +31,15 @@ pub unsafe extern "system" fn plugin_wnd_proc(
         return 0;
     }
 
+    // 显示器配置变更（接入/拔出副屏、分辨率改变、DPI 变更）
+    // 设置全局标志，让托盘轮询任务在下次循环时触发自感归位。
+    if msg == windows_sys::Win32::UI::WindowsAndMessaging::WM_DISPLAYCHANGE {
+        widget_core::DISPLAY_CHANGED.store(true, std::sync::atomic::Ordering::SeqCst);
+        return windows_sys::Win32::UI::WindowsAndMessaging::DefWindowProcW(
+            hwnd, msg, wparam, lparam,
+        );
+    }
+
     if msg == windows_sys::Win32::UI::WindowsAndMessaging::WM_SIZING
         && widget_core::NATIVE_EDIT_MODE.load(std::sync::atomic::Ordering::SeqCst)
     {
@@ -235,45 +244,28 @@ pub fn get_window_bounds(hwnd: isize, scale: f32) -> (f32, f32, f32, f32, f32, i
     if hwnd != 0 {
         unsafe {
             use windows_sys::Win32::Foundation::RECT;
-            use windows_sys::Win32::Graphics::Dwm::{
-                DwmGetWindowAttribute, DWMWA_EXTENDED_FRAME_BOUNDS,
-            };
             use windows_sys::Win32::UI::HiDpi::GetDpiForWindow;
             use windows_sys::Win32::UI::WindowsAndMessaging::GetWindowRect;
 
             let dpi = GetDpiForWindow(hwnd);
             actual_scale = if dpi == 0 { scale } else { dpi as f32 / 96.0 };
 
-            let mut rect: RECT = std::mem::zeroed();
-            let hr = DwmGetWindowAttribute(
-                hwnd,
-                DWMWA_EXTENDED_FRAME_BOUNDS as u32,
-                &mut rect as *mut _ as *mut _,
-                std::mem::size_of::<RECT>() as u32,
-            );
-
-            if hr == 0 {
-                // 优先使用 DWM 真实视觉物理边界（彻底消除 Windows 10/11 系统的 Invisible resize border 误差）
-                phys_x = rect.left;
-                phys_y = rect.top;
-                phys_w = rect.right - rect.left;
-                phys_h = rect.bottom - rect.top;
-                log_x = rect.left as f32 / actual_scale;
-                log_y = rect.top as f32 / actual_scale;
+            // 使用 GetWindowRect 获取真实物理窗口矩形。
+            // WS_POPUP 窗口不含非客户区边框，且 WM_NCCALCSIZE 返回 0 已彻底消除隐形边框，
+            // GetWindowRect == 客户区 == DWM 可见边界，三者一致。
+            // DwmExtendFrameIntoClientArea 会把毛玻璃区域注入客户区，导致
+            // DWMWA_EXTENDED_FRAME_BOUNDS 偏小（将毛玻璃边耗从视觉边界扣除），
+            // 导致每次重启高度越来越小的漂移。
+            let mut wr: RECT = std::mem::zeroed();
+            if GetWindowRect(hwnd, &mut wr) != 0 {
+                phys_x = wr.left;
+                phys_y = wr.top;
+                phys_w = wr.right - wr.left;
+                phys_h = wr.bottom - wr.top;
+                log_x = wr.left as f32 / actual_scale;
+                log_y = wr.top as f32 / actual_scale;
                 log_w = phys_w as f32 / actual_scale;
                 log_h = phys_h as f32 / actual_scale;
-            } else {
-                let mut phys_rect: RECT = std::mem::zeroed();
-                if GetWindowRect(hwnd, &mut phys_rect) != 0 {
-                    phys_x = phys_rect.left;
-                    phys_y = phys_rect.top;
-                    phys_w = phys_rect.right - phys_rect.left;
-                    phys_h = phys_rect.bottom - phys_rect.top;
-                    log_x = phys_rect.left as f32 / actual_scale;
-                    log_y = phys_rect.top as f32 / actual_scale;
-                    log_w = phys_w as f32 / actual_scale;
-                    log_h = phys_h as f32 / actual_scale;
-                }
             }
         }
     }
@@ -288,4 +280,28 @@ pub fn get_window_bounds(hwnd: isize, scale: f32) -> (f32, f32, f32, f32, f32, i
         phys_w,
         phys_h,
     )
+}
+
+/// 获取指定 HWND 的当前物理像素边界（用于显示器配置变更后的已上屏检测）
+///
+/// 返回 `(phys_x, phys_y, phys_w, phys_h)`，失败时返回 `None`。
+pub fn get_hwnd_physical_rect(hwnd: isize) -> Option<(i32, i32, i32, i32)> {
+    if hwnd == 0 {
+        return None;
+    }
+    #[cfg(target_os = "windows")]
+    unsafe {
+        use windows_sys::Win32::Foundation::RECT;
+        use windows_sys::Win32::UI::WindowsAndMessaging::GetWindowRect;
+
+        // 直接使用 GetWindowRect：WS_POPUP + WM_NCCALCSIZE=0 已消除隐形边框，
+        // 此即实际可见边界，与 SetWindowPos 操作的坐标空间一致。
+        let mut wr: RECT = std::mem::zeroed();
+        if GetWindowRect(hwnd, &mut wr) != 0 {
+            return Some((wr.left, wr.top, wr.right - wr.left, wr.bottom - wr.top));
+        }
+        None
+    }
+    #[cfg(not(target_os = "windows"))]
+    None
 }

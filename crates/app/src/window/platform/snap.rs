@@ -1,5 +1,4 @@
 use windows_sys::Win32::Foundation::RECT;
-use windows_sys::Win32::Graphics::Dwm::{DwmGetWindowAttribute, DWMWA_EXTENDED_FRAME_BOUNDS};
 use windows_sys::Win32::Graphics::Gdi::{
     GetMonitorInfoW, MonitorFromWindow, MONITORINFO, MONITOR_DEFAULTTONEAREST,
 };
@@ -57,15 +56,17 @@ pub unsafe fn apply_window_snapping(hwnd: isize, pos: &mut WINDOWPOS) {
     // 标准网格间距（如 8px 网格）
     let grid_gap = ((8.0 * scale).round() as i32).max(4);
 
-    let work = SnapRect {
-        left: info.rcWork.left,
-        top: info.rcWork.top,
-        right: info.rcWork.right,
-        bottom: info.rcWork.bottom,
-    };
-
-    let curr_w = pos.cx;
-    let curr_h = pos.cy;
+    let (curr_w, curr_h) =
+        if (pos.flags & windows_sys::Win32::UI::WindowsAndMessaging::SWP_NOSIZE) != 0 {
+            let mut wr: windows_sys::Win32::Foundation::RECT = std::mem::zeroed();
+            if windows_sys::Win32::UI::WindowsAndMessaging::GetWindowRect(hwnd, &mut wr) != 0 {
+                (wr.right - wr.left, wr.bottom - wr.top)
+            } else {
+                (pos.cx, pos.cy)
+            }
+        } else {
+            (pos.cx, pos.cy)
+        };
     let curr_x = pos.x;
     let curr_y = pos.y;
 
@@ -93,9 +94,12 @@ pub unsafe fn apply_window_snapping(hwnd: isize, pos: &mut WINDOWPOS) {
         }
     };
 
-    // 屏幕左边缘与右边缘紧贴（0 缝隙）
-    consider_x(work.left);
-    consider_x(work.right - curr_w);
+    // 所有显示器工作区左右边缘吸附（多屏支持）
+    let all_monitors = widget_core::enumerate_monitors();
+    for m in &all_monitors {
+        consider_x(m.rc_work.left);
+        consider_x(m.rc_work.right - curr_w);
+    }
 
     // 组件间水平对齐与相贴
     for other in &other_rects {
@@ -137,9 +141,11 @@ pub unsafe fn apply_window_snapping(hwnd: isize, pos: &mut WINDOWPOS) {
         }
     };
 
-    // 屏幕顶边缘与底边缘紧贴（0 缝隙）
-    consider_y(work.top);
-    consider_y(work.bottom - curr_h);
+    // 所有显示器工作区上下边缘吸附（多屏支持）
+    for m in &all_monitors {
+        consider_y(m.rc_work.top);
+        consider_y(m.rc_work.bottom - curr_h);
+    }
 
     // 组件间垂直对齐、相同高度网格对齐与相贴
     for other in &other_rects {
@@ -177,6 +183,7 @@ pub unsafe fn apply_window_snapping(hwnd: isize, pos: &mut WINDOWPOS) {
 }
 
 /// 在编辑模式下拖拽调整窗口大小时的智能网格与高度吸附 (WM_SIZING)
+/// **多屏屏幕全敏感**：吸附目标包含所有已连接显示器的工作区边缘。
 pub unsafe fn apply_sizing_snapping(hwnd: isize, edge: u32, rect: &mut RECT) {
     let hmonitor = MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST);
     let mut info: MONITORINFO = std::mem::zeroed();
@@ -191,12 +198,8 @@ pub unsafe fn apply_sizing_snapping(hwnd: isize, edge: u32, rect: &mut RECT) {
     let scale = (dpi_x as f32 / 96.0).max(0.5);
     let snap_threshold = ((14.0 * scale).round() as i32).clamp(10, 24);
 
-    let work = SnapRect {
-        left: info.rcWork.left,
-        top: info.rcWork.top,
-        right: info.rcWork.right,
-        bottom: info.rcWork.bottom,
-    };
+    // 获取所有显示器工作区（多屏支持）
+    let all_monitors = widget_core::enumerate_monitors();
 
     let mut other_rects = Vec::new();
     if let Some(procs) = WND_PROCS.get() {
@@ -219,8 +222,11 @@ pub unsafe fn apply_sizing_snapping(hwnd: isize, edge: u32, rect: &mut RECT) {
     let is_right = edge == WMSZ_RIGHT || edge == WMSZ_TOPRIGHT || edge == WMSZ_BOTTOMRIGHT;
 
     if is_top {
-        if (curr.top - work.top).abs() < snap_threshold {
-            curr.top = work.top;
+        // 所有显示器顶边吸附（多屏支持）
+        for m in &all_monitors {
+            if (curr.top - m.rc_work.top).abs() < snap_threshold {
+                curr.top = m.rc_work.top;
+            }
         }
         for other in &other_rects {
             // 对齐到邻近组件顶边
@@ -236,8 +242,11 @@ pub unsafe fn apply_sizing_snapping(hwnd: isize, edge: u32, rect: &mut RECT) {
     }
 
     if is_bottom {
-        if (curr.bottom - work.bottom).abs() < snap_threshold {
-            curr.bottom = work.bottom;
+        // 所有显示器底边吸附（多屏支持）
+        for m in &all_monitors {
+            if (curr.bottom - m.rc_work.bottom).abs() < snap_threshold {
+                curr.bottom = m.rc_work.bottom;
+            }
         }
         for other in &other_rects {
             // 对齐到邻近组件底边
@@ -253,8 +262,11 @@ pub unsafe fn apply_sizing_snapping(hwnd: isize, edge: u32, rect: &mut RECT) {
     }
 
     if is_left {
-        if (curr.left - work.left).abs() < snap_threshold {
-            curr.left = work.left;
+        // 所有显示器左边吸附（多屏支持）
+        for m in &all_monitors {
+            if (curr.left - m.rc_work.left).abs() < snap_threshold {
+                curr.left = m.rc_work.left;
+            }
         }
         for other in &other_rects {
             if (curr.left - other.left).abs() < snap_threshold {
@@ -267,8 +279,11 @@ pub unsafe fn apply_sizing_snapping(hwnd: isize, edge: u32, rect: &mut RECT) {
     }
 
     if is_right {
-        if (curr.right - work.right).abs() < snap_threshold {
-            curr.right = work.right;
+        // 所有显示器右边吸附（多屏支持）
+        for m in &all_monitors {
+            if (curr.right - m.rc_work.right).abs() < snap_threshold {
+                curr.right = m.rc_work.right;
+            }
         }
         for other in &other_rects {
             if (curr.right - other.right).abs() < snap_threshold {
@@ -286,7 +301,7 @@ pub unsafe fn apply_sizing_snapping(hwnd: isize, edge: u32, rect: &mut RECT) {
     rect.bottom = curr.bottom;
 }
 
-/// 收集其他有效且可见的小组件窗口真实物理渲染矩形（通过 DWM 拓展帧获取，彻底消除隐形边框误差）
+/// 收集其他有效且可见的小组件窗口真实物理渲染矩形（使用 GetWindowRect 保证与吸附一致）
 unsafe fn collect_visible_windows(
     hwnd: isize,
     guard: &std::collections::HashMap<isize, isize>,
@@ -294,31 +309,14 @@ unsafe fn collect_visible_windows(
 ) {
     for &other_hwnd in guard.keys() {
         if other_hwnd != hwnd && other_hwnd != 0 && IsWindowVisible(other_hwnd) != 0 {
-            let mut dwm_rect: RECT = std::mem::zeroed();
-            let hr = DwmGetWindowAttribute(
-                other_hwnd,
-                DWMWA_EXTENDED_FRAME_BOUNDS as u32,
-                &mut dwm_rect as *mut _ as *mut _,
-                std::mem::size_of::<RECT>() as u32,
-            );
-
-            if hr == 0 {
+            let mut win_rect: RECT = std::mem::zeroed();
+            if GetWindowRect(other_hwnd, &mut win_rect) != 0 {
                 out.push(SnapRect {
-                    left: dwm_rect.left,
-                    top: dwm_rect.top,
-                    right: dwm_rect.right,
-                    bottom: dwm_rect.bottom,
+                    left: win_rect.left,
+                    top: win_rect.top,
+                    right: win_rect.right,
+                    bottom: win_rect.bottom,
                 });
-            } else {
-                let mut win_rect: RECT = std::mem::zeroed();
-                if GetWindowRect(other_hwnd, &mut win_rect) != 0 {
-                    out.push(SnapRect {
-                        left: win_rect.left,
-                        top: win_rect.top,
-                        right: win_rect.right,
-                        bottom: win_rect.bottom,
-                    });
-                }
             }
         }
     }

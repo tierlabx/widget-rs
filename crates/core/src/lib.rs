@@ -8,9 +8,11 @@ mod window_ops;
 pub use js_plugin::{ensure_shell_runtime, get_shell_runtime, init_shell};
 
 pub use monitor::{
-    clamp_to_work_area, enumerate_monitors, find_best_monitor, get_saved_physical_bounds,
-    resolve_plugin_bounds, MonitorInfo, Rect,
+    clamp_to_work_area, enumerate_monitors, find_best_monitor, find_primary_monitor,
+    get_saved_physical_bounds, resolve_plugin_bounds, resolve_plugin_window_bounds, MonitorInfo,
+    Rect, ResolvedPluginBounds,
 };
+
 pub use paths::{
     get_app_icon_path, get_data_dir, get_extensions_dir, get_log_dir, get_project_dirs,
 };

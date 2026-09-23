@@ -123,16 +123,17 @@ pub fn default_widget_window_options(
     plugin_id: &str,
     default_bounds: (f32, f32, f32, f32),
 ) -> WindowOptions {
-    let (x, y, w, h) = crate::resolve_plugin_bounds(cx, plugin_id, default_bounds);
+    let resolved = crate::resolve_plugin_window_bounds(cx, plugin_id, default_bounds);
 
     WindowOptions {
         titlebar: None,
         window_background: WindowBackgroundAppearance::Transparent,
         kind: WindowKind::PopUp,
         is_resizable: false,
+        display_id: resolved.display_id,
         window_bounds: Some(WindowBounds::Windowed(Bounds::new(
-            Point::new(px(x), px(y)),
-            size(px(w), px(h)),
+            Point::new(px(resolved.x), px(resolved.y)),
+            size(px(resolved.width), px(resolved.height)),
         ))),
         ..Default::default()
     }
@@ -152,16 +153,17 @@ pub fn default_widget_window_options_blurred(
     plugin_id: &str,
     default_bounds: (f32, f32, f32, f32),
 ) -> WindowOptions {
-    let (x, y, w, h) = crate::resolve_plugin_bounds(cx, plugin_id, default_bounds);
+    let resolved = crate::resolve_plugin_window_bounds(cx, plugin_id, default_bounds);
 
     WindowOptions {
         titlebar: None,
         window_background: WindowBackgroundAppearance::Blurred,
         kind: WindowKind::PopUp,
         is_resizable: false,
+        display_id: resolved.display_id,
         window_bounds: Some(WindowBounds::Windowed(Bounds::new(
-            Point::new(px(x), px(y)),
-            size(px(w), px(h)),
+            Point::new(px(resolved.x), px(resolved.y)),
+            size(px(resolved.width), px(resolved.height)),
         ))),
         ..Default::default()
     }

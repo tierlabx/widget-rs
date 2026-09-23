@@ -52,6 +52,63 @@ mod tests {
         let m2 = find_best_monitor(&monitors, 500, 200, 300, 200).expect("Should find monitor");
         assert!(m2.is_primary);
         assert_eq!(m2.scale_factor, 1.0);
+
+        // 完全离屏（如拔除副屏后坐标无效）——应回退到主屏，不再返回 None
+        let m3 = find_best_monitor(&monitors, -9999, -9999, 300, 200)
+            .expect("Should fall back to primary");
+        assert!(m3.is_primary, "离屏时应回退到主显示器");
+    }
+
+    #[test]
+    fn test_find_primary_monitor() {
+        use crate::monitor::find_primary_monitor;
+
+        let monitors = vec![
+            MonitorInfo {
+                rc_monitor: Rect {
+                    left: 0,
+                    top: 0,
+                    right: 1920,
+                    bottom: 1080,
+                },
+                rc_work: Rect {
+                    left: 0,
+                    top: 0,
+                    right: 1920,
+                    bottom: 1040,
+                },
+                dpi_x: 96,
+                dpi_y: 96,
+                scale_factor: 1.0,
+                is_primary: true,
+            },
+            MonitorInfo {
+                rc_monitor: Rect {
+                    left: 1920,
+                    top: 0,
+                    right: 4480,
+                    bottom: 1600,
+                },
+                rc_work: Rect {
+                    left: 1920,
+                    top: 0,
+                    right: 4480,
+                    bottom: 1560,
+                },
+                dpi_x: 144,
+                dpi_y: 144,
+                scale_factor: 1.5,
+                is_primary: false,
+            },
+        ];
+
+        let primary = find_primary_monitor(&monitors).expect("Should find primary");
+        assert!(primary.is_primary);
+        assert_eq!(primary.scale_factor, 1.0);
+
+        // 空列表应返回 None
+        let empty: Vec<MonitorInfo> = vec![];
+        assert!(find_primary_monitor(&empty).is_none());
     }
 
     #[test]

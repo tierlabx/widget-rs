@@ -129,6 +129,16 @@ pub fn apply_plugin_window_styles(hwnd: isize, id: &str, config: Option<&AppConf
         if progman != 0 {
             use windows_sys::Win32::UI::WindowsAndMessaging::GWLP_HWNDPARENT;
             SetWindowLongPtrW(hwnd, GWLP_HWNDPARENT, progman);
+            // 挂载 Progman 后必须刷新帧，让 DWM 在多屏场景下重新评估窗口坐标系
+            SetWindowPos(
+                hwnd,
+                0,
+                0,
+                0,
+                0,
+                0,
+                SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_FRAMECHANGED,
+            );
         }
 
         // 6. 注入自定义窗口过程
