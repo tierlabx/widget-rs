@@ -7,4 +7,7 @@ pub mod titlebar;
 pub mod update;
 
 pub use main_window::MainWindow;
-pub use update::{check_for_update, download_update, MainWindowUpdateBridge, UpdateStatus};
+pub use update::{
+    check_for_update, close_update_window, download_update, open_update_window,
+    MainWindowUpdateBridge, UpdateStatus,
+};

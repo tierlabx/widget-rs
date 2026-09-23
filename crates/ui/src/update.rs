@@ -34,16 +34,17 @@ pub struct MainWindowUpdateBridge {
     pub status: UpdateStatus,
     /// 用户是否已手动关闭本次弹窗提醒
     pub dismissed: bool,
+    /// 独立更新窗口句柄（若已打开）
+    pub update_window: Option<AnyWindowHandle>,
 }
 
 impl Global for MainWindowUpdateBridge {}
 
+pub use crate::components::update_modal::{close_update_window, open_update_window};
+
 /// 关闭更新提醒弹窗
 pub fn dismiss_update_modal(cx: &mut App) {
-    cx.update_global::<MainWindowUpdateBridge, _>(|bridge, _| {
-        bridge.dismissed = true;
-    });
-    cx.refresh_windows();
+    close_update_window(cx);
 }
 
 /// 检查新版本
@@ -138,10 +139,17 @@ pub fn check_for_update(cx: &mut App) {
                 .await;
 
             async_cx.update(|cx| {
+                let is_available = matches!(&status, UpdateStatus::Available { .. });
                 cx.update_global::<MainWindowUpdateBridge, _>(|bridge, _| {
                     bridge.status = status;
+                    if is_available {
+                        bridge.dismissed = false;
+                    }
                 });
                 cx.refresh_windows();
+                if is_available {
+                    open_update_window(cx);
+                }
             });
         })
         .detach();
@@ -272,10 +280,17 @@ pub fn download_update(url: String, is_installer: bool, cx: &mut App) {
 
                 if let Some(status) = final_status {
                     async_cx.update(|cx| {
+                        let is_ready = matches!(&status, UpdateStatus::ReadyToRestart { .. });
                         cx.update_global::<MainWindowUpdateBridge, _>(|bridge, _| {
                             bridge.status = status;
+                            if is_ready {
+                                bridge.dismissed = false;
+                            }
                         });
                         cx.refresh_windows();
+                        if is_ready {
+                            open_update_window(cx);
+                        }
                     });
                     break;
                 }

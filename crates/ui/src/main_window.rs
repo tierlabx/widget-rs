@@ -3,7 +3,6 @@ use gpui::*;
 use raw_window_handle::{HasWindowHandle, RawWindowHandle};
 use windows_sys::Win32::UI::WindowsAndMessaging::IsZoomed;
 
-use crate::components::update_modal::render_update_modal;
 use crate::pages::dashboard::render_dashboard_content;
 use crate::pages::settings::{render_settings_page, SettingsTab};
 use crate::pages::widgets::render_widgets_content;
@@ -95,7 +94,7 @@ impl Render for MainWindow {
             return div().bg(rgba(0x00000000)).into_any_element();
         }
 
-        let mut root = div()
+        let root = div()
             .relative()
             .flex()
             .flex_col()
@@ -149,11 +148,6 @@ impl Render for MainWindow {
                         .into_any_element(),
                     }),
             );
-
-        // 顶层挂载更新提示弹窗
-        if let Some(modal) = render_update_modal(cx) {
-            root = root.child(modal);
-        }
 
         root.into_any_element()
     }

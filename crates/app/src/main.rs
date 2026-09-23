@@ -132,6 +132,7 @@ fn main() {
         cx.set_global(widget_ui::MainWindowUpdateBridge {
             status: widget_ui::UpdateStatus::Idle,
             dismissed: false,
+            update_window: None,
         });
 
         // 注册立即写盘回调，插件可调用 save_config_now(cx) 触发
