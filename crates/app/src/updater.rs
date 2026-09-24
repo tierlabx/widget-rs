@@ -114,8 +114,10 @@ fn replace_target_file(
 
 /// 拉起目标新版本程序
 fn spawn_new_process(target: &Path) -> Result<(), String> {
-    std::process::Command::new(target)
-        .spawn()
-        .map_err(|e| format!("启动新进程失败: {}", e))?;
+    let mut cmd = std::process::Command::new(target);
+    if let Some(parent) = target.parent() {
+        cmd.current_dir(parent);
+    }
+    cmd.spawn().map_err(|e| format!("启动新进程失败: {}", e))?;
     Ok(())
 }

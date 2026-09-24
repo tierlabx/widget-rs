@@ -183,8 +183,11 @@ impl Store {
             });
 
             if let Ok(rows) = plugin_map {
-                for item in rows.flatten() {
-                    config.plugins.insert(item.0, item.1);
+                for (id, cfg) in rows.flatten() {
+                    let norm = normalize_plugin_id(&id);
+                    if !config.plugins.contains_key(norm) || norm == id.as_str() {
+                        config.plugins.insert(norm.to_string(), cfg);
+                    }
                 }
             }
         }
@@ -200,8 +203,11 @@ impl Store {
             });
 
             if let Ok(rows) = data_map {
-                for item in rows.flatten() {
-                    config.plugin_data.insert(item.0, item.1);
+                for (id, val) in rows.flatten() {
+                    let norm = normalize_plugin_id(&id);
+                    if !config.plugin_data.contains_key(norm) || norm == id.as_str() {
+                        config.plugin_data.insert(norm.to_string(), val);
+                    }
                 }
             }
         }
@@ -296,5 +302,16 @@ impl Store {
         } else {
             println!("[Store] 配置已保存到 SQLite 数据库 {:?}", self.db_path);
         }
+    }
+}
+
+/// 兼容历史版本可能遗留的旧版插件 ID
+fn normalize_plugin_id(id: &str) -> &str {
+    match id {
+        "todo" => "todo_widget",
+        "sticky" => "sticky_widget",
+        "stretchly" => "stretchly_widget",
+        "fences" => "fences_widget",
+        other => other,
     }
 }

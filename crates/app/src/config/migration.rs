@@ -14,7 +14,34 @@ pub fn try_migrate_from_legacy_json(
     }
 
     let content = fs::read_to_string(&json_path).ok()?;
-    let old_config: AppConfig = serde_json::from_str(&content).ok()?;
+    let mut old_config: AppConfig = serde_json::from_str(&content).ok()?;
+
+    // 规范化旧版本键名（如 todo -> todo_widget）
+    let mut normalized_plugins = std::collections::HashMap::new();
+    for (id, cfg) in old_config.plugins {
+        let norm_id = match id.as_str() {
+            "todo" => "todo_widget".to_string(),
+            "sticky" => "sticky_widget".to_string(),
+            "stretchly" => "stretchly_widget".to_string(),
+            "fences" => "fences_widget".to_string(),
+            _ => id,
+        };
+        normalized_plugins.insert(norm_id, cfg);
+    }
+    old_config.plugins = normalized_plugins;
+
+    let mut normalized_data = std::collections::HashMap::new();
+    for (id, val) in old_config.plugin_data {
+        let norm_id = match id.as_str() {
+            "todo" => "todo_widget".to_string(),
+            "sticky" => "sticky_widget".to_string(),
+            "stretchly" => "stretchly_widget".to_string(),
+            "fences" => "fences_widget".to_string(),
+            _ => id,
+        };
+        normalized_data.insert(norm_id, val);
+    }
+    old_config.plugin_data = normalized_data;
 
     println!(
         "[Store] 检测到旧版本配置文件 {:?}，正在自动迁移至 SQLite 数据库...",

@@ -348,6 +348,9 @@ fn extract_zip_update(zip_path: &Path, base_dir: &Path) -> Result<PathBuf, Strin
 
 /// 启动独立 Updater Helper 完成无缝更新并退出当前应用
 pub fn apply_update_and_restart(new_exe_path: &Path, is_installer: bool, cx: &mut App) {
+    // 退出前先优雅保存当前所有运行中小部件的窗口位置与 loaded 状态
+    widget_core::save_bounds_now(cx);
+
     if is_installer {
         // 降级模式：启动安装器向导并退出
         let _ = std::process::Command::new(new_exe_path).spawn();
