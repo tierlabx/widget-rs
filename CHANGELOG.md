@@ -6,6 +6,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+## [0.10.4](https://github.com/tierlabx/widget-rs/releases/tag/v0.10.4) - 2026-09-24
+
+### Fixed
+
+- 修复JS扩展小组件打包后图标丢失问题并补充类型声明
+- 修复软件更新重启后小部件变成卸载状态的问题
+- 修复代办回车添加多个bug
+
 ## [0.10.3](https://github.com/tierlabx/widget-rs/releases/tag/v0.10.3) - 2026-09-23
 
 ### Fixed
