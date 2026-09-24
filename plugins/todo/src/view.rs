@@ -3,7 +3,7 @@ use gpui::*;
 use gpui_component::input::{InputEvent, InputState};
 
 use crate::model::{TodoData, TodoItem, TodoModel, TodoTag};
-use crate::timer::{get_now_secs, get_simple_time_str, spawn_todo_timer};
+use crate::timer::{get_now_millis, get_simple_time_str, spawn_todo_timer};
 use crate::ui::content_panel::{render_content_panel, ContentPanelProps};
 use crate::ui::item_card::{render_todo_item, ItemCardProps};
 use crate::ui::sidebar::render_sidebar;
@@ -12,9 +12,10 @@ use crate::ui::tag_modal::{render_tag_modal, TagModalMode, TagModalState};
 pub struct TodoWidget {
     data: TodoData,
     new_input: Entity<InputState>,
-    pending_reset: bool,
+    _new_input_sub: gpui::Subscription,
     editing_idx: Option<usize>,
     edit_input: Entity<InputState>,
+    _edit_input_sub: Option<gpui::Subscription>,
     expanded_idx: Option<usize>,
     show_completed: bool,
     scroll_handle: ScrollHandle,
@@ -25,16 +26,61 @@ pub struct TodoWidget {
 impl TodoWidget {
     pub fn new(window: &mut Window, cx: &mut Context<Self>) -> Self {
         let data = TodoModel::load(cx);
-        let new_input = Self::create_new_input(window, cx);
+        let new_input =
+            cx.new(|cx| InputState::new(window, cx).placeholder("输入待办，回车保存..."));
+        let new_input_sub = cx.subscribe_in(
+            &new_input,
+            window,
+            |this: &mut Self,
+             input: &Entity<InputState>,
+             event: &InputEvent,
+             window: &mut Window,
+             cx: &mut Context<Self>| {
+                if let InputEvent::PressEnter { shift: false, .. } = event {
+                    let text = input.read(cx).value().to_string();
+                    let trimmed = text.trim().to_string();
+                    // 立即清空输入框内容，防止重复事件或重入导致二次添加
+                    input.update(cx, |state, cx| {
+                        state.set_value("", window, cx);
+                    });
+                    if !trimmed.is_empty() {
+                        let active_tag = if this.data.active_tag_id == "all" {
+                            this.data
+                                .tags
+                                .first()
+                                .map(|t| t.id.clone())
+                                .unwrap_or_else(|| "work".to_string())
+                        } else {
+                            this.data.active_tag_id.clone()
+                        };
+
+                        this.data.items.push(TodoItem {
+                            id: format!("todo-{}", get_now_millis()),
+                            text: trimmed,
+                            done: false,
+                            tag_id: active_tag,
+                            gantt_color: 0,
+                            reminder: None,
+                            last_reminded_at: None,
+                            created_at: Some(format!("今日 {}", get_simple_time_str())),
+                        });
+                        TodoModel::save(&this.data, cx);
+                        this.scroll_handle.scroll_to_bottom();
+                        cx.notify();
+                    }
+                }
+            },
+        );
         let edit_input = cx.new(|cx| InputState::new(window, cx).placeholder("编辑待办内容..."));
         let timer = spawn_todo_timer(cx.weak_entity(), cx);
 
         Self {
             data,
             new_input,
-            pending_reset: false,
+            _new_input_sub: new_input_sub,
             editing_idx: None,
             edit_input,
+            _edit_input_sub: None,
             expanded_idx: None,
             show_completed: false,
             scroll_handle: ScrollHandle::new(),
@@ -49,47 +95,6 @@ impl TodoWidget {
 
     pub fn data_mut(&mut self) -> &mut TodoData {
         &mut self.data
-    }
-
-    fn create_new_input(window: &mut Window, cx: &mut Context<Self>) -> Entity<InputState> {
-        let input = cx.new(|cx| InputState::new(window, cx).placeholder("输入待办，回车保存..."));
-        cx.subscribe(
-            &input,
-            |this: &mut Self, input: Entity<InputState>, event: &InputEvent, cx| {
-                if let InputEvent::PressEnter { .. } = event {
-                    let text = input.read(cx).value().to_string();
-                    let trimmed = text.trim().to_string();
-                    if !trimmed.is_empty() {
-                        let active_tag = if this.data.active_tag_id == "all" {
-                            this.data
-                                .tags
-                                .first()
-                                .map(|t| t.id.clone())
-                                .unwrap_or_else(|| "work".to_string())
-                        } else {
-                            this.data.active_tag_id.clone()
-                        };
-
-                        this.data.items.push(TodoItem {
-                            id: format!("todo-{}", get_now_secs()),
-                            text: trimmed,
-                            done: false,
-                            tag_id: active_tag,
-                            gantt_color: 0,
-                            reminder: None,
-                            last_reminded_at: None,
-                            created_at: Some(format!("今日 {}", get_simple_time_str())),
-                        });
-                        TodoModel::save(&this.data, cx);
-                        this.scroll_handle.scroll_to_bottom();
-                    }
-                    this.pending_reset = true;
-                    cx.notify();
-                }
-            },
-        )
-        .detach();
-        input
     }
 
     fn open_tag_edit(&mut self, tag: &TodoTag, window: &mut Window, cx: &mut Context<Self>) {
@@ -114,16 +119,11 @@ impl widget_core::WidgetContent for TodoWidget {
 }
 
 impl Render for TodoWidget {
-    fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+    fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         gpui_component::Theme::global_mut(cx).colors.foreground = gpui::hsla(0.0, 0.0, 0.98, 1.0);
         gpui_component::Theme::global_mut(cx)
             .colors
             .muted_foreground = gpui::hsla(0.0, 0.0, 0.65, 1.0);
-
-        if self.pending_reset {
-            self.pending_reset = false;
-            self.new_input = Self::create_new_input(window, cx);
-        }
 
         let editing_idx = self.editing_idx;
         let expanded_idx = self.expanded_idx;
@@ -159,26 +159,31 @@ impl Render for TodoWidget {
                         .default_value(current)
                         .placeholder("编辑待办内容，Enter 确认...")
                 });
-                cx.subscribe(
+                let sub = cx.subscribe_in(
                     &new_edit,
-                    |this: &mut Self, input: Entity<InputState>, event: &InputEvent, cx| {
-                        if let InputEvent::PressEnter { .. } = event {
+                    window,
+                    |this: &mut Self,
+                     input: &Entity<InputState>,
+                     event: &InputEvent,
+                     _window: &mut Window,
+                     cx: &mut Context<Self>| {
+                        if let InputEvent::PressEnter { shift: false, .. } = event {
                             let text = input.read(cx).value().to_string();
                             let trimmed = text.trim().to_string();
-                            if let Some(idx) = this.editing_idx {
+                            if let Some(idx) = this.editing_idx.take() {
                                 if !trimmed.is_empty() {
                                     if let Some(item) = this.data.items.get_mut(idx) {
                                         item.text = trimmed;
                                     }
                                 }
+                                this._edit_input_sub = None;
+                                TodoModel::save(&this.data, cx);
+                                cx.notify();
                             }
-                            this.editing_idx = None;
-                            TodoModel::save(&this.data, cx);
-                            cx.notify();
                         }
                     },
-                )
-                .detach();
+                );
+                this._edit_input_sub = Some(sub);
                 this.edit_input = new_edit;
                 this.editing_idx = Some(idx);
                 cx.notify();
@@ -192,12 +197,14 @@ impl Render for TodoWidget {
                     }
                 }
                 this.editing_idx = None;
+                this._edit_input_sub = None;
                 TodoModel::save(&this.data, cx);
                 cx.notify();
             }),
             on_delete_item: std::rc::Rc::new(|this: &mut Self, _, cx, idx| {
                 if this.editing_idx == Some(idx) {
                     this.editing_idx = None;
+                    this._edit_input_sub = None;
                 }
                 if this.expanded_idx == Some(idx) {
                     this.expanded_idx = None;
@@ -232,6 +239,7 @@ impl Render for TodoWidget {
             on_reorder_item: std::rc::Rc::new(|this: &mut Self, _, cx, src_id, dst_id| {
                 if this.data.reorder_item(&src_id, &dst_id) {
                     this.editing_idx = None;
+                    this._edit_input_sub = None;
                     this.expanded_idx = None;
                     TodoModel::save(&this.data, cx);
                     cx.notify();

@@ -11,6 +11,13 @@ pub fn get_now_secs() -> u64 {
         .as_secs()
 }
 
+pub fn get_now_millis() -> u128 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_millis()
+}
+
 pub fn get_simple_time_str() -> String {
     let secs = get_now_secs();
     let local_secs = (secs + 28800) % 86400; // UTC+8
