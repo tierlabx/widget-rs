@@ -14,7 +14,8 @@ pub use monitor::{
 };
 
 pub use paths::{
-    get_app_icon_path, get_data_dir, get_extensions_dir, get_log_dir, get_project_dirs,
+    get_all_extension_dirs, get_app_icon_path, get_data_dir, get_extensions_dir, get_log_dir,
+    get_project_dirs,
 };
 pub use settings_window::{
     default_settings_window_options, render_settings_shell, render_settings_titlebar,

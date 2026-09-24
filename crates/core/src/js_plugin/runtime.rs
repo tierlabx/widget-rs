@@ -77,10 +77,10 @@ pub fn ensure_shell_runtime(cx: &mut App) -> Result<Rc<gpui_shell::ShellRuntime>
 
 /// 读取插件的配置数据（优先读取本地私有 config.json，其次读取 manifest.json 中的 settings 字段）
 fn read_plugin_config(plugin_id: &str) -> String {
-    let candidate_dirs = [
-        std::path::PathBuf::from("extensions").join(plugin_id),
-        crate::get_extensions_dir().join(plugin_id),
-    ];
+    let candidate_dirs: Vec<std::path::PathBuf> = crate::get_all_extension_dirs()
+        .into_iter()
+        .map(|d| d.join(plugin_id))
+        .collect();
 
     // 1. 优先读取私有 config.json（已加入 .gitignore，保护用户个人私密配置）
     for dir in &candidate_dirs {
@@ -113,10 +113,7 @@ fn read_plugin_config(plugin_id: &str) -> String {
 
 /// 自动扫描本地及用户扩展目录，提取文件中的自定义和风天气等主机名并加入白名单
 fn scan_custom_plugin_hosts(hosts: &mut Vec<String>) {
-    let candidate_dirs = [
-        std::path::PathBuf::from("extensions"),
-        crate::get_extensions_dir(),
-    ];
+    let candidate_dirs = crate::get_all_extension_dirs();
 
     for base_dir in candidate_dirs {
         if !base_dir.exists() || !base_dir.is_dir() {
@@ -152,5 +149,16 @@ fn scan_custom_plugin_hosts(hosts: &mut Vec<String>) {
                 }
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn test_dump_typings() {
+        let mut decls = gpui_shell::type_declarations(&Default::default());
+        decls.push_str("\n\ndeclare module \"widget-rs\" {\n    export function version(): string;\n    export function app_name(): string;\n    export function read_config(plugin_id: string): string;\n}\n");
+        let _ = std::fs::write("../../extensions/clock/gpui-kit.d.ts", &decls);
+        let _ = std::fs::write("../../extensions/gpui-kit.d.ts", &decls);
     }
 }

@@ -17,6 +17,9 @@ eula = false
 identifier = "com.tierlabx.widget-rs"
 publisher = "tierlabx"
 before-packaging-command = "cargo build --release"
+resources = [
+  "../../extensions/**/*"
+]
 
 [dependencies]
 gpui.workspace = true

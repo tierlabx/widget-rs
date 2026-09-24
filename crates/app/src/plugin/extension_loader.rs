@@ -5,17 +5,16 @@ use widget_core::Plugin;
 
 /// 扫描并发现所有外部 JS 扩展插件
 pub fn scan_and_load_extensions() -> Vec<Arc<dyn Plugin>> {
+    // 启动时尝试同步随安装包分发的内置扩展到用户数据目录
+    sync_builtin_extensions();
+
     let mut plugins: Vec<Arc<dyn Plugin>> = Vec::new();
     let mut scanned_paths: Vec<PathBuf> = Vec::new();
+    let mut loaded_ids: std::collections::HashSet<String> = std::collections::HashSet::new();
 
-    // 1. 用户应用数据目录: %APPDATA%/tierlabx/widget-rs/extensions
-    let app_data_ext_dir = widget_core::get_extensions_dir();
-    scan_directory(&app_data_ext_dir, &mut plugins, &mut scanned_paths);
-
-    // 2. 本地开发环境目录: ./extensions
-    let local_ext_dir = PathBuf::from("extensions");
-    if local_ext_dir.exists() && local_ext_dir.is_dir() {
-        scan_directory(&local_ext_dir, &mut plugins, &mut scanned_paths);
+    // 扫描所有已知的扩展根目录（按优先级：AppData > exe 同级 > resources > 本地开发目录）
+    for ext_dir in widget_core::get_all_extension_dirs() {
+        scan_directory(&ext_dir, &mut plugins, &mut scanned_paths, &mut loaded_ids);
     }
 
     println!(
@@ -30,6 +29,7 @@ fn scan_directory(
     base_dir: &Path,
     plugins: &mut Vec<Arc<dyn Plugin>>,
     scanned_paths: &mut Vec<PathBuf>,
+    loaded_ids: &mut std::collections::HashSet<String>,
 ) {
     if !base_dir.exists() || !base_dir.is_dir() {
         return;
@@ -61,6 +61,12 @@ fn scan_directory(
 
                 match JsPlugin::load_from_dir(&path) {
                     Ok(js_plugin) => {
+                        let id = js_plugin.id().to_string();
+                        if loaded_ids.contains(&id) {
+                            continue;
+                        }
+                        loaded_ids.insert(id);
+
                         println!(
                             "[ExtensionLoader] 成功加载外部 JS 扩展: [{}] {} (版本 {})",
                             js_plugin.id(),
@@ -76,4 +82,61 @@ fn scan_directory(
             }
         }
     }
+}
+
+/// 首次启动或更新时，若用户数据目录缺少默认扩展，从安装或资源目录同步
+fn sync_builtin_extensions() {
+    let app_data_ext = widget_core::get_extensions_dir();
+
+    // 收集所有可能的内置扩展分发源目录
+    let mut candidate_sources = Vec::new();
+    if let Ok(exe_path) = std::env::current_exe() {
+        if let Some(exe_dir) = exe_path.parent() {
+            candidate_sources.push(exe_dir.join("extensions"));
+            candidate_sources.push(exe_dir.join("resources").join("extensions"));
+        }
+    }
+    candidate_sources.push(PathBuf::from("extensions"));
+
+    for src_dir in candidate_sources {
+        if !src_dir.exists() || !src_dir.is_dir() {
+            continue;
+        }
+        // 如果源目录和目标目录是同一个目录，跳过
+        if let (Ok(src_c), Ok(dst_c)) = (src_dir.canonicalize(), app_data_ext.canonicalize()) {
+            if src_c == dst_c {
+                continue;
+            }
+        }
+
+        if let Ok(entries) = std::fs::read_dir(&src_dir) {
+            for entry in entries.flatten() {
+                let src_item = entry.path();
+                if src_item.is_dir() {
+                    let name = entry.file_name();
+                    let dst_item = app_data_ext.join(&name);
+                    // 仅当用户扩展目录下不存在该小组件时才自动同步初始模板
+                    if !dst_item.exists() {
+                        let _ = copy_dir_all(&src_item, &dst_item);
+                    }
+                }
+            }
+        }
+    }
+}
+
+/// 递归复制目录
+fn copy_dir_all(src: &Path, dst: &Path) -> std::io::Result<()> {
+    std::fs::create_dir_all(dst)?;
+    for entry in std::fs::read_dir(src)? {
+        let entry = entry?;
+        let ty = entry.file_type()?;
+        let dst_child = dst.join(entry.file_name());
+        if ty.is_dir() {
+            copy_dir_all(&entry.path(), &dst_child)?;
+        } else {
+            std::fs::copy(entry.path(), dst_child)?;
+        }
+    }
+    Ok(())
 }

@@ -58,3 +58,44 @@ pub fn get_extensions_dir() -> PathBuf {
     }
     ext_dir
 }
+
+/// 获取所有可能存放外部扩展小部件的根目录列表（按优先级排序并去重）
+/// 1. 用户应用数据目录：%APPDATA%/tierlabx/widget-rs/extensions
+/// 2. 可执行文件同级目录：<exe_dir>/extensions
+/// 3. 可执行文件资源目录：<exe_dir>/resources/extensions
+/// 4. 当前工作目录（开发环境 cargo run）：./extensions
+pub fn get_all_extension_dirs() -> Vec<PathBuf> {
+    let mut dirs = Vec::new();
+    let mut visited = std::collections::HashSet::new();
+
+    let mut push_dir = |p: PathBuf| {
+        if p.exists() && p.is_dir() {
+            if let Ok(canonical) = p.canonicalize() {
+                if visited.insert(canonical) {
+                    dirs.push(p);
+                }
+            } else if visited.insert(p.clone()) {
+                dirs.push(p);
+            }
+        }
+    };
+
+    // 1. 用户 AppData 目录
+    push_dir(get_extensions_dir());
+
+    // 2. 可执行文件同级及资源目录（安装包环境）
+    if let Ok(exe_path) = std::env::current_exe() {
+        if let Some(exe_dir) = exe_path.parent() {
+            push_dir(exe_dir.join("extensions"));
+            push_dir(exe_dir.join("resources").join("extensions"));
+        }
+    }
+
+    // 3. 当前工作目录（开发环境 cargo run）
+    if let Ok(cwd) = std::env::current_dir() {
+        push_dir(cwd.join("extensions"));
+    }
+    push_dir(PathBuf::from("extensions"));
+
+    dirs
+}

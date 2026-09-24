@@ -18,21 +18,24 @@ impl gpui::AssetSource for AppAssets {
             }
         }
 
-        // 尝试相对 extensions 根目录读取
-        let ext_candidate = std::path::Path::new("extensions").join(path);
-        if ext_candidate.is_file() {
-            if let Ok(bytes) = std::fs::read(ext_candidate) {
-                return Ok(Some(std::borrow::Cow::Owned(bytes)));
+        // 遍历所有已知的扩展存放目录（支持打包安装后的 AppData、安装包目录及本地开发目录）
+        for base_dir in widget_core::get_all_extension_dirs() {
+            // 1. 尝试直接相对扩展根目录查找（例如 extensions/icons/xxx.png）
+            let direct_ext = base_dir.join(path);
+            if direct_ext.is_file() {
+                if let Ok(bytes) = std::fs::read(&direct_ext) {
+                    return Ok(Some(std::borrow::Cow::Owned(bytes)));
+                }
             }
-        }
 
-        // 尝试在 extensions 各子插件目录中递归查找
-        if let Ok(entries) = std::fs::read_dir("extensions") {
-            for entry in entries.flatten() {
-                let sub_path = entry.path().join(path);
-                if sub_path.is_file() {
-                    if let Ok(bytes) = std::fs::read(sub_path) {
-                        return Ok(Some(std::borrow::Cow::Owned(bytes)));
+            // 2. 尝试在各个插件子目录中匹配（例如 extensions/clock/icons/sunny.png）
+            if let Ok(entries) = std::fs::read_dir(&base_dir) {
+                for entry in entries.flatten() {
+                    let sub_path = entry.path().join(path);
+                    if sub_path.is_file() {
+                        if let Ok(bytes) = std::fs::read(&sub_path) {
+                            return Ok(Some(std::borrow::Cow::Owned(bytes)));
+                        }
                     }
                 }
             }
