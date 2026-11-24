@@ -6,8 +6,8 @@ use crate::model::{TodoData, TodoItem, TodoModel, TodoTag};
 use crate::timer::{get_now_millis, get_simple_time_str, spawn_todo_timer};
 use crate::ui::content_panel::{render_content_panel, ContentPanelProps};
 use crate::ui::item_card::{render_todo_item, ItemCardProps};
-use crate::ui::sidebar::render_sidebar;
-use crate::ui::tag_modal::{render_tag_modal, TagModalMode, TagModalState};
+use crate::ui::sidebar::{render_sidebar, SidebarProps};
+use crate::ui::tag_modal::{render_tag_modal, TagModalMode, TagModalProps, TagModalState};
 
 pub struct TodoWidget {
     data: TodoData,
@@ -15,10 +15,12 @@ pub struct TodoWidget {
     _new_input_sub: gpui::Subscription,
     editing_idx: Option<usize>,
     edit_input: Entity<InputState>,
-    _edit_input_sub: Option<gpui::Subscription>,
+    _edit_input_sub: gpui::Subscription,
+    tag_name_input: Entity<InputState>,
     expanded_idx: Option<usize>,
     show_completed: bool,
     scroll_handle: ScrollHandle,
+    sidebar_scroll_handle: ScrollHandle,
     tag_modal: Option<TagModalState>,
     _timer: gpui::Task<()>,
 }
@@ -71,7 +73,25 @@ impl TodoWidget {
                 }
             },
         );
-        let edit_input = cx.new(|cx| InputState::new(window, cx).placeholder("编辑待办内容..."));
+        let edit_input =
+            cx.new(|cx| InputState::new(window, cx).placeholder("编辑待办内容，Enter 确认..."));
+        let edit_input_sub = cx.subscribe_in(
+            &edit_input,
+            window,
+            |this: &mut Self,
+             _input: &Entity<InputState>,
+             event: &InputEvent,
+             window: &mut Window,
+             cx: &mut Context<Self>| {
+                if let InputEvent::PressEnter { shift: false, .. } = event {
+                    if let Some(idx) = this.editing_idx {
+                        this.commit_edit(idx, window, cx);
+                    }
+                }
+            },
+        );
+        let tag_name_input =
+            cx.new(|cx| InputState::new(window, cx).placeholder("输入分类名称..."));
         let timer = spawn_todo_timer(cx.weak_entity(), cx);
 
         Self {
@@ -80,10 +100,12 @@ impl TodoWidget {
             _new_input_sub: new_input_sub,
             editing_idx: None,
             edit_input,
-            _edit_input_sub: None,
+            _edit_input_sub: edit_input_sub,
+            tag_name_input,
             expanded_idx: None,
             show_completed: false,
             scroll_handle: ScrollHandle::new(),
+            sidebar_scroll_handle: ScrollHandle::new(),
             tag_modal: None,
             _timer: timer,
         }
@@ -97,13 +119,49 @@ impl TodoWidget {
         &mut self.data
     }
 
+    fn finish_editing(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        self.editing_idx = None;
+        self.edit_input.update(cx, |state, cx| {
+            state.set_value("", window, cx);
+        });
+        window.blur(cx);
+    }
+
+    fn commit_edit(&mut self, idx: usize, window: &mut Window, cx: &mut Context<Self>) {
+        let trimmed = self.edit_input.read(cx).value().trim().to_string();
+        if !trimmed.is_empty() {
+            if let Some(item) = self.data.items.get_mut(idx) {
+                item.text = trimmed;
+            }
+        }
+        self.finish_editing(window, cx);
+        TodoModel::save(&self.data, cx);
+        cx.notify();
+    }
+
     fn open_tag_edit(&mut self, tag: &TodoTag, window: &mut Window, cx: &mut Context<Self>) {
-        self.tag_modal = Some(TagModalState::new_edit(tag, window, cx));
+        let name = tag.name.clone();
+        self.tag_name_input.update(cx, |state, cx| {
+            state.set_value(name, window, cx);
+        });
+        self.tag_modal = Some(TagModalState::new_edit(tag));
         cx.notify();
     }
 
     fn open_tag_create(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        self.tag_modal = Some(TagModalState::new_create(window, cx));
+        self.tag_name_input.update(cx, |state, cx| {
+            state.set_value("新分类", window, cx);
+        });
+        self.tag_modal = Some(TagModalState::new_create());
+        cx.notify();
+    }
+
+    fn close_tag_modal(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        self.tag_modal = None;
+        self.tag_name_input.update(cx, |state, cx| {
+            state.set_value("", window, cx);
+        });
+        window.blur(cx);
         cx.notify();
     }
 }
@@ -120,18 +178,20 @@ impl widget_core::WidgetContent for TodoWidget {
 
 impl Render for TodoWidget {
     fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        gpui_component::Theme::global_mut(cx).colors.foreground = gpui::hsla(0.0, 0.0, 0.98, 1.0);
-        gpui_component::Theme::global_mut(cx)
-            .colors
-            .muted_foreground = gpui::hsla(0.0, 0.0, 0.65, 1.0);
+        let target_fg = gpui::hsla(0.0, 0.0, 0.98, 1.0);
+        let target_muted = gpui::hsla(0.0, 0.0, 0.65, 1.0);
+        let colors = &gpui_component::Theme::global(cx).colors;
+        if colors.foreground != target_fg || colors.muted_foreground != target_muted {
+            let theme_mut = gpui_component::Theme::global_mut(cx);
+            theme_mut.colors.foreground = target_fg;
+            theme_mut.colors.muted_foreground = target_muted;
+        }
 
         let editing_idx = self.editing_idx;
         let expanded_idx = self.expanded_idx;
-        let edit_input = &self.edit_input;
-        let new_input = &self.new_input;
-        let active_tag_id = self.data.active_tag_id.clone();
-        let tags = self.data.tags.clone();
-        let active_tag_obj = tags.iter().find(|t| t.id == active_tag_id).cloned();
+        let active_tag_id = &self.data.active_tag_id;
+        let tags = &self.data.tags;
+        let active_tag_obj = tags.iter().find(|t| &t.id == active_tag_id).cloned();
 
         let mut pending_elements = Vec::new();
         let mut completed_elements = Vec::new();
@@ -153,58 +213,21 @@ impl Render for TodoWidget {
                 cx.notify();
             }),
             on_start_edit: std::rc::Rc::new(|this: &mut Self, window, cx, idx| {
-                let current = this.data.items[idx].text.clone();
-                let new_edit = cx.new(|cx| {
-                    InputState::new(window, cx)
-                        .default_value(current)
-                        .placeholder("编辑待办内容，Enter 确认...")
-                });
-                let sub = cx.subscribe_in(
-                    &new_edit,
-                    window,
-                    |this: &mut Self,
-                     input: &Entity<InputState>,
-                     event: &InputEvent,
-                     _window: &mut Window,
-                     cx: &mut Context<Self>| {
-                        if let InputEvent::PressEnter { shift: false, .. } = event {
-                            let text = input.read(cx).value().to_string();
-                            let trimmed = text.trim().to_string();
-                            if let Some(idx) = this.editing_idx.take() {
-                                if !trimmed.is_empty() {
-                                    if let Some(item) = this.data.items.get_mut(idx) {
-                                        item.text = trimmed;
-                                    }
-                                }
-                                this._edit_input_sub = None;
-                                TodoModel::save(&this.data, cx);
-                                cx.notify();
-                            }
-                        }
-                    },
-                );
-                this._edit_input_sub = Some(sub);
-                this.edit_input = new_edit;
-                this.editing_idx = Some(idx);
-                cx.notify();
-            }),
-            on_confirm_edit: std::rc::Rc::new(|this: &mut Self, _, cx, idx| {
-                let text = this.edit_input.read(cx).value().to_string();
-                let trimmed = text.trim().to_string();
-                if !trimmed.is_empty() {
-                    if let Some(item) = this.data.items.get_mut(idx) {
-                        item.text = trimmed;
-                    }
+                if let Some(item) = this.data.items.get(idx) {
+                    let current = item.text.clone();
+                    this.edit_input.update(cx, |state, cx| {
+                        state.set_value(current, window, cx);
+                    });
+                    this.editing_idx = Some(idx);
+                    cx.notify();
                 }
-                this.editing_idx = None;
-                this._edit_input_sub = None;
-                TodoModel::save(&this.data, cx);
-                cx.notify();
             }),
-            on_delete_item: std::rc::Rc::new(|this: &mut Self, _, cx, idx| {
+            on_confirm_edit: std::rc::Rc::new(|this: &mut Self, window, cx, idx| {
+                this.commit_edit(idx, window, cx);
+            }),
+            on_delete_item: std::rc::Rc::new(|this: &mut Self, window, cx, idx| {
                 if this.editing_idx == Some(idx) {
-                    this.editing_idx = None;
-                    this._edit_input_sub = None;
+                    this.finish_editing(window, cx);
                 }
                 if this.expanded_idx == Some(idx) {
                     this.expanded_idx = None;
@@ -236,10 +259,11 @@ impl Render for TodoWidget {
                     cx.notify();
                 }
             }),
-            on_reorder_item: std::rc::Rc::new(|this: &mut Self, _, cx, src_id, dst_id| {
+            on_reorder_item: std::rc::Rc::new(|this: &mut Self, window, cx, src_id, dst_id| {
                 if this.data.reorder_item(&src_id, &dst_id) {
-                    this.editing_idx = None;
-                    this._edit_input_sub = None;
+                    if this.editing_idx.is_some() {
+                        this.finish_editing(window, cx);
+                    }
                     this.expanded_idx = None;
                     TodoModel::save(&this.data, cx);
                     cx.notify();
@@ -248,7 +272,7 @@ impl Render for TodoWidget {
         };
 
         for (idx, item) in self.data.items.iter().enumerate() {
-            if active_tag_id != "all" && item.tag_id != active_tag_id {
+            if active_tag_id != "all" && &item.tag_id != active_tag_id {
                 continue;
             }
 
@@ -256,12 +280,12 @@ impl Render for TodoWidget {
                 ItemCardProps {
                     idx,
                     item,
-                    tags: &tags,
+                    tags,
                     reminder_presets: &self.data.reminder_presets,
-                    active_tag_id: &active_tag_id,
+                    active_tag_id,
                     is_editing: editing_idx == Some(idx),
                     is_expanded: expanded_idx == Some(idx),
-                    edit_input,
+                    edit_input: &self.edit_input,
                 },
                 &callbacks,
                 cx,
@@ -280,13 +304,18 @@ impl Render for TodoWidget {
             .relative()
             .flex()
             .flex_row()
+            .items_stretch()
             .size_full()
+            .min_h_0()
             .gap(px(2.0))
             .overflow_hidden()
             // ── 左侧：吸附 Tab 侧边栏 ──────────────────────────────
             .child(render_sidebar(
-                &tags,
-                &active_tag_id,
+                SidebarProps {
+                    tags,
+                    active_tag_id,
+                    scroll_handle: &self.sidebar_scroll_handle,
+                },
                 |this, _, cx, tag_id| {
                     this.data.active_tag_id = tag_id;
                     cx.notify();
@@ -310,7 +339,7 @@ impl Render for TodoWidget {
                     active_tag_obj,
                     pending_count: pending_elements.len(),
                     can_delete_tag,
-                    new_input,
+                    new_input: &self.new_input,
                     scroll_handle: &self.scroll_handle,
                     show_completed: self.show_completed,
                     pending_elements,
@@ -333,39 +362,44 @@ impl Render for TodoWidget {
             // ── 弹窗浮层（标签新建/编辑） ─────────────────────────
             .when_some(self.tag_modal.as_ref(), |d: Div, modal| {
                 d.child(render_tag_modal(
-                    modal,
-                    can_delete_tag,
+                    TagModalProps {
+                        modal,
+                        name_input: &self.tag_name_input,
+                        can_delete: can_delete_tag,
+                    },
                     |this, _, cx, color_idx| {
                         if let Some(m) = &mut this.tag_modal {
                             m.selected_color = color_idx;
                             cx.notify();
                         }
                     },
-                    |this, _, cx, name, color_idx| {
+                    |this, window, cx, name, color_idx| {
                         if let Some(m) = &this.tag_modal {
+                            let mut created = false;
                             match &m.mode {
                                 TagModalMode::Create => {
                                     let new_id = this.data.add_tag(name, color_idx);
                                     this.data.active_tag_id = new_id;
+                                    created = true;
                                 }
                                 TagModalMode::Edit { tag_id } => {
                                     this.data.update_tag(tag_id, name, color_idx);
                                 }
                             }
                             TodoModel::save(&this.data, cx);
+                            if created {
+                                this.sidebar_scroll_handle.scroll_to_bottom();
+                            }
                         }
-                        this.tag_modal = None;
-                        cx.notify();
+                        this.close_tag_modal(window, cx);
                     },
-                    |this, _, cx, tag_id| {
+                    |this, window, cx, tag_id| {
                         this.data.delete_tag_and_migrate(&tag_id);
                         TodoModel::save(&this.data, cx);
-                        this.tag_modal = None;
-                        cx.notify();
+                        this.close_tag_modal(window, cx);
                     },
-                    |this, _, cx| {
-                        this.tag_modal = None;
-                        cx.notify();
+                    |this, window, cx| {
+                        this.close_tag_modal(window, cx);
                     },
                     cx,
                 ))

@@ -15,52 +15,47 @@ pub enum TagModalMode {
 /// 标签编辑弹窗状态
 pub struct TagModalState {
     pub mode: TagModalMode,
-    pub name_input: Entity<InputState>,
     pub selected_color: usize,
 }
 
 impl TagModalState {
-    pub fn new_create<V: 'static>(window: &mut Window, cx: &mut Context<V>) -> Self {
-        let name_input = cx.new(|cx| {
-            InputState::new(window, cx)
-                .default_value("新分类".to_string())
-                .placeholder("输入分类名称...")
-        });
+    pub fn new_create() -> Self {
         Self {
             mode: TagModalMode::Create,
-            name_input,
             selected_color: 0,
         }
     }
 
-    pub fn new_edit<V: 'static>(tag: &TodoTag, window: &mut Window, cx: &mut Context<V>) -> Self {
-        let name_input = cx.new(|cx| {
-            InputState::new(window, cx)
-                .default_value(tag.name.clone())
-                .placeholder("输入分类名称...")
-        });
+    pub fn new_edit(tag: &TodoTag) -> Self {
         Self {
             mode: TagModalMode::Edit {
                 tag_id: tag.id.clone(),
             },
-            name_input,
             selected_color: tag.gantt_color % GANTT_COLORS.len(),
         }
     }
 }
 
+/// 标签弹窗渲染参数
+pub struct TagModalProps<'a> {
+    pub modal: &'a TagModalState,
+    pub name_input: &'a Entity<InputState>,
+    pub can_delete: bool,
+}
+
 /// 渲染标签编辑/新建浮层卡片
 pub fn render_tag_modal<V: 'static>(
-    modal: &TagModalState,
-    can_delete: bool,
+    props: TagModalProps<'_>,
     on_select_color: impl Fn(&mut V, &mut Window, &mut Context<V>, usize) + 'static + Clone,
     on_save: impl Fn(&mut V, &mut Window, &mut Context<V>, String, usize) + 'static + Clone,
     on_delete: impl Fn(&mut V, &mut Window, &mut Context<V>, String) + 'static + Clone,
     on_close: impl Fn(&mut V, &mut Window, &mut Context<V>) + 'static + Clone,
     cx: &mut Context<V>,
 ) -> impl IntoElement {
+    let modal = props.modal;
+    let name_input = props.name_input;
+    let can_delete = props.can_delete;
     let mode = modal.mode.clone();
-    let name_input = &modal.name_input;
     let selected_color = modal.selected_color;
     let is_edit = matches!(mode, TagModalMode::Edit { .. });
 

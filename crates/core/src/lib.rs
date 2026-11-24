@@ -155,23 +155,86 @@ impl Global for ReloadExtensionsCallback {}
 pub struct CloseMainWindowCallback(pub std::sync::Arc<dyn Fn(&mut App) + Send + Sync>);
 impl Global for CloseMainWindowCallback {}
 
-/// 立即落盘：克隆数据后交给后台执行器执行 IO，不阻塞 GPUI 主线程
+#[derive(Default)]
+struct PendingSaveState {
+    latest: Option<AppConfig>,
+    running: bool,
+}
+
+static PENDING_SAVE: std::sync::Mutex<PendingSaveState> = std::sync::Mutex::new(PendingSaveState {
+    latest: None,
+    running: false,
+});
+
+/// 保证后台保存循环异常退出时重置 running 标记
+struct SaveRunningGuard {
+    finished_cleanly: bool,
+}
+
+impl Drop for SaveRunningGuard {
+    fn drop(&mut self) {
+        if !self.finished_cleanly {
+            if let Ok(mut state) = PENDING_SAVE.lock() {
+                state.running = false;
+            }
+        }
+    }
+}
+
+/// 立即落盘：使用单飞合并策略在后台线程串行写入最新配置，避免高并发克隆与线程堆膨胀
 /// 在任何 GPUI 事件处理器（subscribe/listener）内都可安全调用
 pub fn save_config_now(cx: &mut App) {
-    // 1. 先克隆好所需数据（短暂借用，立即释放）
+    // 1. 短暂借用并克隆快照与保存回调，随即释放 GPUI 全局借用
     let config = match cx.try_global::<AppConfig>() {
         Some(c) => c.clone(),
         None => return,
     };
     let save_fn = match cx.try_global::<SaveCallback>() {
-        Some(cb) => cb.0.clone(), // 克隆 Arc，立即释放对 SaveCallback 的借用
+        Some(cb) => cb.0.clone(),
         None => return,
     };
 
-    // 2. 将 IO 操作派发到后台线程，完全绕开 GPUI RefCell
+    // 2. 写入最新快照；若已有后台写盘任务在运行则直接合并，不重复派发任务
+    let should_spawn = {
+        let Ok(mut state) = PENDING_SAVE.lock() else {
+            return;
+        };
+        state.latest = Some(config);
+        if state.running {
+            false
+        } else {
+            state.running = true;
+            true
+        }
+    };
+
+    if !should_spawn {
+        return;
+    }
+
+    // 3. 同一时刻最多一个后台任务循环消费最新快照，并在落盘后归还后台线程闲置堆内存
     cx.background_executor()
         .spawn(async move {
-            save_fn(&config);
+            let mut guard = SaveRunningGuard {
+                finished_cleanly: false,
+            };
+            loop {
+                let next = {
+                    let Ok(mut state) = PENDING_SAVE.lock() else {
+                        break;
+                    };
+                    match state.latest.take() {
+                        Some(cfg) => cfg,
+                        None => {
+                            state.running = false;
+                            guard.finished_cleanly = true;
+                            break;
+                        }
+                    }
+                };
+                save_fn(&next);
+                trim_process_memory();
+            }
         })
         .detach();
 }

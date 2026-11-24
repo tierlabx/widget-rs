@@ -345,3 +345,17 @@ fn test_todo_reorder_item() {
         .collect();
     assert_eq!(life_ids, vec!["l1", "l2"]);
 }
+
+#[test]
+fn test_todo_add_tag_rapid_unique_ids() {
+    let mut data = TodoData::default();
+    let mut created_ids = Vec::new();
+    for i in 0..20 {
+        let id = data.add_tag(format!("分类-{i}"), i % GANTT_COLORS.len());
+        created_ids.push(id);
+    }
+
+    let unique: std::collections::HashSet<&str> = created_ids.iter().map(|s| s.as_str()).collect();
+    assert_eq!(unique.len(), 20, "同毫秒内连续添加分类的 ID 必须全部唯一");
+    assert_eq!(data.tags.len(), 4 + 20);
+}

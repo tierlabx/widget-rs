@@ -1,3 +1,4 @@
+mod content_panel;
 mod model;
 #[cfg(test)]
 mod model_tests;

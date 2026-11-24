@@ -57,7 +57,7 @@ pub fn render_todo_item<V: 'static>(
         .cloned();
     let reminder_text = props.item.reminder.as_ref().map(|r| r.display_text());
     let active_tag_id = props.active_tag_id.to_string();
-    let all_tags = props.tags.to_vec();
+    let all_tags = props.tags;
 
     if is_editing {
         let on_confirm = callbacks.on_confirm_edit.clone();
@@ -81,40 +81,32 @@ pub fn render_todo_item<V: 'static>(
                 ),
             )
             .child(
-                div()
-                    .w(px(18.0))
-                    .h(px(18.0))
-                    .flex()
-                    .justify_center()
-                    .items_center()
-                    .rounded(px(3.0))
-                    .cursor_pointer()
-                    .bg(rgba(0x00d99220))
-                    .text_color(rgb(0x00d992))
-                    .hover(|s| s.bg(rgba(0x00d99245)))
-                    .id(ElementId::Name(format!("todo-confirm-{idx}").into()))
-                    .on_click(cx.listener(move |this, _, window, cx| {
+                render_row_icon_btn(
+                    ElementId::Name(format!("todo-confirm-{idx}").into()),
+                    IconName::Check,
+                    (18.0, 9.0),
+                    rgb(0x00d992).into(),
+                    rgba(0x00d99245),
+                    rgb(0x00d992),
+                    cx.listener(move |this, _, window, cx| {
                         on_confirm(this, window, cx, idx);
-                    }))
-                    .child(Icon::new(IconName::Check).size(px(9.0))),
+                    }),
+                )
+                .bg(rgba(0x00d99220)),
             )
             .child(
-                div()
-                    .w(px(18.0))
-                    .h(px(18.0))
-                    .flex()
-                    .justify_center()
-                    .items_center()
-                    .rounded(px(3.0))
-                    .cursor_pointer()
-                    .bg(rgba(0xff4d4d20))
-                    .text_color(rgb(0xff6b6b))
-                    .hover(|s| s.bg(rgba(0xff4d4d40)))
-                    .id(ElementId::Name(format!("todo-del-{idx}").into()))
-                    .on_click(cx.listener(move |this, _, window, cx| {
+                render_row_icon_btn(
+                    ElementId::Name(format!("todo-del-{idx}").into()),
+                    IconName::Delete,
+                    (18.0, 9.0),
+                    rgb(0xff6b6b).into(),
+                    rgba(0xff4d4d40),
+                    rgb(0xff6b6b),
+                    cx.listener(move |this, _, window, cx| {
                         on_delete(this, window, cx, idx);
-                    }))
-                    .child(Icon::new(IconName::Delete).size(px(9.0))),
+                    }),
+                )
+                .bg(rgba(0xff4d4d20)),
             )
             .into_any_element()
     } else {
@@ -300,90 +292,61 @@ pub fn render_todo_item<V: 'static>(
                             .group_hover("todo-row", |s| s.opacity(1.0))
                             .child({
                                 let copy_text = text.clone();
-                                div()
-                                    .w(px(16.0))
-                                    .h(px(16.0))
-                                    .flex_shrink_0()
-                                    .flex()
-                                    .justify_center()
-                                    .items_center()
-                                    .rounded(px(3.0))
-                                    .cursor_pointer()
-                                    .text_color(rgba(0xffffff50))
-                                    .hover(|s| s.bg(rgba(0xffffff15)).text_color(rgb(0x38bdf8)))
-                                    .id(ElementId::Name(format!("todo-copy-{idx}").into()))
-                                    .on_click(cx.listener(move |_this, _, _window, cx| {
+                                render_row_icon_btn(
+                                    ElementId::Name(format!("todo-copy-{idx}").into()),
+                                    IconName::Copy,
+                                    (16.0, 8.5),
+                                    rgba(0xffffff50).into(),
+                                    rgba(0xffffff15),
+                                    rgb(0x38bdf8),
+                                    cx.listener(move |_this, _, _window, cx| {
                                         cx.write_to_clipboard(ClipboardItem::new_string(
                                             copy_text.clone(),
                                         ));
-                                    }))
-                                    .child(Icon::new(IconName::Copy).size(px(8.5)))
+                                    }),
+                                )
                             })
-                            .child(
-                                div()
-                                    .w(px(16.0))
-                                    .h(px(16.0))
-                                    .flex_shrink_0()
-                                    .flex()
-                                    .justify_center()
-                                    .items_center()
-                                    .rounded(px(3.0))
-                                    .cursor_pointer()
-                                    .text_color(if is_expanded {
-                                        rgb(gantt.hex)
-                                    } else {
-                                        rgba(0xffffff50)
-                                    })
-                                    .hover(|s| s.bg(rgba(0xffffff15)).text_color(rgb(0xffffff)))
-                                    .id(ElementId::Name(format!("todo-expand-{idx}").into()))
-                                    .on_click(cx.listener(move |this, _, window, cx| {
-                                        on_expand(this, window, cx, idx);
-                                    }))
-                                    .child(
-                                        Icon::new(if is_expanded {
-                                            IconName::ChevronUp
-                                        } else {
-                                            IconName::ChevronDown
-                                        })
-                                        .size(px(8.5)),
-                                    ),
-                            )
-                            .child(
-                                div()
-                                    .w(px(16.0))
-                                    .h(px(16.0))
-                                    .flex_shrink_0()
-                                    .flex()
-                                    .justify_center()
-                                    .items_center()
-                                    .rounded(px(3.0))
-                                    .cursor_pointer()
-                                    .text_color(rgba(0xffffff50))
-                                    .hover(|s| s.bg(rgba(0xffffff15)).text_color(rgb(0x00d992)))
-                                    .id(ElementId::Name(format!("todo-edit-{idx}").into()))
-                                    .on_click(cx.listener(move |this, _, window, cx| {
-                                        on_edit(this, window, cx, idx);
-                                    }))
-                                    .child(Icon::new(IconName::Redo).size(px(8.5))),
-                            )
-                            .child(
-                                div()
-                                    .w(px(16.0))
-                                    .h(px(16.0))
-                                    .flex_shrink_0()
-                                    .flex()
-                                    .justify_center()
-                                    .items_center()
-                                    .rounded(px(3.0))
-                                    .cursor_pointer()
-                                    .text_color(rgba(0xffffff50))
-                                    .hover(|s| s.bg(rgba(0xff4d4d25)).text_color(rgb(0xff6b6b)))
-                                    .id(ElementId::Name(format!("todo-del-{idx}").into()))
-                                    .on_click(cx.listener(move |this, _, window, cx| {
-                                        on_delete(this, window, cx, idx);
-                                    }))
-                                    .child(Icon::new(IconName::Delete).size(px(8.5))),
-                            ),
+                            .child(render_row_icon_btn(
+                                ElementId::Name(format!("todo-expand-{idx}").into()),
+                                if is_expanded {
+                                    IconName::ChevronUp
+                                } else {
+                                    IconName::ChevronDown
+                                },
+                                (16.0, 8.5),
+                                if is_expanded {
+                                    rgb(gantt.hex).into()
+                                } else {
+                                    rgba(0xffffff50).into()
+                                },
+                                rgba(0xffffff15),
+                                rgb(0xffffff),
+                                cx.listener(move |this, _, window, cx| {
+                                    on_expand(this, window, cx, idx);
+                                }),
+                            ))
+                            .child(render_row_icon_btn(
+                                ElementId::Name(format!("todo-edit-{idx}").into()),
+                                IconName::Redo,
+                                (16.0, 8.5),
+                                rgba(0xffffff50).into(),
+                                rgba(0xffffff15),
+                                rgb(0x00d992),
+                                cx.listener(move |this, _, window, cx| {
+                                    on_edit(this, window, cx, idx);
+                                }),
+                            ))
+                            .child(render_row_icon_btn(
+                                ElementId::Name(format!("todo-del-{idx}").into()),
+                                IconName::Delete,
+                                (16.0, 8.5),
+                                rgba(0xffffff50).into(),
+                                rgba(0xff4d4d25),
+                                rgb(0xff6b6b),
+                                cx.listener(move |this, _, window, cx| {
+                                    on_delete(this, window, cx, idx);
+                                }),
+                            )),
                     ),
             )
             // ── 展开面板 ─────────────────────────────────────
@@ -394,7 +357,7 @@ pub fn render_todo_item<V: 'static>(
                 card.child(render_item_detail(
                     idx,
                     props.item,
-                    &all_tags,
+                    all_tags,
                     props.reminder_presets,
                     move |this, window, cx, idx, tag_id| {
                         on_tag(this, window, cx, idx, tag_id);
@@ -410,4 +373,30 @@ pub fn render_todo_item<V: 'static>(
             })
             .into_any_element()
     }
+}
+
+/// 渲染待办条目操作图标按钮
+fn render_row_icon_btn(
+    id: ElementId,
+    icon: IconName,
+    (box_size, icon_size): (f32, f32),
+    text_color: Hsla,
+    hover_bg: Rgba,
+    hover_color: Rgba,
+    on_click: impl Fn(&ClickEvent, &mut Window, &mut App) + 'static,
+) -> Stateful<Div> {
+    div()
+        .w(px(box_size))
+        .h(px(box_size))
+        .flex_shrink_0()
+        .flex()
+        .justify_center()
+        .items_center()
+        .rounded(px(3.0))
+        .cursor_pointer()
+        .text_color(text_color)
+        .hover(move |s| s.bg(hover_bg).text_color(hover_color))
+        .id(id)
+        .on_click(on_click)
+        .child(Icon::new(icon).size(px(icon_size)))
 }

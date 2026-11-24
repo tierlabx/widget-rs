@@ -82,3 +82,24 @@ fn bench_sticky_notes_lifecycle() {
     );
     assert!(duration.as_millis() < 50, "5000张便签构建应在50ms内完成");
 }
+
+#[test]
+fn test_sticky_reorder_note() {
+    let mut data = StickyData::default();
+    data.current_mut().title = "第一张".to_string();
+    data.new_note();
+    data.current_mut().title = "第二张".to_string();
+    data.new_note();
+    data.current_mut().title = "第三张".to_string();
+
+    // 当前选中第 0 张，向后拖到索引 2 位置
+    data.switch_to(0);
+    assert!(data.reorder_note(0, 2));
+    let titles: Vec<&str> = data.notes.iter().map(|n| n.title.as_str()).collect();
+    assert_eq!(titles, vec!["第二张", "第一张", "第三张"]);
+    assert_eq!(data.current_index, 1);
+
+    // 非法或同位置移动返回 false
+    assert!(!data.reorder_note(1, 1));
+    assert!(!data.reorder_note(0, 10));
+}

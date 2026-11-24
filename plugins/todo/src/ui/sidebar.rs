@@ -44,27 +44,39 @@ impl Render for TagDragPreview {
     }
 }
 
-/// 渲染左侧吸附式分类标签侧边栏（宽度自动，高度固定，支持拖动排序）
+/// 左侧分类侧边栏渲染参数
+pub struct SidebarProps<'a> {
+    pub tags: &'a [TodoTag],
+    pub active_tag_id: &'a str,
+    pub scroll_handle: &'a ScrollHandle,
+}
+
+/// 渲染左侧吸附式分类标签侧边栏（宽度固定，支持独立垂直滚动与拖动排序）
 pub fn render_sidebar<V: 'static>(
-    tags: &[TodoTag],
-    active_tag_id: &str,
+    props: SidebarProps<'_>,
     on_select_tag: impl Fn(&mut V, &mut Window, &mut Context<V>, String) + 'static + Clone,
     on_edit_tag: impl Fn(&mut V, &mut Window, &mut Context<V>, TodoTag) + 'static + Clone,
     on_add_tag_click: impl Fn(&mut V, &mut Window, &mut Context<V>) + 'static + Clone,
     on_reorder_tag: impl Fn(&mut V, &mut Window, &mut Context<V>, usize, usize) + 'static + Clone,
     cx: &mut Context<V>,
 ) -> impl IntoElement {
-    let active_tag_id = active_tag_id.to_string();
+    let tags = props.tags;
+    let active_tag_id = props.active_tag_id.to_string();
+    let scroll_handle = props.scroll_handle;
 
     div()
         .w(px(46.0))
+        .h_full()
+        .min_h_0()
+        .flex_shrink_0()
         .flex()
         .flex_col()
+        .items_stretch()
         .gap(px(3.0))
         .pt(px(16.0))
         .pb(px(8.0))
         .overflow_hidden()
-        // 1. "全部" 分类 Tab（不可拖动）
+        // 1. "全部" 分类 Tab（固定在顶部，不可拖动）
         .child({
             let is_active = active_tag_id == "all";
             let on_select = on_select_tag.clone();
@@ -72,6 +84,7 @@ pub fn render_sidebar<V: 'static>(
                 .relative()
                 .w_full()
                 .h(px(32.0))
+                .flex_shrink_0()
                 .rounded_l(px(8.0))
                 .flex()
                 .items_center()
@@ -117,112 +130,128 @@ pub fn render_sidebar<V: 'static>(
                 }))
                 .child("全部")
         })
-        // 2. 各自定义分类 Tab（可拖动排序）
-        .children(tags.iter().enumerate().map(|(tag_idx, tag)| {
-            let is_active = active_tag_id == tag.id;
-            let tag_clone = tag.clone();
-            let tag_id_clone = tag.id.clone();
-            let tag_color = &GANTT_COLORS[tag.gantt_color % GANTT_COLORS.len()];
-            let on_select = on_select_tag.clone();
-            let on_edit = on_edit_tag.clone();
-            let on_reorder = on_reorder_tag.clone();
-            let contrast_text = tag_color.contrast_text();
-            let preview_text = tag.name.clone();
-            let preview_color = tag_color.hex;
-
+        // 2. 各自定义分类 Tab（独立滚动区，支持拖动排序）
+        .child(
             div()
-                .relative()
+                .id("todo-tabs-scroll")
+                .flex_initial()
+                .min_h_0()
                 .w_full()
-                .h(px(32.0))
-                .rounded_l(px(8.0))
-                .px(px(6.0))
                 .flex()
-                .items_center()
-                .justify_center()
-                .overflow_hidden()
-                .cursor_grab()
-                .text_xs()
-                .font_weight(if is_active {
-                    FontWeight::BOLD
-                } else {
-                    FontWeight::MEDIUM
-                })
-                .text_color(if is_active {
-                    contrast_text
-                } else {
-                    rgba(0xffffffcc).into()
-                })
-                .bg(if is_active {
-                    rgb(tag_color.hex)
-                } else {
-                    rgba(0x0f172a65)
-                })
-                .border_1()
-                .border_color(if is_active {
-                    rgb(0xffffff)
-                } else {
-                    rgba(0xffffff15)
-                })
-                .hover(|s| {
-                    s.bg(if is_active {
-                        rgb(tag_color.hex)
-                    } else {
-                        rgba(0x1e293ba0)
-                    })
-                })
-                // id 必须在 on_drag 之前，将 Div 转为 Stateful<Div>
-                .id(ElementId::Name(format!("todo-tab-{}", tag.id).into()))
-                // 拖拽悬停高亮
-                .drag_over::<DraggedTag>(|s, _, _, _| {
-                    s.border_color(rgb(0x38bdf8)).bg(rgba(0x38bdf820))
-                })
-                // 接受放下：执行排序
-                .on_drop(cx.listener(move |this, drag: &DraggedTag, window, cx| {
-                    on_reorder(this, window, cx, drag.from_idx, tag_idx);
-                }))
-                // 开始拖拽：生成预览
-                .on_drag(DraggedTag { from_idx: tag_idx }, move |_, _, _, cx| {
-                    cx.new(|_| TagDragPreview {
-                        text: preview_text.clone(),
-                        color_hex: preview_color,
-                    })
-                })
-                .on_click(cx.listener({
-                    let tag_id = tag_id_clone.clone();
-                    let on_select = on_select.clone();
-                    move |this, event: &ClickEvent, window, cx| {
-                        if event.click_count() >= 2 {
-                            on_edit(this, window, cx, tag_clone.clone());
-                        } else {
-                            on_select(this, window, cx, tag_id.clone());
-                        }
-                    }
-                }))
-                .child(
+                .flex_col()
+                .items_stretch()
+                .gap(px(3.0))
+                .overflow_x_hidden()
+                .overflow_y_scroll()
+                .track_scroll(scroll_handle)
+                .children(tags.iter().enumerate().map(|(tag_idx, tag)| {
+                    let is_active = active_tag_id == tag.id;
+                    let tag_clone = tag.clone();
+                    let tag_id_clone = tag.id.clone();
+                    let tag_color = &GANTT_COLORS[tag.gantt_color % GANTT_COLORS.len()];
+                    let on_select = on_select_tag.clone();
+                    let on_edit = on_edit_tag.clone();
+                    let on_reorder = on_reorder_tag.clone();
+                    let contrast_text = tag_color.contrast_text();
+                    let preview_text = tag.name.clone();
+                    let preview_color = tag_color.hex;
+
                     div()
-                        .absolute()
-                        .left(px(3.0))
-                        .w(px(4.0))
-                        .h(px(4.0))
-                        .rounded_full()
-                        .bg(if is_active {
+                        .relative()
+                        .w_full()
+                        .h(px(32.0))
+                        .flex_shrink_0()
+                        .rounded_l(px(8.0))
+                        .px(px(6.0))
+                        .flex()
+                        .items_center()
+                        .justify_center()
+                        .overflow_hidden()
+                        .cursor_grab()
+                        .text_xs()
+                        .font_weight(if is_active {
+                            FontWeight::BOLD
+                        } else {
+                            FontWeight::MEDIUM
+                        })
+                        .text_color(if is_active {
                             contrast_text
                         } else {
-                            rgb(tag_color.hex).into()
-                        }),
-                )
-                .child(
-                    div()
-                        .overflow_hidden()
-                        .whitespace_nowrap()
-                        .child(tag.name.clone()),
-                )
-        }))
-        // 3. 底部"+"新建分类按钮
+                            rgba(0xffffffcc).into()
+                        })
+                        .bg(if is_active {
+                            rgb(tag_color.hex)
+                        } else {
+                            rgba(0x0f172a65)
+                        })
+                        .border_1()
+                        .border_color(if is_active {
+                            rgb(0xffffff)
+                        } else {
+                            rgba(0xffffff15)
+                        })
+                        .hover(|s| {
+                            s.bg(if is_active {
+                                rgb(tag_color.hex)
+                            } else {
+                                rgba(0x1e293ba0)
+                            })
+                        })
+                        // id 必须在 on_drag 之前，将 Div 转为 Stateful<Div>
+                        .id(ElementId::Name(format!("todo-tab-{}", tag.id).into()))
+                        // 拖拽悬停高亮
+                        .drag_over::<DraggedTag>(|s, _, _, _| {
+                            s.border_color(rgb(0x38bdf8)).bg(rgba(0x38bdf820))
+                        })
+                        // 接受放下：执行排序
+                        .on_drop(cx.listener(move |this, drag: &DraggedTag, window, cx| {
+                            on_reorder(this, window, cx, drag.from_idx, tag_idx);
+                        }))
+                        // 开始拖拽：生成预览
+                        .on_drag(DraggedTag { from_idx: tag_idx }, move |_, _, _, cx| {
+                            cx.new(|_| TagDragPreview {
+                                text: preview_text.clone(),
+                                color_hex: preview_color,
+                            })
+                        })
+                        .on_click(cx.listener({
+                            let tag_id = tag_id_clone.clone();
+                            let on_select = on_select.clone();
+                            move |this, event: &ClickEvent, window, cx| {
+                                if event.click_count() >= 2 {
+                                    on_edit(this, window, cx, tag_clone.clone());
+                                } else {
+                                    on_select(this, window, cx, tag_id.clone());
+                                }
+                            }
+                        }))
+                        .child(
+                            div()
+                                .absolute()
+                                .left(px(3.0))
+                                .w(px(4.0))
+                                .h(px(4.0))
+                                .rounded_full()
+                                .bg(if is_active {
+                                    contrast_text
+                                } else {
+                                    rgb(tag_color.hex).into()
+                                }),
+                        )
+                        .child(
+                            div()
+                                .overflow_hidden()
+                                .whitespace_nowrap()
+                                .child(tag.name.clone()),
+                        )
+                })),
+        )
+        // 3. 底部"+"新建分类按钮（固定不被挤压）
         .child(
             div()
                 .w_full()
                 .h(px(28.0))
+                .flex_shrink_0()
                 .rounded_l(px(6.0))
                 .flex()
                 .items_center()

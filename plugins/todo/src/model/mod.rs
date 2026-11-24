@@ -305,11 +305,15 @@ impl TodoData {
 
     /// 新增分类标签，返回新标签 ID
     pub fn add_tag(&mut self, name: String, gantt_color: usize) -> String {
-        let now = std::time::SystemTime::now()
+        let mut ts = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap_or_default()
-            .as_secs();
-        let new_id = format!("tag-{}", now);
+            .as_millis();
+        let mut new_id = format!("tag-{ts}");
+        while self.tags.iter().any(|t| t.id == new_id) {
+            ts += 1;
+            new_id = format!("tag-{ts}");
+        }
         self.tags.push(TodoTag {
             id: new_id.clone(),
             name,
@@ -364,11 +368,15 @@ impl TodoData {
 
     /// 新增提醒预设
     pub fn add_preset(&mut self, label: String, rule: ReminderRule) -> String {
-        let now = std::time::SystemTime::now()
+        let mut ts = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap_or_default()
-            .as_secs();
-        let new_id = format!("preset-{}", now);
+            .as_millis();
+        let mut new_id = format!("preset-{ts}");
+        while self.reminder_presets.iter().any(|p| p.id == new_id) {
+            ts += 1;
+            new_id = format!("preset-{ts}");
+        }
         self.reminder_presets.push(ReminderPreset {
             id: new_id.clone(),
             label,

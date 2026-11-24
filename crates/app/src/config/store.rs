@@ -10,6 +10,8 @@ use super::migration;
 pub struct Store {
     /// SQLite 数据库文件路径（通常为 `%APPDATA%\tierlabx\widget-rs\config.db`）
     db_path: PathBuf,
+    /// 串行化数据库写入，防止多任务并发写盘引发锁竞争与临时堆扩张
+    write_lock: std::sync::Mutex<()>,
 }
 
 impl Store {
@@ -30,7 +32,10 @@ impl Store {
             fallback.join("config.db")
         };
 
-        let store = Self { db_path };
+        let store = Self {
+            db_path,
+            write_lock: std::sync::Mutex::new(()),
+        };
         if let Err(e) = store.init_db() {
             eprintln!("[Store] 初始化数据库失败: {}", e);
         }
@@ -45,7 +50,10 @@ impl Store {
                 let _ = fs::create_dir_all(parent);
             }
         }
-        let store = Self { db_path };
+        let store = Self {
+            db_path,
+            write_lock: std::sync::Mutex::new(()),
+        };
         if let Err(e) = store.init_db() {
             eprintln!("[Store] 初始化数据库失败: {}", e);
         }
@@ -59,7 +67,8 @@ impl Store {
             "PRAGMA journal_mode = WAL;
              PRAGMA synchronous = NORMAL;
              PRAGMA foreign_keys = ON;
-             PRAGMA cache_size = -500;
+             PRAGMA cache_size = -128;
+             PRAGMA busy_timeout = 3000;
              PRAGMA temp_store = MEMORY;
              PRAGMA mmap_size = 0;",
         )?;
@@ -242,15 +251,24 @@ impl Store {
             ])?;
         }
 
-        // 2. 保存 plugin_configs
-        {
-            // 清理旧的记录并写入最新记录，保证与 HashMap 状态严格一致
+        // 2. 保存 plugin_configs（UPSERT 并清理已移除记录）
+        if config.plugins.is_empty() {
             tx.execute("DELETE FROM plugin_configs", [])?;
+        } else {
+            Self::prune_stale_rows(&tx, "plugin_configs", &config.plugins)?;
             let mut stmt = tx.prepare(
                 "INSERT INTO plugin_configs (
                     id, x, y, width, height, scale, phys_x, phys_y, phys_w, phys_h,
                     always_on_top, mouse_passthrough, pinned_to_desktop, loaded, enabled
-                 ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15)",
+                 ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15)
+                 ON CONFLICT(id) DO UPDATE SET
+                    x = excluded.x, y = excluded.y, width = excluded.width, height = excluded.height,
+                    scale = excluded.scale, phys_x = excluded.phys_x, phys_y = excluded.phys_y,
+                    phys_w = excluded.phys_w, phys_h = excluded.phys_h,
+                    always_on_top = excluded.always_on_top,
+                    mouse_passthrough = excluded.mouse_passthrough,
+                    pinned_to_desktop = excluded.pinned_to_desktop,
+                    loaded = excluded.loaded, enabled = excluded.enabled",
             )?;
             for (id, p) in &config.plugins {
                 stmt.execute(rusqlite::params![
@@ -273,10 +291,16 @@ impl Store {
             }
         }
 
-        // 3. 保存 plugin_data
-        {
+        // 3. 保存 plugin_data（仅在内容变更时更新，跳过未变化插件写页）
+        if config.plugin_data.is_empty() {
             tx.execute("DELETE FROM plugin_data", [])?;
-            let mut stmt = tx.prepare("INSERT INTO plugin_data (id, data) VALUES (?1, ?2)")?;
+        } else {
+            Self::prune_stale_rows(&tx, "plugin_data", &config.plugin_data)?;
+            let mut stmt = tx.prepare(
+                "INSERT INTO plugin_data (id, data) VALUES (?1, ?2)
+                 ON CONFLICT(id) DO UPDATE SET data = excluded.data
+                 WHERE data != excluded.data",
+            )?;
             for (id, val) in &config.plugin_data {
                 let json_str = serde_json::to_string(val).unwrap_or_default();
                 stmt.execute(rusqlite::params![id, json_str])?;
@@ -287,8 +311,33 @@ impl Store {
         Ok(())
     }
 
+    /// 仅删除表中已不存在于内存集合的过期记录
+    fn prune_stale_rows<V>(
+        tx: &rusqlite::Transaction<'_>,
+        table: &str,
+        active: &std::collections::HashMap<String, V>,
+    ) -> rusqlite::Result<()> {
+        let query = format!("SELECT id FROM {table}");
+        let stale_ids: Vec<String> = {
+            let mut stmt = tx.prepare(&query)?;
+            let rows = stmt.query_map([], |row| row.get::<_, String>(0))?;
+            rows.flatten()
+                .filter(|id| !active.contains_key(id.as_str()))
+                .collect()
+        };
+        if !stale_ids.is_empty() {
+            let del_sql = format!("DELETE FROM {table} WHERE id = ?1");
+            let mut del_stmt = tx.prepare(&del_sql)?;
+            for id in stale_ids {
+                del_stmt.execute(rusqlite::params![id])?;
+            }
+        }
+        Ok(())
+    }
+
     /// 保存配置到 SQLite 数据库
     pub fn save_config(&self, config: &AppConfig) {
+        let _guard = self.write_lock.lock().unwrap_or_else(|e| e.into_inner());
         let mut conn = match self.open_connection() {
             Ok(c) => c,
             Err(e) => {
