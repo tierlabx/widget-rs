@@ -6,6 +6,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+## [0.10.5](https://github.com/tierlabx/widget-rs/releases/tag/v0.10.5) - 2026-11-27
+
+### Fixed
+
+- 修复 Win+D 后小组件被桌面遮挡的回归问题并补充防回归测试
+- 遗漏提交
+- 优化便签与待办内存占用并修复侧边栏 Tab 滚动问题
+
 ## [0.10.4](https://github.com/tierlabx/widget-rs/releases/tag/v0.10.4) - 2026-09-24
 
 ### Fixed
