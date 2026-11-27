@@ -2,9 +2,55 @@ use std::sync::{Mutex, OnceLock};
 
 pub static WND_PROCS: OnceLock<Mutex<std::collections::HashMap<isize, isize>>> = OnceLock::new();
 
+/// 判断在 `WM_WINDOWPOSCHANGING` 中是否应阻断被动 Z 序联动置前。
+///
+/// 共享桌面宿主（`Progman`/`WorkerW`）的所有小组件构成同一个 Win32 Owner 组：
+/// 当用户点击某个兄弟小组件时，系统会自动把同组其他小组件也拉到前台。
+/// 但若直接一刀切拦截所有 `!self_active` 的 Z 序变更，会把 `Win+D`（显示桌面）时
+/// 系统将小组件随桌面抬升到桌面之上的 Z 序提升也一并拦死，导致小组件被压在桌面背后。
+///
+/// 因此仅当以下条件同时满足时才追加 `SWP_NOZORDER` 阻断组联动：
+/// - 本次操作包含 Z 序变更，且既不是置顶/取消置顶，当前窗口也未处于显式置顶或显式放行状态；
+/// - 当前窗口自身并非激活或前台窗口；
+/// - 当前真正处于前台（或焦点切换瞬间处于激活）的窗口是本进程注册的其他兄弟小组件。
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn should_block_sibling_zorder_change(
+    hwnd: isize,
+    flags: u32,
+    hwnd_insert_after: isize,
+    is_topmost: bool,
+    active_hwnd: isize,
+    foreground_hwnd: isize,
+    explicit_allowed: bool,
+    is_registered_widget: impl Fn(isize) -> bool,
+) -> bool {
+    use windows_sys::Win32::UI::WindowsAndMessaging::{HWND_NOTOPMOST, HWND_TOPMOST, SWP_NOZORDER};
+
+    let z_change = (flags & SWP_NOZORDER) == 0;
+    if !z_change || is_topmost || explicit_allowed {
+        return false;
+    }
+
+    let topmost_op = hwnd_insert_after == HWND_TOPMOST || hwnd_insert_after == HWND_NOTOPMOST;
+    if topmost_op {
+        return false;
+    }
+
+    let self_active = active_hwnd == hwnd || foreground_hwnd == hwnd;
+    if self_active {
+        return false;
+    }
+
+    if foreground_hwnd != 0 {
+        is_registered_widget(foreground_hwnd)
+    } else {
+        active_hwnd != 0 && is_registered_widget(active_hwnd)
+    }
+}
+
 /// 插件窗口的消息处理回调。
 ///
-/// 负责处理边界吸附、防止失去焦点以及鼠标交互穿透等特定需求。
+/// 负责处理边界吸附、防最小化保护、独立聚焦 Z 序隔离以及鼠标交互穿透等特定需求。
 pub unsafe extern "system" fn plugin_wnd_proc(
     hwnd: isize,
     msg: u32,
@@ -28,6 +74,13 @@ pub unsafe extern "system" fn plugin_wnd_proc(
 
     if msg == windows_sys::Win32::UI::WindowsAndMessaging::WM_NCCALCSIZE && wparam != 0 {
         // 彻底消除 Windows 10/11 的 Invisible resize border 带来的隐形缩放边框与吸附空隙
+        return 0;
+    }
+
+    // 阻止系统级最小化命令（如 Win+M / 窗口系统菜单最小化）将桌面小组件最小化
+    if msg == windows_sys::Win32::UI::WindowsAndMessaging::WM_SYSCOMMAND
+        && (wparam & 0xFFF0) == windows_sys::Win32::UI::WindowsAndMessaging::SC_MINIMIZE as usize
+    {
         return 0;
     }
 
@@ -56,29 +109,33 @@ pub unsafe extern "system" fn plugin_wnd_proc(
             use windows_sys::Win32::UI::WindowsAndMessaging::WINDOWPOS;
             let pos = &mut *(lparam as *mut WINDOWPOS);
 
-            // 【核心修复 - 独立聚焦】阻断共享 Progman Owner 的组件间“组式 Z 序联动置前”
-            // ─────────────────────────────────────────────────────────────────────────────
-            // 根因：所有小组件都挂载到 Progman（Win+D 桌面常驻能力，见 styles.rs 第 5 步），
-            // 同 Owner 的窗口构成 Z 序联动组：激活任意一个，Windows 会把同组兄弟窗口全部
-            // 拉到前台，表现为“点击一个小组件，其他全部聚焦”。
-            // 修复：在 WM_WINDOWPOSCHANGING 中，对“非激活窗口的被动 Z 序变更”追加
-            // SWP_NOZORDER，仅放行被点击窗口自身的置前与显式置顶操作，
-            // 保持各小组件聚焦独立（已通过 .tmp-ztest/ztest.cs 复现并验证）。
-            // ─────────────────────────────────────────────────────────────────────────────
+            // 【核心修复 - 独立聚焦与 Win+D 兼容】仅阻断由兄弟小组件引发的组式 Z 序联动
             {
                 use windows_sys::Win32::UI::Input::KeyboardAndMouse::GetActiveWindow;
                 use windows_sys::Win32::UI::WindowsAndMessaging::{
-                    GetForegroundWindow, GetWindowLongW, GWL_EXSTYLE, HWND_NOTOPMOST, HWND_TOPMOST,
-                    SWP_NOZORDER, WS_EX_TOPMOST,
+                    GetForegroundWindow, GetWindowLongW, GWL_EXSTYLE, SWP_NOZORDER, WS_EX_TOPMOST,
                 };
-                let z_change = (pos.flags & SWP_NOZORDER) == 0;
-                let topmost_op =
-                    pos.hwndInsertAfter == HWND_TOPMOST || pos.hwndInsertAfter == HWND_NOTOPMOST;
                 let is_topmost = (GetWindowLongW(hwnd, GWL_EXSTYLE) & WS_EX_TOPMOST as i32) != 0;
-                let self_active = GetActiveWindow() == hwnd || GetForegroundWindow() == hwnd;
+                let active_hwnd = GetActiveWindow();
+                let foreground_hwnd = GetForegroundWindow();
                 let explicit_allowed =
                     widget_core::ALLOW_EXPLICIT_ZORDER.load(std::sync::atomic::Ordering::SeqCst);
-                if z_change && !topmost_op && !self_active && !is_topmost && !explicit_allowed {
+                let block = should_block_sibling_zorder_change(
+                    hwnd,
+                    pos.flags,
+                    pos.hwndInsertAfter,
+                    is_topmost,
+                    active_hwnd,
+                    foreground_hwnd,
+                    explicit_allowed,
+                    |other| {
+                        WND_PROCS
+                            .get()
+                            .and_then(|procs| procs.lock().ok())
+                            .is_some_and(|guard| guard.contains_key(&other))
+                    },
+                );
+                if block {
                     pos.flags |= SWP_NOZORDER;
                 }
             }
@@ -218,7 +275,8 @@ pub fn show_plugin_window(hwnd: isize, visible: bool) {
     println!("[WindowManager] HWND {} 可见性: {}", hwnd, visible);
 }
 
-/// 销毁给定的 HWND 窗口句柄。
+/// 销毁给定的 HWND 窗口句柄（注意：严禁对系统桌面宿主 Progman/WorkerW 调用）。
+#[allow(dead_code)]
 pub fn destroy_window(hwnd: isize) {
     if hwnd != 0 {
         unsafe {

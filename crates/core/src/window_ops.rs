@@ -94,12 +94,64 @@ pub static ALLOW_EXPLICIT_ZORDER: AtomicBool = AtomicBool::new(false);
 /// 触发 `WindowManager::reposition_all_to_valid_screens` 自动将离屏插件归位。
 pub static DISPLAY_CHANGED: AtomicBool = AtomicBool::new(false);
 
+/// 查找用于挂载桌面小组件的系统桌面宿主 HWND（优先 `Progman`，兼容 `WorkerW`）。
+///
+/// 在不同 Windows 版本或启用动态壁纸/幻灯片切换时，包含图标视图 `SHELLDLL_DefView` 的桌面宿主
+/// 可能位于 `Progman` 下，也可能迁移至顶层 `WorkerW` 窗口。若找不到 `SHELLDLL_DefView`，
+/// 则回退返回 `Progman` 句柄；在非 Windows 平台上返回 `0`。
+pub fn find_desktop_owner_hwnd() -> isize {
+    #[cfg(target_os = "windows")]
+    unsafe {
+        use windows_sys::Win32::UI::WindowsAndMessaging::{FindWindowExW, FindWindowW};
+
+        let progman = FindWindowW(windows_sys::core::w!("Progman"), std::ptr::null());
+        if progman != 0
+            && FindWindowExW(
+                progman,
+                0,
+                windows_sys::core::w!("SHELLDLL_DefView"),
+                std::ptr::null(),
+            ) != 0
+        {
+            return progman;
+        }
+
+        let mut worker = 0isize;
+        loop {
+            worker = FindWindowExW(
+                0,
+                worker,
+                windows_sys::core::w!("WorkerW"),
+                std::ptr::null(),
+            );
+            if worker == 0 {
+                break;
+            }
+            if FindWindowExW(
+                worker,
+                0,
+                windows_sys::core::w!("SHELLDLL_DefView"),
+                std::ptr::null(),
+            ) != 0
+            {
+                return worker;
+            }
+        }
+
+        progman
+    }
+    #[cfg(not(target_os = "windows"))]
+    {
+        0
+    }
+}
+
 /// 设置或取消窗口的系统级置顶状态（Always on Top）
 ///
 /// 遵循 Win32 窗口体系规范：
-/// - 置顶时：将小组件解绑 Progman 桌面宿主（GWLP_HWNDPARENT = 0），并赋予 HWND_TOPMOST 成为全局悬浮置顶窗。
-///   根因：Win32 规定非置顶窗口（Progman）不能作为置顶窗口的宿主，若不解绑会被锁死在底层桌面而被编辑器等遮挡。
-/// - 取消置顶时：使用 HWND_NOTOPMOST 撤销置顶，并重新挂载回 Progman 桌面窗口以恢复 Win+D 桌面常驻特性。
+/// - 置顶时：将小组件解绑桌面宿主（GWLP_HWNDPARENT = 0），并赋予 HWND_TOPMOST 成为全局悬浮置顶窗。
+///   根因：Win32 规定非置顶窗口（Progman/WorkerW）不能作为置顶窗口的宿主，若不解绑会被锁死在底层桌面而被编辑器等遮挡。
+/// - 取消置顶时：使用 HWND_NOTOPMOST 撤销置顶，并重新挂载回桌面宿主窗口以恢复 Win+D 桌面常驻特性。
 pub fn set_window_always_on_top(hwnd: isize, always_on_top: bool) {
     if hwnd == 0 {
         return;
@@ -107,16 +159,15 @@ pub fn set_window_always_on_top(hwnd: isize, always_on_top: bool) {
     #[cfg(target_os = "windows")]
     unsafe {
         use windows_sys::Win32::UI::WindowsAndMessaging::{
-            BringWindowToTop, FindWindowW, SetWindowLongPtrW, SetWindowPos, GWLP_HWNDPARENT,
-            HWND_NOTOPMOST, HWND_TOPMOST, SWP_FRAMECHANGED, SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOSIZE,
-            SWP_SHOWWINDOW,
+            BringWindowToTop, SetWindowLongPtrW, SetWindowPos, GWLP_HWNDPARENT, HWND_NOTOPMOST,
+            HWND_TOPMOST, SWP_FRAMECHANGED, SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOSIZE, SWP_SHOWWINDOW,
         };
 
         // 显式允许本次 Z 序变更，避免窗口过程拦截
         ALLOW_EXPLICIT_ZORDER.store(true, Ordering::SeqCst);
 
         if always_on_top {
-            // 1. 置顶窗口脱离 Progman 宿主
+            // 1. 置顶窗口脱离桌面宿主
             SetWindowLongPtrW(hwnd, GWLP_HWNDPARENT, 0);
 
             // 2. 赋予全局 TOPMOST 状态并刷新显示
@@ -144,10 +195,10 @@ pub fn set_window_always_on_top(hwnd: isize, always_on_top: bool) {
                 SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_FRAMECHANGED,
             );
 
-            // 2. 重新挂载到 Progman 桌面窗口（恢复 Win+D 桌面常驻能力）
-            let progman = FindWindowW(windows_sys::core::w!("Progman"), std::ptr::null());
-            if progman != 0 {
-                SetWindowLongPtrW(hwnd, GWLP_HWNDPARENT, progman);
+            // 2. 重新挂载到桌面宿主窗口（恢复 Win+D 桌面常驻能力）
+            let desktop_owner = find_desktop_owner_hwnd();
+            if desktop_owner != 0 {
+                SetWindowLongPtrW(hwnd, GWLP_HWNDPARENT, desktop_owner);
             }
         }
 

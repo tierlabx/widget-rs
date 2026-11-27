@@ -126,12 +126,13 @@ impl WindowManager {
             .insert(id.to_string(), (handle, hwnd, 0));
     }
 
-    /// 移除插件窗口记录，同时销毁关联的隐藏 Owner 窗口
+    /// 移除插件窗口记录。
+    ///
+    /// 注意：`owner_hwnd` 指向系统桌面宿主（`Progman`/`WorkerW`），绝不可对其调用 `DestroyWindow`。
     pub fn remove_widget_window(&mut self, id: &str) {
         if let Some((_, _, owner_hwnd)) = self.widget_windows.remove(id) {
-            crate::window::platform::windows::destroy_window(owner_hwnd);
             println!(
-                "[WindowManager] 已销毁插件 {} 的隐藏 Owner HWND: {}",
+                "[WindowManager] 已移除插件 {} 窗口记录（保留系统桌面宿主 HWND: {}）",
                 id, owner_hwnd
             );
         }

@@ -73,7 +73,9 @@ trigger: always_on
 ## 5. 核心窗口能力保护规范 (Core Window Behaviors)
 - **Win+D 桌面常驻特性**：
   - 桌面小组件的核心定位是“融入桌面”，用户按 `Win+D`（显示桌面）时，普通小组件**必须始终与桌面一同保留**，绝不能随普通应用程序被最小化或隐藏。
-  - 实现机制：必须在 `apply_plugin_window_styles` 中通过 `GWLP_HWNDPARENT` 将小组件挂载到系统 `Progman`（桌面窗口）。**严禁**在后续重构或修改中漏掉或移除此桌面绑定逻辑。
+  - 实现机制：必须在 `apply_plugin_window_styles` 和取消置顶时统一调用 `widget_core::find_desktop_owner_hwnd()`（兼容系统 `Progman` 与承载 `SHELLDLL_DefView` 的 `WorkerW`）并通过 `GWLP_HWNDPARENT` 挂载。**严禁**在后续重构或修改中漏掉或移除此桌面绑定逻辑。
+  - **独立聚焦与 Win+D 兼容性禁令**：在 `plugin_wnd_proc` 的 `WM_WINDOWPOSCHANGING` 中阻断同宿主兄弟小组件 Z 序联动时，**严禁**一刀切拦截所有 `!self_active` 的 Z 序变更（否则会拦截 `Win+D` 时系统随桌面抬升小组件的 Z 序提升，导致小组件被压在桌面背后）；必须通过 `should_block_sibling_zorder_change` 仅拦截前台/激活窗口为本进程其他小组件的情况，并确保 [tests.rs](file:///F:/03_OpenSource/widget-rs/crates/app/src/window/platform/tests.rs) 全部通过。
+  - **严禁销毁系统桌面宿主**：在卸载或移除插件窗口记录时，**严禁**对 `owner_hwnd`（系统 `Progman`/`WorkerW`）调用 `DestroyWindow`。
 - **置顶与取消置顶标准**：
   - 置顶必须使用 `HWND_TOPMOST`（`-1`），取消置顶**必须**使用 `HWND_NOTOPMOST`（`-2`），**严禁**误用 `HWND_BOTTOM`（`1`）。
   - 所有置顶/取消置顶操作必须统一调用 `widget_core::set_window_always_on_top(hwnd, is_top)`，避免重复手写 Win32 常量。

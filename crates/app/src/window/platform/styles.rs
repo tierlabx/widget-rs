@@ -11,11 +11,11 @@ pub fn apply_plugin_window_styles(hwnd: isize, id: &str, config: Option<&AppConf
         use windows_sys::Win32::UI::WindowsAndMessaging::{
             GetWindowLongW, SetWindowLongPtrW, SetWindowLongW, SetWindowPos, GWLP_WNDPROC,
             GWL_EXSTYLE, GWL_STYLE, SWP_FRAMECHANGED, SWP_NOMOVE, SWP_NOSIZE, SWP_NOZORDER,
-            WS_BORDER, WS_CAPTION, WS_EX_CLIENTEDGE, WS_EX_TOOLWINDOW, WS_EX_WINDOWEDGE, WS_POPUP,
-            WS_SYSMENU, WS_THICKFRAME,
+            WS_BORDER, WS_CAPTION, WS_EX_APPWINDOW, WS_EX_CLIENTEDGE, WS_EX_TOOLWINDOW,
+            WS_EX_WINDOWEDGE, WS_MAXIMIZEBOX, WS_MINIMIZEBOX, WS_POPUP, WS_SYSMENU, WS_THICKFRAME,
         };
 
-        // 1. 纯净设置 Window Style
+        // 1. 纯净设置 Window Style（清除最小化/最大化按钮样式，防止系统将其视作可最小化窗口）
         let style = GetWindowLongW(hwnd, GWL_STYLE);
         SetWindowLongW(
             hwnd,
@@ -24,16 +24,19 @@ pub fn apply_plugin_window_styles(hwnd: isize, id: &str, config: Option<&AppConf
                 & !(WS_CAPTION as i32)
                 & !(WS_THICKFRAME as i32)
                 & !(WS_BORDER as i32)
-                & !(WS_SYSMENU as i32))
+                & !(WS_SYSMENU as i32)
+                & !(WS_MINIMIZEBOX as i32)
+                & !(WS_MAXIMIZEBOX as i32))
                 | WS_POPUP as i32,
         );
 
-        // 2. 纯净设置 Extended Style（保留 TOOLWINDOW，清除无用边框）
+        // 2. 纯净设置 Extended Style（保留 TOOLWINDOW，清除 APPWINDOW 与无用边框）
         let ex_style = GetWindowLongW(hwnd, GWL_EXSTYLE);
         SetWindowLongW(
             hwnd,
             GWL_EXSTYLE,
             (ex_style | WS_EX_TOOLWINDOW as i32)
+                & !(WS_EX_APPWINDOW as i32)
                 & !(WS_EX_CLIENTEDGE as i32)
                 & !(WS_EX_WINDOWEDGE as i32),
         );
@@ -115,21 +118,18 @@ pub fn apply_plugin_window_styles(hwnd: isize, id: &str, config: Option<&AppConf
             SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_FRAMECHANGED,
         );
 
-        // 5. 【核心能力 - 严禁删除/修改】将小部件挂载到系统 Progman 桌面窗口
+        // 5. 【核心能力 - 严禁删除/修改】将小部件挂载到系统桌面宿主窗口（Progman / WorkerW）
         // ─────────────────────────────────────────────────────────────────────────────
-        // 核心机制：小组件作为桌面部件，必须作为桌面窗口（Progman）的 Owned 窗口存在。
-        // 当用户按下 Win+D（显示桌面 / ToggleDesktop）时，系统会最小化所有普通应用程序并拉起桌面。
-        // 通过 GWLP_HWNDPARENT 将小部件绑定到 Progman 后，小部件会随桌面一同保留在屏幕上，
+        // 核心机制：小组件作为桌面部件，必须作为桌面宿主窗口的 Owned 窗口存在。
+        // 当用户按下 Win+D（显示桌面 / ToggleDesktop）时，系统会最小化所有普通应用程序并抬升桌面。
+        // 通过 GWLP_HWNDPARENT 将小部件绑定到桌面宿主后，小部件会随桌面一同保留在屏幕上，
         // 绝不会随普通软件被最小化隐藏。任何后续重构严禁移除此逻辑！
         // ─────────────────────────────────────────────────────────────────────────────
-        let progman = windows_sys::Win32::UI::WindowsAndMessaging::FindWindowW(
-            windows_sys::core::w!("Progman"),
-            std::ptr::null(),
-        );
-        if progman != 0 {
+        let desktop_owner = widget_core::find_desktop_owner_hwnd();
+        if desktop_owner != 0 {
             use windows_sys::Win32::UI::WindowsAndMessaging::GWLP_HWNDPARENT;
-            SetWindowLongPtrW(hwnd, GWLP_HWNDPARENT, progman);
-            // 挂载 Progman 后必须刷新帧，让 DWM 在多屏场景下重新评估窗口坐标系
+            SetWindowLongPtrW(hwnd, GWLP_HWNDPARENT, desktop_owner);
+            // 挂载桌面宿主后必须刷新帧，让 DWM 在多屏场景下重新评估窗口坐标系
             SetWindowPos(
                 hwnd,
                 0,
@@ -168,7 +168,7 @@ pub fn apply_plugin_window_styles(hwnd: isize, id: &str, config: Option<&AppConf
             }
         }
 
-        progman
+        desktop_owner
     }
 }
 
